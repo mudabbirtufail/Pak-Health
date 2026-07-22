@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pak Health</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #F1F4F2;
+    --paper: #FFFFFF;
+    --ink: #17242E;
+    --ink-soft: #4C5A62;
+    --muted: #7C8A8F;
+    --line: #D8E0DC;
+    --teal: #1F6F63;
+    --teal-dark: #16544B;
+    --teal-wash: #E4EFEC;
+    --red: #A22D3B;
+    --red-wash: #F6E7E7;
+    --amber: #97672A;
+    --amber-wash: #F3ECDF;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(23,36,46,0.06), 0 8px 24px rgba(23,36,46,0.06);
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  h1,h2,h3{ font-family: 'Spectral', serif; margin: 0; color: var(--ink); }
+  .mono{ font-family: 'IBM Plex Mono', monospace; }
+  a{ color: inherit; }
+  button{ font-family: inherit; cursor: pointer; }
+  ::selection{ background: var(--teal); color: white; }
+  :focus-visible{ outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  .hidden{ display:none !important; }
+  .view{ min-height: 100vh; display:flex; flex-direction:column; }
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 18px 32px; border-bottom: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .wordmark{ display:flex; align-items:center; gap:10px; font-family:'Spectral', serif; font-weight:600; font-size:1.25rem; letter-spacing:0.01em; }
+  .wordmark svg{ flex-shrink:0; }
+  .topbar-right{ display:flex; align-items:center; gap:14px; }
+  .role-chip{
+    font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em;
+    color: var(--muted); border:1px solid var(--line); border-radius:999px; padding:4px 10px;
+  }
+  .link-btn{
+    background:none; border:none; color:var(--ink-soft); font-size:0.88rem; text-decoration:underline;
+    text-underline-offset:3px; padding:4px 2px;
+  }
+  .link-btn:hover{ color: var(--red); }
+
+  /* ---------- Pulse divider (signature motif) ---------- */
+  .pulse{ width:100%; display:block; overflow:hidden; }
+  .pulse path{
+    fill:none; stroke: var(--red); stroke-width:3; stroke-linecap:round; stroke-linejoin:round;
+  }
+  @media (prefers-reduced-motion: no-preference){
+    .pulse.animate path{
+      stroke-dasharray: 2400;
+      stroke-dashoffset: 2400;
+      animation: draw 1.7s ease-out forwards;
+    }
+  }
+  @keyframes draw{ to{ stroke-dashoffset: 0; } }
+
+  /* ---------- Landing ---------- */
+  .landing-main{ flex:1; display:flex; flex-direction:column; }
+  .hero{ padding: 56px 32px 28px; max-width: 900px; }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:0.75rem; letter-spacing:0.14em;
+    text-transform:uppercase; color: var(--teal-dark); margin-bottom:14px; display:block;
+  }
+  .hero h1{ font-size: clamp(2.1rem, 5vw, 3.2rem); font-weight:600; line-height:1.08; }
+  .hero p{ color: var(--ink-soft); font-size:1.05rem; max-width:520px; margin-top:14px; line-height:1.55; }
+
+  .choices{ flex:1; display:grid; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 760px){ .choices{ grid-template-columns: 1fr; } }
+  .choice{
+    position:relative; padding: 44px 40px; display:flex; flex-direction:column; justify-content:flex-end;
+    min-height: 320px; border-top:1px solid var(--line); text-align:left;
+    background: var(--paper); border:none; border-left:1px solid var(--line);
+    transition: background 0.25s ease;
+  }
+  .choice:first-child{ border-left:none; }
+  .choice:hover, .choice:focus-visible{ background: var(--teal-wash); }
+  .choice .num{ font-family:'IBM Plex Mono', monospace; font-size:0.78rem; color:var(--muted); margin-bottom:20px; }
+  .choice h2{ font-size:1.7rem; font-weight:600; margin-bottom:10px; }
+  .choice p{ color: var(--ink-soft); font-size:0.96rem; max-width:340px; line-height:1.5; margin-bottom:22px; }
+  .choice .go{ display:flex; align-items:center; gap:8px; font-weight:600; color: var(--teal-dark); font-size:0.94rem; }
+  .choice .go svg{ transition: transform 0.2s ease; }
+  .choice:hover .go svg{ transform: translateX(4px); }
+  .choice-icon{ position:absolute; top:40px; right:40px; opacity:0.9; }
+
+  .landing-footer{
+    padding: 18px 32px; border-top:1px solid var(--line); background: var(--paper);
+    font-size:0.78rem; color: var(--muted); line-height:1.5;
+  }
+
+  /* ---------- Auth ---------- */
+  .auth-wrap{ flex:1; display:flex; align-items:flex-start; justify-content:center; padding: 48px 20px; }
+  .auth-card{
+    width:100%; max-width: 440px; background: var(--paper); border:1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px;
+  }
+  .auth-back{ font-size:0.85rem; color:var(--muted); text-decoration:none; display:inline-flex; align-items:center; gap:6px; margin-bottom:18px; background:none; border:none; padding:0; }
+  .auth-back:hover{ color: var(--red); }
+  .auth-title{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .auth-title h2{ font-size:1.5rem; }
+  .auth-sub{ color: var(--ink-soft); font-size:0.9rem; margin-bottom:22px; }
+
+  .tabs{ display:flex; border-bottom:1px solid var(--line); margin-bottom:22px; }
+  .tab{
+    flex:1; background:none; border:none; padding:10px 0; font-size:0.9rem; font-weight:600;
+    color: var(--muted); border-bottom:2px solid transparent; margin-bottom:-1px;
+  }
+  .tab.active{ color: var(--ink); border-bottom-color: var(--red); }
+
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:0.8rem; font-weight:600; color: var(--ink-soft); margin-bottom:6px; }
+  .field .hint{ font-size:0.76rem; color:var(--muted); margin-top:5px; }
+  input[type=text], input[type=email], input[type=tel], input[type=date], input[type=password], select, textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:6px;
+    font-family:'IBM Plex Sans', sans-serif; font-size:0.94rem; background: var(--paper); color: var(--ink);
+  }
+  input:focus, select:focus, textarea:focus{ border-color: var(--teal); }
+  textarea{ resize: vertical; min-height:70px; line-height:1.5; }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    padding:12px 20px; border-radius:6px; border:1px solid transparent; font-weight:600; font-size:0.92rem;
+  }
+  .btn-primary{ background: var(--teal); color:white; width:100%; }
+  .btn-primary:hover{ background: var(--teal-dark); }
+  .btn-secondary{ background: var(--paper); color: var(--ink); border-color: var(--line); }
+  .btn-secondary:hover{ border-color: var(--ink); }
+  .btn-block{ width:100%; }
+  .btn:disabled{ opacity:0.55; cursor:not-allowed; }
+
+  .error-text{ color: var(--red); font-size:0.85rem; margin-top:10px; display:none; }
+  .error-text.show{ display:block; }
+
+  /* ---------- Tear-off code card ---------- */
+  .tearoff{
+    position:relative; background: var(--paper); border:1.5px dashed var(--muted);
+    border-radius: 10px; padding: 22px 22px 20px; text-align:center; margin: 4px 0 18px;
+  }
+  .tearoff::before, .tearoff::after{
+    content:""; position:absolute; top:50%; width:18px; height:18px; background: var(--bg);
+    border-radius:50%; transform: translateY(-50%);
+  }
+  .tearoff::before{ left:-10px; }
+  .tearoff::after{ right:-10px; }
+  .tearoff .eyebrow{ margin-bottom:8px; }
+  .tearoff .code{ font-family:'IBM Plex Mono', monospace; font-size:2rem; letter-spacing:0.06em; font-weight:600; color: var(--ink); }
+  .tearoff .code-actions{ margin-top:14px; display:flex; gap:10px; justify-content:center; }
+  .copy-note{ font-size:0.78rem; color: var(--teal-dark); margin-top:8px; height:16px; }
+
+  /* ---------- Dashboard ---------- */
+  .dash-main{ flex:1; padding: 32px; max-width:1100px; margin:0 auto; width:100%; }
+  .dash-main-wide{ max-width:1320px; }
+  .dash-grid{ display:grid; grid-template-columns: 420px minmax(0, 620px) 1fr; gap:24px; align-items:start; }
+  .dash-grid .center-col{ width:100%; }
+  @media (max-width: 1180px){ .dash-grid{ grid-template-columns: 420px 1fr; } }
+  @media (max-width: 860px){ .dash-grid{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background: var(--paper); border:1px solid var(--line); border-radius: var(--radius);
+    padding: 24px; box-shadow: var(--shadow); margin-bottom:20px;
+  }
+  .panel h3{ font-size:1.1rem; margin-bottom:4px; }
+  .panel .panel-sub{ color: var(--muted); font-size:0.85rem; margin-bottom:18px; }
+
+  .badge{
+    display:inline-flex; align-items:center; gap:6px; font-size:0.78rem; font-weight:600;
+    padding:5px 11px; border-radius:999px; letter-spacing:0.02em;
+  }
+  .badge.verified{ background: var(--teal-wash); color: var(--teal-dark); }
+  .badge.unverified{ background: var(--amber-wash); color: var(--amber); }
+
+  .checklist{ list-style:none; padding:0; margin:14px 0 0; font-size:0.84rem; color: var(--ink-soft); }
+  .checklist li{ padding:4px 0; display:flex; align-items:center; gap:8px; }
+  .checklist li.done{ color: var(--teal-dark); }
+  .checklist .dot{ width:6px; height:6px; border-radius:50%; background: var(--muted); flex-shrink:0; }
+  .checklist li.done .dot{ background: var(--teal); }
+
+  .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width: 560px){ .form-grid{ grid-template-columns:1fr; } }
+  .form-grid .span-2{ grid-column: 1 / -1; }
+
+  .save-row{ display:flex; align-items:center; gap:14px; margin-top:6px; }
+  .save-note{ font-size:0.84rem; color: var(--teal-dark); opacity:0; transition: opacity 0.3s ease; }
+  .save-note.show{ opacity:1; }
+
+  .lookup-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .lookup-row input{ flex:1 1 180px; min-width:0; }
+  .lookup-row .btn{ flex-shrink:0; }
+
+  .patient-result{ margin-top:20px; border-top:1px solid var(--line); padding-top:20px; }
+  .patient-result .name-row{ display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+  .patient-result h3{ font-size:1.25rem; }
+  .kv{ display:grid; grid-template-columns: 140px 1fr; gap:8px 14px; font-size:0.9rem; margin-bottom:14px; }
+  .kv dt{ color: var(--muted); }
+  .kv dd{ margin:0; color: var(--ink); }
+  .kv .block{ grid-column: 1 / -1; margin-top:2px; }
+  .empty-state{ color: var(--muted); font-size:0.9rem; padding: 18px 0; }
+  .not-found{ color: var(--red); font-size:0.9rem; padding: 10px 0; }
+
+  .privacy-note{
+    font-size:0.8rem; color: var(--muted); background: var(--bg); border-radius:8px; padding:12px 14px; line-height:1.5; margin-top:16px;
+  }
+
+  /* ---------- Google sign-up ---------- */
+  .divider{ display:flex; align-items:center; gap:12px; margin:18px 0; color: var(--muted); font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em; }
+  .divider::before, .divider::after{ content:""; flex:1; height:1px; background: var(--line); }
+  .btn-google{
+    background: var(--paper); color: var(--ink); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; gap:10px; width:100%;
+  }
+  .btn-google:hover{ border-color: var(--ink-soft); background: var(--bg); }
+  .google-panel{
+    border:1px solid var(--line); border-radius:8px; padding:18px; margin-top:16px; background: var(--bg);
+  }
+  .google-panel .demo-note{ font-size:0.76rem; color: var(--muted); margin-bottom:14px; line-height:1.5; }
+
+  /* ---------- Account dropdown ---------- */
+  .dropdown-wrap{ position:relative; }
+  .dropdown-trigger{
+    display:inline-flex; align-items:center; gap:7px; background: var(--paper); cursor:pointer;
+  }
+  .dropdown-trigger svg{ color: var(--muted); transition: transform 0.15s ease; }
+  .dropdown-trigger[aria-expanded="true"] svg{ transform: rotate(180deg); }
+  .dropdown-menu{
+    position:absolute; top: calc(100% + 8px); right:0; min-width:180px;
+    background: var(--paper); border:1px solid var(--line); border-radius:8px;
+    box-shadow: var(--shadow); overflow:hidden; z-index:30;
+  }
+  .dropdown-menu button{
+    display:block; width:100%; text-align:left; padding:11px 16px; background:none; border:none;
+    font-size:0.88rem; color: var(--ink);
+  }
+  .dropdown-menu button:hover{ background: var(--bg); }
+  .dropdown-menu button.danger:hover{ color: var(--red); }
+  .dropdown-menu button + button{ border-top:1px solid var(--line); }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay{
+    position:fixed; inset:0; background: rgba(23,36,46,0.45); display:flex;
+    align-items:flex-start; justify-content:center; padding: 60px 20px; z-index:50;
+  }
+  .modal-card{
+    position:relative; background: var(--paper); border-radius: var(--radius); box-shadow: var(--shadow);
+    max-width: 440px; width:100%; max-height: 80vh; overflow-y:auto; padding: 30px;
+  }
+  .modal-close{
+    position:absolute; top:14px; right:14px; background:none; border:none; font-size:1.5rem;
+    line-height:1; color: var(--muted); padding:4px;
+  }
+  .modal-close:hover{ color: var(--ink); }
+
+  /* ---------- Patient details / tabs / lists ---------- */
+  .panel-header-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:4px; }
+  .btn-sm{ padding:7px 14px; font-size:0.8rem; }
+  .subhead{
+    font-family:'IBM Plex Mono', monospace; font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase;
+    color: var(--muted); margin: 18px 0 10px;
+  }
+  .panel hr, .modal-card hr{ border:none; border-top:1px solid var(--line); margin:18px 0; }
+  .list-item{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:13px 4px; border-bottom:1px solid var(--line); cursor:pointer;
+  }
+  .list-item:last-child{ border-bottom:none; }
+  .list-item:hover{ background: var(--bg); }
+  .list-item .li-title{ font-weight:600; font-size:0.92rem; }
+  .list-item .li-sub{ font-size:0.8rem; color: var(--muted); margin-top:2px; }
+  .list-item .chevron{ color: var(--muted); flex-shrink:0; }
+
+  /* ---------- Health card ---------- */
+  .health-card-panel{ padding-bottom:24px; }
+  .health-card{
+    position:relative; overflow:hidden; border-radius:14px; padding:20px 22px 18px;
+    background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%); color:#fff;
+    aspect-ratio: 1.586 / 1; max-width:440px; display:flex; flex-direction:column; justify-content:space-between;
+  }
+  .health-card-watermark{ position:absolute; right:-10px; bottom:-6px; width:70%; height:auto; opacity:0.16; pointer-events:none; }
+  .health-card-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; position:relative; }
+  .health-card-brand{ font-family:'IBM Plex Mono', monospace; font-size:0.68rem; letter-spacing:0.12em; opacity:0.85; }
+  .health-card .badge{ background: rgba(255,255,255,0.2); color:#fff; }
+  .health-card-body{ display:flex; align-items:center; gap:14px; position:relative; }
+  .avatar-btn{
+    width:56px; height:56px; border-radius:50%; flex-shrink:0; padding:0; overflow:hidden;
+    background: rgba(255,255,255,0.16); border:2px solid rgba(255,255,255,0.4);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .avatar-btn:hover{ border-color: rgba(255,255,255,0.75); }
+  .avatar-img{ width:100%; height:100%; object-fit:cover; }
+  .avatar-fallback{ font-family:'Spectral', serif; font-weight:600; font-size:1.15rem; color:#fff; }
+  .health-card-info{ min-width:0; }
+  .health-card-name{ font-family:'Spectral', serif; font-weight:600; font-size:1.2rem; line-height:1.25; overflow-wrap:anywhere; }
+  .health-card-phone{ font-size:0.85rem; opacity:0.88; margin-top:3px; }
+  .health-card-code-row{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:12px;
+    padding-top:16px; border-top:1px solid rgba(255,255,255,0.28); position:relative;
+  }
+  .health-card-code-label{ display:block; font-family:'IBM Plex Mono', monospace; font-size:0.66rem; letter-spacing:0.1em; text-transform:uppercase; opacity:0.78; margin-bottom:4px; }
+  .health-card-code{ font-size:1.35rem; font-weight:600; letter-spacing:0.05em; }
+  .health-card-code-row .btn-secondary{ background: rgba(255,255,255,0.16); color:#fff; border-color: rgba(255,255,255,0.4); flex-shrink:0; }
+  .health-card-code-row .btn-secondary:hover{ background: rgba(255,255,255,0.28); border-color: rgba(255,255,255,0.75); }
+  .health-card-panel .copy-note{ margin-top:10px; }
+  .health-card-panel .checklist{ margin-top:16px; }
+</style>
+</head>
+<body>
+
+<!-- ============ LANDING ============ -->
+<div id="view-landing" class="view">
+  <header class="topbar">
+    <div class="wordmark">
+      <svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Pak Health
+    </div>
+  </header>
+
+  <svg class="pulse animate" viewBox="0 0 1000 40" preserveAspectRatio="none" style="height:40px;">
+    <path d="M0,20 L120,20 L140,4 L160,36 L180,20 L300,20 L320,8 L340,20 L460,20 L480,2 L500,38 L520,20 L640,20 L660,8 L680,20 L800,20 L820,4 L840,36 L860,20 L1000,20"/>
+  </svg>
+
+  <main class="landing-main">
+    <div class="hero">
+      <span class="eyebrow">Patient records, on call</span>
+      <h1>Two ways in.</h1>
+      <p>Pak Health holds one record per person and shares it only with the code they choose to give out. Pick where you're starting from.</p>
+    </div>
+
+    <div class="choices">
+      <button class="choice" id="choice-individual">
+        <svg class="choice-icon" width="46" height="46" viewBox="0 0 46 46"><circle cx="23" cy="15" r="8" fill="none" stroke="#1F6F63" stroke-width="2"/><path d="M8,40 C8,29 14,25 23,25 C32,25 38,29 38,40" fill="none" stroke="#1F6F63" stroke-width="2" stroke-linecap="round"/></svg>
+        <span class="num">01</span>
+        <h2>I am an individual</h2>
+        <p>Sign up in seconds, get an 8-digit code, and fill in your health history whenever you're ready.</p>
+        <span class="go">Continue as an individual
+          <svg width="16" height="10" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        </span>
+      </button>
+
+      <button class="choice" id="choice-doctor">
+        <svg class="choice-icon" width="46" height="46" viewBox="0 0 46 46"><path d="M14,6 V18 C14,25 18,29 23,29 C28,29 32,25 32,18 V6" fill="none" stroke="#1F6F63" stroke-width="2" stroke-linecap="round"/><circle cx="32" cy="9" r="3" fill="none" stroke="#1F6F63" stroke-width="2"/><path d="M23,29 V36" stroke="#1F6F63" stroke-width="2" stroke-linecap="round"/></svg>
+        <span class="num">02</span>
+        <h2>I am a doctor</h2>
+        <p>Create your account, then enter a patient's code any time you need to pull up their record.</p>
+        <span class="go">Continue as a doctor
+          <svg width="16" height="10" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        </span>
+      </button>
+    </div>
+  </main>
+
+  <div class="landing-footer">
+    Prototype — records live in this app's shared storage, not a clinical system. Don't use it for real medical data.
+  </div>
+</div>
+
+<!-- ============ DOCTOR AUTH ============ -->
+<div id="view-doctor-auth" class="view hidden">
+  <header class="topbar">
+    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+  </header>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <button class="auth-back" data-goto="view-landing">
+        <svg width="14" height="10" viewBox="0 0 16 10"><path d="M16,5 H2 M7,0 L2,5 L7,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        Back
+      </button>
+      <div class="auth-title"><h2>Doctor access</h2></div>
+      <p class="auth-sub">Create an account or sign back in with your doctor ID.</p>
+
+      <div class="tabs">
+        <button class="tab active" id="doc-tab-signup">Sign up</button>
+        <button class="tab" id="doc-tab-signin">Sign in</button>
+      </div>
+
+      <div id="doc-signup-pane">
+        <div id="doc-signup-start">
+          <p style="color:var(--ink-soft); font-size:0.9rem; margin-bottom:18px; line-height:1.5;">A few basics to get started — add your license later to get verified.</p>
+          <div class="field"><label for="doc-signup-name">Full name</label><input type="text" id="doc-signup-name" placeholder="Dr. Sam Petersen"></div>
+          <div class="field"><label for="doc-signup-phone">Phone</label><input type="tel" id="doc-signup-phone" placeholder="+45 00 00 00 00"></div>
+          <div class="field"><label for="doc-signup-email">Email</label><input type="email" id="doc-signup-email" placeholder="you@clinic.com"></div>
+          <div class="field"><label for="doc-signup-password">Password (optional)</label><input type="password" id="doc-signup-password" placeholder="Leave blank to skip for now"></div>
+          <div class="field"><label for="doc-signup-password2">Confirm password</label><input type="password" id="doc-signup-password2" placeholder="Re-enter your password"></div>
+          <button class="btn btn-primary btn-block" id="doc-create-btn">Create my account</button>
+          <div class="error-text" id="doc-create-error"></div>
+          <div class="divider">or</div>
+          <button class="btn btn-google" id="doc-google-btn">
+            <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.56 2.7-3.87 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.94v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.16.28-1.7V4.97H.94A9 9 0 0 0 0 9c0 1.45.35 2.83.94 4.03l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .94 4.97l3.01 2.33C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+            Continue with Google
+          </button>
+          <div class="google-panel hidden" id="doc-google-panel">
+            <div class="demo-note">Demo Google sign-in — no real Google account is connected. Enter details to continue.</div>
+            <div class="field"><label for="doc-google-name">Name</label><input type="text" id="doc-google-name" placeholder="Dr. Sam Petersen"></div>
+            <div class="field"><label for="doc-google-phone">Phone</label><input type="tel" id="doc-google-phone" placeholder="+45 00 00 00 00"></div>
+            <div class="field"><label for="doc-google-email">Google email</label><input type="email" id="doc-google-email" placeholder="you@gmail.com"></div>
+            <button class="btn btn-primary btn-block" id="doc-google-continue">Continue</button>
+            <div class="error-text" id="doc-google-error">Something went wrong creating your account. Please try again.</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="doc-signin-pane" class="hidden">
+        <div class="field">
+          <label for="doc-signin-id">Doctor ID</label>
+          <input type="text" id="doc-signin-id" placeholder="DR-482913">
+        </div>
+        <div class="field">
+          <label for="doc-signin-password">Password</label>
+          <input type="password" id="doc-signin-password" placeholder="Your password">
+        </div>
+        <button class="btn btn-primary btn-block" id="doc-signin-btn">Sign in</button>
+        <div class="error-text" id="doc-signin-error"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PATIENT AUTH ============ -->
+<div id="view-patient-auth" class="view hidden">
+  <header class="topbar">
+    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+  </header>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <button class="auth-back" data-goto="view-landing">
+        <svg width="14" height="10" viewBox="0 0 16 10"><path d="M16,5 H2 M7,0 L2,5 L7,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        Back
+      </button>
+      <div class="auth-title"><h2>Individual access</h2></div>
+      <p class="auth-sub">Create an account or sign back in with your access code.</p>
+
+      <div class="tabs">
+        <button class="tab active" id="pat-tab-signup">Sign up</button>
+        <button class="tab" id="pat-tab-signin">Sign in</button>
+      </div>
+
+      <div id="pat-signup-pane">
+        <div id="pat-signup-start">
+          <p style="color:var(--ink-soft); font-size:0.9rem; margin-bottom:18px; line-height:1.5;">A few basics to get started — add the rest of your history later.</p>
+          <div class="field"><label for="pat-signup-name">Full name</label><input type="text" id="pat-signup-name" placeholder="Jordan Rivers"></div>
+          <div class="field"><label for="pat-signup-phone">Phone</label><input type="tel" id="pat-signup-phone" placeholder="+45 00 00 00 00"></div>
+          <div class="field"><label for="pat-signup-email">Email</label><input type="email" id="pat-signup-email" placeholder="you@example.com"></div>
+          <div class="field"><label for="pat-signup-password">Password (optional)</label><input type="password" id="pat-signup-password" placeholder="Leave blank to skip for now"></div>
+          <div class="field"><label for="pat-signup-password2">Confirm password</label><input type="password" id="pat-signup-password2" placeholder="Re-enter your password"></div>
+          <button class="btn btn-primary btn-block" id="pat-create-btn">Create my account</button>
+          <div class="error-text" id="pat-create-error"></div>
+          <div class="divider">or</div>
+          <button class="btn btn-google" id="pat-google-btn">
+            <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.56 2.7-3.87 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.94v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.16.28-1.7V4.97H.94A9 9 0 0 0 0 9c0 1.45.35 2.83.94 4.03l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .94 4.97l3.01 2.33C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+            Continue with Google
+          </button>
+          <div class="google-panel hidden" id="pat-google-panel">
+            <div class="demo-note">Demo Google sign-in — no real Google account is connected. Enter details to continue.</div>
+            <div class="field"><label for="pat-google-name">Name</label><input type="text" id="pat-google-name" placeholder="Jordan Rivers"></div>
+            <div class="field"><label for="pat-google-phone">Phone</label><input type="tel" id="pat-google-phone" placeholder="+45 00 00 00 00"></div>
+            <div class="field"><label for="pat-google-email">Google email</label><input type="email" id="pat-google-email" placeholder="you@gmail.com"></div>
+            <button class="btn btn-primary btn-block" id="pat-google-continue">Continue</button>
+            <div class="error-text" id="pat-google-error">Something went wrong creating your account. Please try again.</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="pat-signin-pane" class="hidden">
+        <div class="field">
+          <label for="pat-signin-code">Access code</label>
+          <input type="text" id="pat-signin-code" placeholder="8-digit code">
+        </div>
+        <div class="field">
+          <label for="pat-signin-password">Password</label>
+          <input type="password" id="pat-signin-password" placeholder="Your password">
+        </div>
+        <button class="btn btn-primary btn-block" id="pat-signin-btn">Sign in</button>
+        <div class="error-text" id="pat-signin-error"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PATIENT DASHBOARD ============ -->
+<div id="view-patient-dash" class="view hidden">
+  <header class="topbar">
+    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="topbar-right">
+      <span class="role-chip">Individual account</span>
+      <button class="link-btn" id="pat-signout">Sign out</button>
+    </div>
+  </header>
+  <main class="dash-main dash-main-wide">
+    <div class="dash-grid">
+      <div>
+        <div class="panel health-card-panel">
+          <div class="health-card">
+            <svg class="health-card-watermark" viewBox="0 0 220 60" preserveAspectRatio="none"><path d="M0,30 L50,30 L58,14 L66,46 L74,30 L120,30 L128,18 L136,30 L180,30 L188,12 L196,48 L204,30 L220,30" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class="health-card-top">
+              <span class="health-card-brand">PAK HEALTH · PATIENT ID</span>
+              <span class="badge unverified" id="pat-badge">Unverified</span>
+            </div>
+            <div class="health-card-body">
+              <button class="avatar-btn" id="pat-avatar-btn" type="button" title="Add a profile picture">
+                <img id="pat-avatar-img" class="avatar-img hidden" alt="">
+                <span class="avatar-fallback" id="pat-avatar-fallback">?</span>
+              </button>
+              <div class="health-card-info">
+                <div class="health-card-name" id="card-name">—</div>
+                <div class="health-card-phone" id="card-phone">No phone on file</div>
+              </div>
+            </div>
+            <div class="health-card-code-row">
+              <div>
+                <span class="health-card-code-label">Access code</span>
+                <div class="health-card-code mono" id="pat-dash-code">0000 0000</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="pat-dash-copy">Copy</button>
+            </div>
+          </div>
+          <input type="file" accept="image/*" id="pat-avatar-input" class="hidden">
+          <div class="copy-note" id="pat-dash-copy-note"></div>
+          <ul class="checklist" id="pat-checklist"></ul>
+          <div class="privacy-note">Anyone holding this code can view your record. Only share it with a doctor you trust.</div>
+        </div>
+      </div>
+
+      <div class="center-col">
+        <div class="panel">
+          <div class="tabs">
+            <button class="tab active" id="pat-tab-visits">Visits</button>
+            <button class="tab" id="pat-tab-tests">Tests</button>
+          </div>
+
+          <div id="pat-visits-pane">
+            <div id="pat-visits-list"></div>
+            <div class="empty-state" id="pat-visits-empty">No visits recorded yet. Your visit history will appear here after a doctor sees you.</div>
+          </div>
+
+          <div id="pat-tests-pane" class="hidden">
+            <div id="pat-tests-list"></div>
+            <div class="empty-state" id="pat-tests-empty">No tests on file yet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-overlay hidden" id="pat-visit-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="pat-visit-modal-close" aria-label="Close">&times;</button>
+      <span class="eyebrow" id="visit-modal-date">—</span>
+      <h3 id="visit-modal-doctor" style="margin-top:6px;">—</h3>
+      <dl class="kv" style="margin-top:18px;">
+        <dt>Symptoms</dt><dd class="block" id="visit-modal-symptoms">—</dd>
+        <dt>Diagnosis</dt><dd class="block" id="visit-modal-diagnosis">—</dd>
+        <dt>Prescription</dt><dd class="block" id="visit-modal-prescription">—</dd>
+        <dt>Notes</dt><dd class="block" id="visit-modal-notes">—</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="pat-test-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="pat-test-modal-close" aria-label="Close">&times;</button>
+      <span class="eyebrow" id="test-modal-date">—</span>
+      <h3 id="test-modal-name" style="margin-top:6px;">—</h3>
+      <dl class="kv" style="margin-top:16px;">
+        <dt>Ordered by</dt><dd id="test-modal-doctor">—</dd>
+        <dt>Result summary</dt><dd class="block" id="test-modal-result">—</dd>
+      </dl>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DOCTOR DASHBOARD ============ -->
+<div id="view-doctor-dash" class="view hidden">
+  <header class="topbar">
+    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="topbar-right">
+      <span class="role-chip">Doctor account</span>
+      <button class="link-btn" id="doc-signout">Sign out</button>
+    </div>
+  </header>
+  <main class="dash-main dash-main-wide">
+    <div class="dash-grid">
+      <div>
+        <div class="panel health-card-panel">
+          <div class="health-card">
+            <svg class="health-card-watermark" viewBox="0 0 220 60" preserveAspectRatio="none"><path d="M0,30 L50,30 L58,14 L66,46 L74,30 L120,30 L128,18 L136,30 L180,30 L188,12 L196,48 L204,30 L220,30" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class="health-card-top">
+              <span class="health-card-brand">PAK HEALTH · DOCTOR ID</span>
+              <span class="badge unverified" id="doc-badge">Unverified</span>
+            </div>
+            <div class="health-card-body">
+              <button class="avatar-btn" id="doc-avatar-btn" type="button" title="Add a profile picture">
+                <img id="doc-avatar-img" class="avatar-img hidden" alt="">
+                <span class="avatar-fallback" id="doc-avatar-fallback">?</span>
+              </button>
+              <div class="health-card-info">
+                <div class="health-card-name" id="doc-card-name">—</div>
+                <div class="health-card-phone" id="doc-card-specialty">Specialty not set</div>
+              </div>
+            </div>
+            <div class="health-card-code-row">
+              <div>
+                <span class="health-card-code-label">Doctor ID</span>
+                <div class="health-card-code mono" id="doc-dash-id">DR-000000</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="doc-dash-copy">Copy</button>
+            </div>
+          </div>
+          <input type="file" accept="image/*" id="doc-avatar-input" class="hidden">
+          <div class="copy-note" id="doc-dash-copy-note"></div>
+          <ul class="checklist" id="doc-checklist"></ul>
+          <button class="btn btn-secondary btn-block" id="doc-account-settings-btn" style="margin-top:16px;">Account settings</button>
+        </div>
+      </div>
+
+      <div class="center-col">
+        <div class="panel">
+          <h3>Look up a patient</h3>
+          <p class="panel-sub" id="lookup-subtitle">Enter the 8-digit code your patient gave you.</p>
+          <div class="lookup-row" id="lookup-row">
+            <input type="text" id="lookup-code" placeholder="8-digit patient code">
+            <button class="btn btn-primary" id="lookup-btn">View record</button>
+          </div>
+          <div class="not-found hidden" id="lookup-not-found">No patient found with that code. Double-check it with your patient.</div>
+
+          <div class="patient-result hidden" id="patient-result">
+            <div class="name-row">
+              <h3 id="res-name">—</h3>
+              <span class="badge" id="res-badge">Unverified</span>
+            </div>
+            <div class="copy-note" style="margin:-8px 0 4px; color:var(--muted);">Code: <span class="mono" id="res-code">—</span></div>
+            <button class="link-btn" id="lookup-change-btn" style="margin-bottom:16px;">Search a different patient</button>
+
+            <div class="tabs">
+              <button class="tab active" id="doc-tab-visits">Visits</button>
+              <button class="tab" id="doc-tab-tests">Tests</button>
+            </div>
+
+            <div id="doc-visits-pane">
+              <button class="btn btn-primary btn-block" id="add-visit-btn">Add visit note</button>
+              <span class="save-note" id="add-visit-note" style="display:block; text-align:center; margin:8px 0 6px;">Visit added</span>
+              <div id="doc-visits-list"></div>
+              <div class="empty-state" id="doc-visits-empty">No visits recorded yet.</div>
+            </div>
+
+            <div id="doc-tests-pane" class="hidden">
+              <button class="btn btn-primary btn-block" id="add-test-btn">Add test / report</button>
+              <span class="save-note" id="add-test-note" style="display:block; text-align:center; margin:8px 0 6px;">Test added</span>
+              <div id="doc-tests-list"></div>
+              <div class="empty-state" id="doc-tests-empty">No tests on file yet.</div>
+            </div>
+          </div>
+
+          <div class="empty-state" id="lookup-empty">No patient looked up yet.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-overlay hidden" id="doc-profile-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="doc-profile-close" aria-label="Close">&times;</button>
+      <span class="eyebrow">Doctor ID</span>
+      <div class="code mono" id="doc-modal-id" style="font-size:1.3rem; margin:10px 0 16px;">DR-000000</div>
+
+      <h3>Account settings</h3>
+      <p class="panel-sub">Complete email, phone and license to get verified.</p>
+      <h4 class="subhead">Contact</h4>
+      <div class="field"><label for="doc-name">Full name</label><input type="text" id="doc-name" placeholder="Dr. Sam Petersen"></div>
+      <div class="field"><label for="doc-email">Email</label><input type="email" id="doc-email" placeholder="you@clinic.com"></div>
+      <div class="field"><label for="doc-phone">Phone</label><input type="tel" id="doc-phone" placeholder="+45 00 00 00 00"></div>
+      <div class="field"><label for="doc-license">Medical license number</label><input type="text" id="doc-license" placeholder="License / registration no."></div>
+
+      <hr>
+      <h4 class="subhead">Professional profile</h4>
+      <div class="field"><label for="doc-specialty">Specialty</label><input type="text" id="doc-specialty" placeholder="e.g. Cardiology, Family Medicine"></div>
+      <div class="field"><label for="doc-education">Education & qualifications</label><textarea id="doc-education" placeholder="Degrees, residency, board certifications..."></textarea></div>
+      <div class="field"><label for="doc-about">About</label><textarea id="doc-about" placeholder="A short bio patients can see when you're verified."></textarea></div>
+
+      <div class="save-row">
+        <button class="btn btn-primary btn-block" id="doc-save-btn">Save changes</button>
+      </div>
+      <span class="save-note" id="doc-save-note">Saved</span>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="doc-test-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="doc-test-modal-close" aria-label="Close">&times;</button>
+      <span class="eyebrow" id="doc-test-modal-date">—</span>
+      <h3 id="doc-test-modal-name" style="margin-top:6px;">—</h3>
+      <dl class="kv" style="margin-top:16px;">
+        <dt>Ordered by</dt><dd id="doc-test-modal-doctor">—</dd>
+        <dt>Result summary</dt><dd class="block" id="doc-test-modal-result">—</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="add-test-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="add-test-close" aria-label="Close">&times;</button>
+      <span class="eyebrow">New test for <span id="add-test-patient-name">this patient</span></span>
+      <h3 style="margin-top:6px;">Add test / report</h3>
+      <div class="form-grid" style="margin-top:18px;">
+        <div class="field span-2"><label for="test-name">Test name</label><input type="text" id="test-name" placeholder="e.g. Complete Blood Count (CBC)"></div>
+        <div class="field span-2"><label for="test-date">Date</label><input type="date" id="test-date"></div>
+      </div>
+      <div class="field"><label for="test-result">Result summary</label><textarea id="test-result" placeholder="Key findings, values, or 'Pending' if results aren't back yet"></textarea></div>
+      <div class="error-text" id="add-test-error"></div>
+      <div class="save-row">
+        <button class="btn btn-primary" id="add-test-save">Save test</button>
+        <button class="btn btn-secondary" id="add-test-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="doc-visit-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="doc-visit-modal-close" aria-label="Close">&times;</button>
+      <span class="eyebrow" id="doc-visit-modal-date">—</span>
+      <h3 id="doc-visit-modal-doctor" style="margin-top:6px;">—</h3>
+      <dl class="kv" style="margin-top:18px;">
+        <dt>Symptoms</dt><dd class="block" id="doc-visit-modal-symptoms">—</dd>
+        <dt>Diagnosis</dt><dd class="block" id="doc-visit-modal-diagnosis">—</dd>
+        <dt>Prescription</dt><dd class="block" id="doc-visit-modal-prescription">—</dd>
+        <dt>Notes</dt><dd class="block" id="doc-visit-modal-notes">—</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="add-visit-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="add-visit-close" aria-label="Close">&times;</button>
+      <span class="eyebrow">New visit note for <span id="add-visit-patient-name">this patient</span></span>
+      <h3 style="margin-top:6px;">Add visit note</h3>
+      <div class="form-grid" style="margin-top:18px;">
+        <div class="field"><label for="visit-date">Date</label><input type="date" id="visit-date"></div>
+        <div class="field"><label for="visit-time">Time</label><input type="text" id="visit-time" placeholder="10:30 AM"></div>
+      </div>
+      <div class="field"><label for="visit-symptoms">Symptoms</label><textarea id="visit-symptoms" placeholder="What the patient reported"></textarea></div>
+      <div class="field"><label for="visit-diagnosis">Diagnosis</label><textarea id="visit-diagnosis" placeholder="Your assessment"></textarea></div>
+      <div class="field"><label for="visit-prescription">Prescription</label><textarea id="visit-prescription" placeholder="Medication, dose, duration — or 'None'"></textarea></div>
+      <div class="field"><label for="visit-notes">Notes</label><textarea id="visit-notes" placeholder="Anything else worth recording"></textarea></div>
+      <div class="error-text" id="add-visit-error"></div>
+      <div class="save-row">
+        <button class="btn btn-primary" id="add-visit-save">Save visit note</button>
+        <button class="btn btn-secondary" id="add-visit-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- helpers ----------
+  function $(id){ return document.getElementById(id); }
+  function showView(id){
+    document.querySelectorAll('.view').forEach(function(v){ v.classList.add('hidden'); });
+    $(id).classList.remove('hidden');
+    window.scrollTo(0,0);
+  }
+  function randomDigits(n){
+    var s = '';
+    for (var i=0;i<n;i++) s += Math.floor(Math.random()*10);
+    return s;
+  }
+  function formatCode(code){ return code.slice(0,4) + ' ' + code.slice(4); }
+
+  // In-memory fallback store, used if window.storage is unavailable or errors out,
+  // so the app still works (for this browser tab) even without persistence.
+  var memoryStore = {};
+  async function storeGet(key){
+    if (window.storage && typeof window.storage.get === 'function'){
+      try{
+        var r = await window.storage.get(key, true);
+        return r ? r.value : null;
+      }catch(e){
+        // treat as "not found" and fall through to memory below
+      }
+    }
+    return Object.prototype.hasOwnProperty.call(memoryStore, key) ? memoryStore[key] : null;
+  }
+  async function storeSet(key, value){
+    memoryStore[key] = value;
+    if (window.storage && typeof window.storage.set === 'function'){
+      try{
+        await window.storage.set(key, value, true);
+      }catch(e){
+        // keep the memory copy so the app still works this session
+      }
+    }
+  }
+  async function keyExists(key){
+    var v = await storeGet(key);
+    return v !== null && v !== undefined;
+  }
+  async function generatePatientCode(){
+    var code, exists = true;
+    while(exists){ code = randomDigits(8); exists = await keyExists('patient:'+code); }
+    return code;
+  }
+  async function generateDoctorId(){
+    var id, exists = true;
+    while(exists){ id = 'DR-' + randomDigits(6); exists = await keyExists('doctor:'+id); }
+    return id;
+  }
+  async function savePatient(code, data){
+    await storeSet('patient:'+code, JSON.stringify(data));
+  }
+  async function loadPatient(code){
+    var v = await storeGet('patient:'+code);
+    try{ return v ? JSON.parse(v) : null; }catch(e){ return null; }
+  }
+  async function saveDoctor(id, data){
+    await storeSet('doctor:'+id, JSON.stringify(data));
+  }
+  async function loadDoctor(id){
+    var v = await storeGet('doctor:'+id);
+    try{ return v ? JSON.parse(v) : null; }catch(e){ return null; }
+  }
+  function isPatientVerified(d){ return !!(d.email && d.phone); }
+  function isDoctorVerified(d){ return !!(d.email && d.phone && d.license); }
+  async function hashPassword(password){
+    if (!password) return '';
+    try{
+      var enc = new TextEncoder().encode(password);
+      var digest = await crypto.subtle.digest('SHA-256', enc);
+      return Array.from(new Uint8Array(digest)).map(function(b){ return b.toString(16).padStart(2, '0'); }).join('');
+    }catch(e){
+      // Fallback for environments without SubtleCrypto (e.g. non-HTTPS). Not cryptographically secure.
+      var h = 0;
+      for (var i = 0; i < password.length; i++){ h = ((h << 5) - h + password.charCodeAt(i)) | 0; }
+      return 'fb_' + h;
+    }
+  }
+  function showError(el, message){
+    el.textContent = message;
+    el.classList.add('show');
+  }
+  function clearError(el){
+    el.textContent = '';
+    el.classList.remove('show');
+  }
+  function copyToClipboard(text, noteEl){
+    var done = function(){
+      noteEl.textContent = 'Copied';
+      setTimeout(function(){ noteEl.textContent = ''; }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done).catch(function(){
+        noteEl.textContent = 'Copy failed — select and copy manually';
+      });
+    } else {
+      noteEl.textContent = 'Copy not supported here';
+    }
+  }
+
+  var session = { type: null, id: null };
+
+  // ---------- landing ----------
+  $('choice-individual').addEventListener('click', function(){
+    resetPatientAuthView();
+    showView('view-patient-auth');
+  });
+  $('choice-doctor').addEventListener('click', function(){
+    resetDoctorAuthView();
+    showView('view-doctor-auth');
+  });
+  document.querySelectorAll('[data-goto]').forEach(function(el){
+    el.addEventListener('click', function(){ showView(el.getAttribute('data-goto')); });
+  });
+
+  // ================= DOCTOR AUTH =================
+  function resetDoctorAuthView(){
+    $('doc-tab-signup').classList.add('active');
+    $('doc-tab-signin').classList.remove('active');
+    $('doc-signup-pane').classList.remove('hidden');
+    $('doc-signin-pane').classList.add('hidden');
+    $('doc-google-panel').classList.add('hidden');
+    $('doc-signup-name').value = '';
+    $('doc-signup-phone').value = '';
+    $('doc-signup-email').value = '';
+    $('doc-signup-password').value = '';
+    $('doc-signup-password2').value = '';
+    $('doc-google-name').value = '';
+    $('doc-google-phone').value = '';
+    $('doc-google-email').value = '';
+    clearError($('doc-create-error'));
+    clearError($('doc-google-error'));
+    $('doc-signin-id').value = '';
+    $('doc-signin-password').value = '';
+    clearError($('doc-signin-error'));
+  }
+  $('doc-tab-signup').addEventListener('click', function(){
+    $('doc-tab-signup').classList.add('active'); $('doc-tab-signin').classList.remove('active');
+    $('doc-signup-pane').classList.remove('hidden'); $('doc-signin-pane').classList.add('hidden');
+  });
+  $('doc-tab-signin').addEventListener('click', function(){
+    $('doc-tab-signin').classList.add('active'); $('doc-tab-signup').classList.remove('active');
+    $('doc-signin-pane').classList.remove('hidden'); $('doc-signup-pane').classList.add('hidden');
+  });
+  async function createDoctorAccount(name, phone, email, password){
+    var id = await generateDoctorId();
+    var passwordHash = password ? await hashPassword(password) : '';
+    var data = { doctorId:id, name:name||'', email:email||'', phone:phone||'', license:'', specialty:'', education:'', about:'', photoUrl:'', passwordHash:passwordHash, createdAt: Date.now() };
+    data.verified = isDoctorVerified(data);
+    await saveDoctor(id, data);
+    session = { type:'doctor', id:id };
+    await enterDoctorDash(id);
+  }
+  $('doc-create-btn').addEventListener('click', async function(){
+    var name = $('doc-signup-name').value.trim();
+    var phone = $('doc-signup-phone').value.trim();
+    var email = $('doc-signup-email').value.trim();
+    var password = $('doc-signup-password').value;
+    var password2 = $('doc-signup-password2').value;
+    clearError($('doc-create-error'));
+    if (password && password.length < 6){
+      showError($('doc-create-error'), 'Password must be at least 6 characters, or leave both password fields blank to skip it for now.');
+      return;
+    }
+    if (password !== password2){
+      showError($('doc-create-error'), 'Passwords don\u2019t match.');
+      return;
+    }
+    $('doc-create-btn').disabled = true;
+    $('doc-create-btn').textContent = 'Creating...';
+    try{
+      await createDoctorAccount(name, phone, email, password);
+    }catch(e){
+      showError($('doc-create-error'), 'Something went wrong creating your account. Please try again.');
+    }finally{
+      $('doc-create-btn').disabled = false;
+      $('doc-create-btn').textContent = 'Create my account';
+    }
+  });
+  $('doc-google-btn').addEventListener('click', function(){
+    $('doc-google-panel').classList.toggle('hidden');
+  });
+  $('doc-google-continue').addEventListener('click', async function(){
+    var name = $('doc-google-name').value.trim();
+    var phone = $('doc-google-phone').value.trim();
+    var email = $('doc-google-email').value.trim();
+    $('doc-google-continue').disabled = true;
+    $('doc-google-continue').textContent = 'Creating...';
+    clearError($('doc-google-error'));
+    try{
+      await createDoctorAccount(name, phone, email, '');
+    }catch(e){
+      showError($('doc-google-error'), 'Something went wrong creating your account. Please try again.');
+    }finally{
+      $('doc-google-continue').disabled = false;
+      $('doc-google-continue').textContent = 'Continue';
+    }
+  });
+  $('doc-signin-btn').addEventListener('click', async function(){
+    var raw = $('doc-signin-id').value.trim().toUpperCase();
+    var id = raw.indexOf('DR-') === 0 ? raw : 'DR-' + raw.replace(/[^0-9]/g,'');
+    var password = $('doc-signin-password').value;
+    var data = await loadDoctor(id);
+    if (!data){
+      showError($('doc-signin-error'), 'We couldn\u2019t find a doctor account with that ID.');
+      return;
+    }
+    if (data.passwordHash){
+      var enteredHash = await hashPassword(password);
+      if (!password || enteredHash !== data.passwordHash){
+        showError($('doc-signin-error'), 'Incorrect password.');
+        return;
+      }
+    }
+    clearError($('doc-signin-error'));
+    session = { type:'doctor', id:id };
+    await enterDoctorDash(id);
+  });
+
+  // ================= PATIENT AUTH =================
+  function resetPatientAuthView(){
+    $('pat-tab-signup').classList.add('active');
+    $('pat-tab-signin').classList.remove('active');
+    $('pat-signup-pane').classList.remove('hidden');
+    $('pat-signin-pane').classList.add('hidden');
+    $('pat-google-panel').classList.add('hidden');
+    $('pat-signup-name').value = '';
+    $('pat-signup-phone').value = '';
+    $('pat-signup-email').value = '';
+    $('pat-signup-password').value = '';
+    $('pat-signup-password2').value = '';
+    $('pat-google-name').value = '';
+    $('pat-google-phone').value = '';
+    $('pat-google-email').value = '';
+    clearError($('pat-create-error'));
+    clearError($('pat-google-error'));
+    $('pat-signin-code').value = '';
+    $('pat-signin-password').value = '';
+    clearError($('pat-signin-error'));
+  }
+  $('pat-tab-signup').addEventListener('click', function(){
+    $('pat-tab-signup').classList.add('active'); $('pat-tab-signin').classList.remove('active');
+    $('pat-signup-pane').classList.remove('hidden'); $('pat-signin-pane').classList.add('hidden');
+  });
+  $('pat-tab-signin').addEventListener('click', function(){
+    $('pat-tab-signin').classList.add('active'); $('pat-tab-signup').classList.remove('active');
+    $('pat-signin-pane').classList.remove('hidden'); $('pat-signup-pane').classList.add('hidden');
+  });
+  async function createPatientAccount(name, phone, email, password){
+    var code = await generatePatientCode();
+    var passwordHash = password ? await hashPassword(password) : '';
+    var data = { code:code, name:name||'', email:email||'', phone:phone||'', dob:'', idNumber:'', bloodType:'', emergencyContact:'', allergies:'', conditions:'', medications:'', photoUrl:'', passwordHash:passwordHash, visits: sampleVisits(), tests: sampleTests(), createdAt: Date.now() };
+    data.verified = isPatientVerified(data);
+    await savePatient(code, data);
+    session = { type:'patient', id:code };
+    await enterPatientDash(code);
+  }
+  $('pat-create-btn').addEventListener('click', async function(){
+    var name = $('pat-signup-name').value.trim();
+    var phone = $('pat-signup-phone').value.trim();
+    var email = $('pat-signup-email').value.trim();
+    var password = $('pat-signup-password').value;
+    var password2 = $('pat-signup-password2').value;
+    clearError($('pat-create-error'));
+    if (password && password.length < 6){
+      showError($('pat-create-error'), 'Password must be at least 6 characters, or leave both password fields blank to skip it for now.');
+      return;
+    }
+    if (password !== password2){
+      showError($('pat-create-error'), 'Passwords don\u2019t match.');
+      return;
+    }
+    $('pat-create-btn').disabled = true;
+    $('pat-create-btn').textContent = 'Creating...';
+    try{
+      await createPatientAccount(name, phone, email, password);
+    }catch(e){
+      showError($('pat-create-error'), 'Something went wrong creating your account. Please try again.');
+    }finally{
+      $('pat-create-btn').disabled = false;
+      $('pat-create-btn').textContent = 'Create my account';
+    }
+  });
+  $('pat-google-btn').addEventListener('click', function(){
+    $('pat-google-panel').classList.toggle('hidden');
+  });
+  $('pat-google-continue').addEventListener('click', async function(){
+    var name = $('pat-google-name').value.trim();
+    var phone = $('pat-google-phone').value.trim();
+    var email = $('pat-google-email').value.trim();
+    $('pat-google-continue').disabled = true;
+    $('pat-google-continue').textContent = 'Creating...';
+    clearError($('pat-google-error'));
+    try{
+      await createPatientAccount(name, phone, email, '');
+    }catch(e){
+      showError($('pat-google-error'), 'Something went wrong creating your account. Please try again.');
+    }finally{
+      $('pat-google-continue').disabled = false;
+      $('pat-google-continue').textContent = 'Continue';
+    }
+  });
+  $('pat-signin-btn').addEventListener('click', async function(){
+    var code = $('pat-signin-code').value.replace(/[^0-9]/g,'');
+    var password = $('pat-signin-password').value;
+    if (code.length !== 8){
+      showError($('pat-signin-error'), 'We couldn\u2019t find an account with that code.');
+      return;
+    }
+    var data = await loadPatient(code);
+    if (!data){
+      showError($('pat-signin-error'), 'We couldn\u2019t find an account with that code.');
+      return;
+    }
+    if (data.passwordHash){
+      var enteredHash = await hashPassword(password);
+      if (!password || enteredHash !== data.passwordHash){
+        showError($('pat-signin-error'), 'Incorrect password.');
+        return;
+      }
+    }
+    clearError($('pat-signin-error'));
+    session = { type:'patient', id:code };
+    await enterPatientDash(code);
+  });
+
+  // ================= PATIENT DASHBOARD =================
+  var currentPatientData = null;
+
+  function sampleVisits(){
+    return [
+      { doctorName:'Dr. Elena Cho', date:'2026-05-14', time:'10:30 AM', symptoms:'Persistent cough and mild fever for four days.', diagnosis:'Acute bronchitis', prescription:'Amoxicillin 500mg, 3x daily for 7 days.', notes:'Follow up if symptoms persist beyond 10 days.' },
+      { doctorName:'Dr. Marcus Webb', date:'2026-02-02', time:'3:00 PM', symptoms:'Routine annual check-up, no complaints.', diagnosis:'No concerns found.', prescription:'None', notes:'Recommended an annual blood panel and flu shot.' }
+    ];
+  }
+  function sampleTests(){
+    return [
+      { name:'Complete Blood Count (CBC)', date:'2026-02-02' },
+      { name:'Chest X-Ray', date:'2026-05-15' }
+    ];
+  }
+  function getInitials(name){
+    if (!name || !name.trim()) return '?';
+    var parts = name.trim().split(/\s+/);
+    var initials = parts.slice(0, 2).map(function(p){ return p[0] ? p[0].toUpperCase() : ''; }).join('');
+    return initials || '?';
+  }
+  function renderHealthCard(data){
+    $('card-name').textContent = data.name || 'Unnamed patient';
+    $('card-phone').textContent = data.phone || 'No phone on file';
+    if (data.photoUrl){
+      $('pat-avatar-img').src = data.photoUrl;
+      $('pat-avatar-img').classList.remove('hidden');
+      $('pat-avatar-fallback').classList.add('hidden');
+    } else {
+      $('pat-avatar-img').classList.add('hidden');
+      $('pat-avatar-fallback').classList.remove('hidden');
+      $('pat-avatar-fallback').textContent = getInitials(data.name);
+    }
+  }
+
+  async function enterPatientDash(code){
+    var data = await loadPatient(code);
+    if (!data) data = { code:code };
+    var seeded = false;
+    if (!data.visits || !data.visits.length){ data.visits = sampleVisits(); seeded = true; }
+    if (!data.tests || !data.tests.length){ data.tests = sampleTests(); seeded = true; }
+    currentPatientData = data;
+    if (seeded){ try{ await savePatient(code, data); }catch(e){} }
+    $('pat-dash-code').textContent = formatCode(code);
+    renderHealthCard(data);
+    renderPatientVerification(data);
+    renderVisitsList(data.visits);
+    renderTestsList(data.tests);
+    switchPatientTab('visits');
+    closeVisitModal();
+    closeTestModal();
+    showView('view-patient-dash');
+  }
+  function renderPatientVerification(data){
+    var verified = isPatientVerified(data);
+    var badge = $('pat-badge');
+    badge.textContent = verified ? 'Verified' : 'Unverified';
+    badge.className = 'badge ' + (verified ? 'verified' : 'unverified');
+    var items = [
+      { label:'Email address', done: !!data.email },
+      { label:'Phone number', done: !!data.phone }
+    ];
+    var html = '';
+    items.forEach(function(it){
+      html += '<li class="'+(it.done?'done':'')+'"><span class="dot"></span>'+it.label+'</li>';
+    });
+    $('pat-checklist').innerHTML = html;
+  }
+
+  $('pat-dash-copy').addEventListener('click', function(){
+    copyToClipboard(session.id, $('pat-dash-copy-note'));
+  });
+  $('pat-avatar-btn').addEventListener('click', function(){
+    $('pat-avatar-input').click();
+  });
+  $('pat-avatar-input').addEventListener('change', function(e){
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')){ e.target.value = ''; return; }
+    if (file.size > 3 * 1024 * 1024){
+      $('pat-dash-copy-note').textContent = 'Image too large — please use one under 3MB';
+      setTimeout(function(){ $('pat-dash-copy-note').textContent = ''; }, 2500);
+      e.target.value = '';
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = async function(){
+      var dataUrl = reader.result;
+      $('pat-avatar-img').src = dataUrl;
+      $('pat-avatar-img').classList.remove('hidden');
+      $('pat-avatar-fallback').classList.add('hidden');
+      var data = Object.assign({}, currentPatientData, { photoUrl: dataUrl });
+      currentPatientData = data;
+      try{ await savePatient(session.id, data); }catch(err){}
+    };
+    reader.readAsDataURL(file);
+  });
+  $('pat-signout').addEventListener('click', function(){
+    session = { type:null, id:null };
+    showView('view-landing');
+  });
+
+  // ---- Visits / Tests tabs ----
+  function switchPatientTab(tab){
+    var visits = tab === 'visits';
+    $('pat-tab-visits').classList.toggle('active', visits);
+    $('pat-tab-tests').classList.toggle('active', !visits);
+    $('pat-visits-pane').classList.toggle('hidden', !visits);
+    $('pat-tests-pane').classList.toggle('hidden', visits);
+  }
+  $('pat-tab-visits').addEventListener('click', function(){ switchPatientTab('visits'); });
+  $('pat-tab-tests').addEventListener('click', function(){ switchPatientTab('tests'); });
+
+  function formatDateDisplay(dateStr){
+    if (!dateStr) return '—';
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+  }
+  var chevronSvg = '<svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+
+  function renderVisitsList(visits){
+    var listEl = $('pat-visits-list');
+    var emptyEl = $('pat-visits-empty');
+    if (!visits || !visits.length){
+      listEl.innerHTML = '';
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = visits.map(function(v, i){
+      return '<div class="list-item" data-idx="'+i+'">'
+        + '<div><div class="li-title">'+escapeHtml(v.doctorName || 'Doctor')+'</div>'
+        + '<div class="li-sub">'+escapeHtml(formatDateDisplay(v.date))+(v.time ? ' · '+escapeHtml(v.time) : '')+'</div></div>'
+        + chevronSvg + '</div>';
+    }).join('');
+    listEl.querySelectorAll('.list-item').forEach(function(el){
+      el.addEventListener('click', function(){
+        openVisitModal(visits[parseInt(el.getAttribute('data-idx'), 10)]);
+      });
+    });
+  }
+  function renderTestsList(tests){
+    var listEl = $('pat-tests-list');
+    var emptyEl = $('pat-tests-empty');
+    if (!tests || !tests.length){
+      listEl.innerHTML = '';
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = tests.map(function(t, i){
+      return '<div class="list-item" data-idx="'+i+'">'
+        + '<div><div class="li-title">'+escapeHtml(t.name || 'Test')+'</div>'
+        + '<div class="li-sub">'+escapeHtml(formatDateDisplay(t.date))+'</div></div>'
+        + chevronSvg + '</div>';
+    }).join('');
+    listEl.querySelectorAll('.list-item').forEach(function(el){
+      el.addEventListener('click', function(){
+        openTestModal(tests[parseInt(el.getAttribute('data-idx'), 10)]);
+      });
+    });
+  }
+  function openVisitModal(v){
+    $('visit-modal-date').textContent = formatDateDisplay(v.date) + (v.time ? ' · ' + v.time : '');
+    $('visit-modal-doctor').textContent = v.doctorName || 'Doctor';
+    $('visit-modal-symptoms').textContent = v.symptoms || 'Not recorded';
+    $('visit-modal-diagnosis').textContent = v.diagnosis || 'Not recorded';
+    $('visit-modal-prescription').textContent = v.prescription || 'Not recorded';
+    $('visit-modal-notes').textContent = v.notes || 'Not recorded';
+    $('pat-visit-modal').classList.remove('hidden');
+  }
+  function closeVisitModal(){ $('pat-visit-modal').classList.add('hidden'); }
+  $('pat-visit-modal-close').addEventListener('click', closeVisitModal);
+  $('pat-visit-modal').addEventListener('click', function(e){ if (e.target === $('pat-visit-modal')) closeVisitModal(); });
+
+  function openTestModal(t){
+    $('test-modal-date').textContent = formatDateDisplay(t.date);
+    $('test-modal-name').textContent = t.name || 'Test';
+    $('test-modal-doctor').textContent = t.doctorName || 'Not recorded';
+    $('test-modal-result').textContent = t.resultSummary || 'No result summary added yet.';
+    $('pat-test-modal').classList.remove('hidden');
+  }
+  function closeTestModal(){ $('pat-test-modal').classList.add('hidden'); }
+  $('pat-test-modal-close').addEventListener('click', closeTestModal);
+  $('pat-test-modal').addEventListener('click', function(e){ if (e.target === $('pat-test-modal')) closeTestModal(); });
+
+  // ================= DOCTOR DASHBOARD =================
+  var currentDoctorData = null;
+  function getDoctorInitials(name){
+    if (!name || !name.trim()) return '?';
+    var parts = name.trim().split(/\s+/);
+    var initials = parts.slice(0, 2).map(function(p){ return p[0] ? p[0].toUpperCase() : ''; }).join('');
+    return initials || '?';
+  }
+  function renderDoctorCard(data){
+    $('doc-card-name').textContent = data.name ? ('Dr. ' + data.name.replace(/^Dr\.?\s*/i, '')) : 'Unnamed doctor';
+    $('doc-card-specialty').textContent = data.specialty || 'Specialty not set';
+    if (data.photoUrl){
+      $('doc-avatar-img').src = data.photoUrl;
+      $('doc-avatar-img').classList.remove('hidden');
+      $('doc-avatar-fallback').classList.add('hidden');
+    } else {
+      $('doc-avatar-img').classList.add('hidden');
+      $('doc-avatar-fallback').classList.remove('hidden');
+      $('doc-avatar-fallback').textContent = getDoctorInitials(data.name);
+    }
+  }
+  async function enterDoctorDash(id){
+    var data = await loadDoctor(id);
+    if (!data) data = { doctorId:id };
+    currentDoctorData = data;
+    $('doc-dash-id').textContent = id;
+    $('doc-modal-id').textContent = id;
+    $('doc-name').value = data.name || '';
+    $('doc-email').value = data.email || '';
+    $('doc-phone').value = data.phone || '';
+    $('doc-license').value = data.license || '';
+    $('doc-specialty').value = data.specialty || '';
+    $('doc-education').value = data.education || '';
+    $('doc-about').value = data.about || '';
+    renderDoctorCard(data);
+    renderDoctorVerification(data);
+    $('lookup-code').value = '';
+    $('lookup-row').classList.remove('hidden');
+    $('lookup-subtitle').classList.remove('hidden');
+    $('patient-result').classList.add('hidden');
+    $('lookup-not-found').classList.add('hidden');
+    $('lookup-empty').classList.remove('hidden');
+    currentLookupCode = null;
+    currentLookupData = null;
+    closeDocProfileModal();
+    closeAddVisitModal();
+    closeDocVisitModal();
+    closeAddTestModal();
+    closeDocTestModal();
+    showView('view-doctor-dash');
+  }
+  function renderDoctorVerification(data){
+    var verified = isDoctorVerified(data);
+    var badge = $('doc-badge');
+    badge.textContent = verified ? 'Verified' : 'Unverified';
+    badge.className = 'badge ' + (verified ? 'verified' : 'unverified');
+    var items = [
+      { label:'Email address', done: !!data.email },
+      { label:'Phone number', done: !!data.phone },
+      { label:'Medical license number', done: !!data.license }
+    ];
+    var html = '';
+    items.forEach(function(it){
+      html += '<li class="'+(it.done?'done':'')+'"><span class="dot"></span>'+it.label+'</li>';
+    });
+    $('doc-checklist').innerHTML = html;
+  }
+  $('doc-save-btn').addEventListener('click', async function(){
+    var data = Object.assign({}, currentDoctorData, {
+      doctorId: session.id,
+      name: $('doc-name').value.trim(),
+      email: $('doc-email').value.trim(),
+      phone: $('doc-phone').value.trim(),
+      license: $('doc-license').value.trim(),
+      specialty: $('doc-specialty').value.trim(),
+      education: $('doc-education').value.trim(),
+      about: $('doc-about').value.trim()
+    });
+    data.verified = isDoctorVerified(data);
+    await saveDoctor(session.id, data);
+    currentDoctorData = data;
+    renderDoctorCard(data);
+    renderDoctorVerification(data);
+    var note = $('doc-save-note');
+    note.classList.add('show');
+    setTimeout(function(){ note.classList.remove('show'); }, 1800);
+  });
+  $('doc-dash-copy').addEventListener('click', function(){
+    copyToClipboard(session.id, $('doc-dash-copy-note'));
+  });
+  $('doc-avatar-btn').addEventListener('click', function(){
+    $('doc-avatar-input').click();
+  });
+  $('doc-avatar-input').addEventListener('change', function(e){
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')){ e.target.value = ''; return; }
+    if (file.size > 3 * 1024 * 1024){
+      $('doc-dash-copy-note').textContent = 'Image too large — please use one under 3MB';
+      setTimeout(function(){ $('doc-dash-copy-note').textContent = ''; }, 2500);
+      e.target.value = '';
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = async function(){
+      var dataUrl = reader.result;
+      $('doc-avatar-img').src = dataUrl;
+      $('doc-avatar-img').classList.remove('hidden');
+      $('doc-avatar-fallback').classList.add('hidden');
+      var data = Object.assign({}, currentDoctorData, { photoUrl: dataUrl });
+      currentDoctorData = data;
+      try{ await saveDoctor(session.id, data); }catch(err){}
+    };
+    reader.readAsDataURL(file);
+  });
+  $('doc-signout').addEventListener('click', function(){
+    session = { type:null, id:null };
+    showView('view-landing');
+  });
+
+  function openDocProfileModal(){
+    $('doc-profile-modal').classList.remove('hidden');
+  }
+  function closeDocProfileModal(){
+    $('doc-profile-modal').classList.add('hidden');
+  }
+  $('doc-account-settings-btn').addEventListener('click', openDocProfileModal);
+  $('doc-profile-close').addEventListener('click', closeDocProfileModal);
+  $('doc-profile-modal').addEventListener('click', function(e){
+    if (e.target === $('doc-profile-modal')) closeDocProfileModal();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); }
+  });
+
+  function escapeHtml(s){
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+  var currentLookupCode = null;
+  var currentLookupData = null;
+
+  function renderDoctorVisitsList(visits){
+    var listEl = $('doc-visits-list');
+    var emptyEl = $('doc-visits-empty');
+    if (!visits || !visits.length){
+      listEl.innerHTML = '';
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = visits.map(function(v, i){
+      return '<div class="list-item" data-idx="'+i+'">'
+        + '<div><div class="li-title">'+escapeHtml(v.doctorName || 'Doctor')+'</div>'
+        + '<div class="li-sub">'+escapeHtml(formatDateDisplay(v.date))+(v.time ? ' · '+escapeHtml(v.time) : '')+'</div></div>'
+        + chevronSvg + '</div>';
+    }).join('');
+    listEl.querySelectorAll('.list-item').forEach(function(el){
+      el.addEventListener('click', function(){
+        openDocVisitModal(visits[parseInt(el.getAttribute('data-idx'), 10)]);
+      });
+    });
+  }
+  function openDocVisitModal(v){
+    $('doc-visit-modal-date').textContent = formatDateDisplay(v.date) + (v.time ? ' · ' + v.time : '');
+    $('doc-visit-modal-doctor').textContent = v.doctorName || 'Doctor';
+    $('doc-visit-modal-symptoms').textContent = v.symptoms || 'Not recorded';
+    $('doc-visit-modal-diagnosis').textContent = v.diagnosis || 'Not recorded';
+    $('doc-visit-modal-prescription').textContent = v.prescription || 'Not recorded';
+    $('doc-visit-modal-notes').textContent = v.notes || 'Not recorded';
+    $('doc-visit-modal').classList.remove('hidden');
+  }
+  function closeDocVisitModal(){ $('doc-visit-modal').classList.add('hidden'); }
+  $('doc-visit-modal-close').addEventListener('click', closeDocVisitModal);
+  $('doc-visit-modal').addEventListener('click', function(e){ if (e.target === $('doc-visit-modal')) closeDocVisitModal(); });
+
+  function renderDoctorTestsList(tests){
+    var listEl = $('doc-tests-list');
+    var emptyEl = $('doc-tests-empty');
+    if (!tests || !tests.length){
+      listEl.innerHTML = '';
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = tests.map(function(t, i){
+      return '<div class="list-item" data-idx="'+i+'">'
+        + '<div><div class="li-title">'+escapeHtml(t.name || 'Test')+'</div>'
+        + '<div class="li-sub">'+escapeHtml(formatDateDisplay(t.date))+'</div></div>'
+        + chevronSvg + '</div>';
+    }).join('');
+    listEl.querySelectorAll('.list-item').forEach(function(el){
+      el.addEventListener('click', function(){
+        openDocTestModal(tests[parseInt(el.getAttribute('data-idx'), 10)]);
+      });
+    });
+  }
+  function openDocTestModal(t){
+    $('doc-test-modal-date').textContent = formatDateDisplay(t.date);
+    $('doc-test-modal-name').textContent = t.name || 'Test';
+    $('doc-test-modal-doctor').textContent = t.doctorName || 'Not recorded';
+    $('doc-test-modal-result').textContent = t.resultSummary || 'No result summary added yet.';
+    $('doc-test-modal').classList.remove('hidden');
+  }
+  function closeDocTestModal(){ $('doc-test-modal').classList.add('hidden'); }
+  $('doc-test-modal-close').addEventListener('click', closeDocTestModal);
+  $('doc-test-modal').addEventListener('click', function(e){ if (e.target === $('doc-test-modal')) closeDocTestModal(); });
+
+  function switchDoctorResultTab(tab){
+    var visits = tab === 'visits';
+    $('doc-tab-visits').classList.toggle('active', visits);
+    $('doc-tab-tests').classList.toggle('active', !visits);
+    $('doc-visits-pane').classList.toggle('hidden', !visits);
+    $('doc-tests-pane').classList.toggle('hidden', visits);
+  }
+  $('doc-tab-visits').addEventListener('click', function(){ switchDoctorResultTab('visits'); });
+  $('doc-tab-tests').addEventListener('click', function(){ switchDoctorResultTab('tests'); });
+
+  function showLookupResult(code, data){
+    currentLookupCode = code;
+    currentLookupData = data;
+    $('lookup-row').classList.add('hidden');
+    $('lookup-subtitle').classList.add('hidden');
+    $('lookup-not-found').classList.add('hidden');
+    $('patient-result').classList.remove('hidden');
+    var verified = isPatientVerified(data);
+    $('res-name').textContent = data.name || 'Unnamed patient';
+    $('add-visit-patient-name').textContent = data.name || 'this patient';
+    var badge = $('res-badge');
+    badge.textContent = verified ? 'Verified' : 'Unverified';
+    badge.className = 'badge ' + (verified ? 'verified' : 'unverified');
+    $('res-code').textContent = formatCode(code);
+    renderDoctorVisitsList(data.visits || []);
+    renderDoctorTestsList(data.tests || []);
+    switchDoctorResultTab('visits');
+  }
+  function resetLookup(){
+    currentLookupCode = null;
+    currentLookupData = null;
+    $('lookup-code').value = '';
+    $('lookup-row').classList.remove('hidden');
+    $('lookup-subtitle').classList.remove('hidden');
+    $('patient-result').classList.add('hidden');
+    $('lookup-not-found').classList.add('hidden');
+    $('lookup-empty').classList.remove('hidden');
+    $('lookup-code').focus();
+  }
+  $('lookup-btn').addEventListener('click', async function(){
+    var code = $('lookup-code').value.replace(/[^0-9]/g,'');
+    $('lookup-empty').classList.add('hidden');
+    if (code.length !== 8){
+      $('patient-result').classList.add('hidden');
+      $('lookup-not-found').classList.remove('hidden');
+      currentLookupCode = null;
+      currentLookupData = null;
+      return;
+    }
+    var data = await loadPatient(code);
+    if (!data){
+      $('patient-result').classList.add('hidden');
+      $('lookup-not-found').classList.remove('hidden');
+      currentLookupCode = null;
+      currentLookupData = null;
+      return;
+    }
+    showLookupResult(code, data);
+  });
+  $('lookup-code').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') $('lookup-btn').click();
+  });
+  $('lookup-change-btn').addEventListener('click', resetLookup);
+
+  function currentDoctorDisplayName(){
+    var name = currentDoctorData && currentDoctorData.name ? currentDoctorData.name.trim() : '';
+    if (name) return 'Dr. ' + name.replace(/^Dr\.?\s*/i, '');
+    return session.id || 'Doctor';
+  }
+  function openAddVisitModal(){
+    if (!currentLookupCode) return;
+    $('visit-date').value = new Date().toISOString().slice(0, 10);
+    $('visit-time').value = '';
+    $('visit-symptoms').value = '';
+    $('visit-diagnosis').value = '';
+    $('visit-prescription').value = '';
+    $('visit-notes').value = '';
+    clearError($('add-visit-error'));
+    $('add-visit-modal').classList.remove('hidden');
+  }
+  function closeAddVisitModal(){
+    $('add-visit-modal').classList.add('hidden');
+  }
+  $('add-visit-btn').addEventListener('click', openAddVisitModal);
+  $('add-visit-close').addEventListener('click', closeAddVisitModal);
+  $('add-visit-cancel').addEventListener('click', closeAddVisitModal);
+  $('add-visit-modal').addEventListener('click', function(e){
+    if (e.target === $('add-visit-modal')) closeAddVisitModal();
+  });
+  $('add-visit-save').addEventListener('click', async function(){
+    if (!currentLookupCode){
+      showError($('add-visit-error'), 'No patient selected.');
+      return;
+    }
+    var date = $('visit-date').value;
+    if (!date){
+      showError($('add-visit-error'), 'Please choose a date.');
+      return;
+    }
+    clearError($('add-visit-error'));
+    var visit = {
+      doctorName: currentDoctorDisplayName(),
+      date: date,
+      time: $('visit-time').value.trim(),
+      symptoms: $('visit-symptoms').value.trim(),
+      diagnosis: $('visit-diagnosis').value.trim(),
+      prescription: $('visit-prescription').value.trim(),
+      notes: $('visit-notes').value.trim()
+    };
+    $('add-visit-save').disabled = true;
+    $('add-visit-save').textContent = 'Saving...';
+    try{
+      var data = await loadPatient(currentLookupCode);
+      if (!data){
+        showError($('add-visit-error'), 'This patient record could not be found anymore.');
+        return;
+      }
+      if (!data.visits) data.visits = [];
+      data.visits.unshift(visit);
+      await savePatient(currentLookupCode, data);
+      currentLookupData = data;
+      renderDoctorVisitsList(data.visits);
+      closeAddVisitModal();
+      var note = $('add-visit-note');
+      note.classList.add('show');
+      setTimeout(function(){ note.classList.remove('show'); }, 2200);
+    }catch(e){
+      showError($('add-visit-error'), 'Something went wrong saving this visit. Please try again.');
+    }finally{
+      $('add-visit-save').disabled = false;
+      $('add-visit-save').textContent = 'Save visit note';
+    }
+  });
+
+  function openAddTestModal(){
+    if (!currentLookupCode) return;
+    $('test-name').value = '';
+    $('test-date').value = new Date().toISOString().slice(0, 10);
+    $('test-result').value = '';
+    clearError($('add-test-error'));
+    $('add-test-patient-name').textContent = (currentLookupData && currentLookupData.name) || 'this patient';
+    $('add-test-modal').classList.remove('hidden');
+  }
+  function closeAddTestModal(){
+    $('add-test-modal').classList.add('hidden');
+  }
+  $('add-test-btn').addEventListener('click', openAddTestModal);
+  $('add-test-close').addEventListener('click', closeAddTestModal);
+  $('add-test-cancel').addEventListener('click', closeAddTestModal);
+  $('add-test-modal').addEventListener('click', function(e){
+    if (e.target === $('add-test-modal')) closeAddTestModal();
+  });
+  $('add-test-save').addEventListener('click', async function(){
+    if (!currentLookupCode){
+      showError($('add-test-error'), 'No patient selected.');
+      return;
+    }
+    var name = $('test-name').value.trim();
+    var date = $('test-date').value;
+    if (!name){
+      showError($('add-test-error'), 'Please enter a test name.');
+      return;
+    }
+    if (!date){
+      showError($('add-test-error'), 'Please choose a date.');
+      return;
+    }
+    clearError($('add-test-error'));
+    var test = {
+      name: name,
+      date: date,
+      doctorName: currentDoctorDisplayName(),
+      resultSummary: $('test-result').value.trim()
+    };
+    $('add-test-save').disabled = true;
+    $('add-test-save').textContent = 'Saving...';
+    try{
+      var data = await loadPatient(currentLookupCode);
+      if (!data){
+        showError($('add-test-error'), 'This patient record could not be found anymore.');
+        return;
+      }
+      if (!data.tests) data.tests = [];
+      data.tests.unshift(test);
+      await savePatient(currentLookupCode, data);
+      currentLookupData = data;
+      renderDoctorTestsList(data.tests);
+      closeAddTestModal();
+      var note = $('add-test-note');
+      note.classList.add('show');
+      setTimeout(function(){ note.classList.remove('show'); }, 2200);
+    }catch(e){
+      showError($('add-test-error'), 'Something went wrong saving this test. Please try again.');
+    }finally{
+      $('add-test-save').disabled = false;
+      $('add-test-save').textContent = 'Save test';
+    }
+  });
+
+  showView('view-landing');
+})();
+</script>
+</body>
+</html>

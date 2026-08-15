@@ -499,8 +499,8 @@
 
       <div id="pat-signin-pane" class="hidden">
         <div class="field">
-          <label for="pat-signin-code">Access code</label>
-          <input type="text" id="pat-signin-code" placeholder="8-digit code">
+          <label for="pat-signin-code">Access code or email</label>
+          <input type="text" id="pat-signin-code" placeholder="8-digit code or email">
         </div>
         <div class="field">
           <label for="pat-signin-password">Password</label>
@@ -528,8 +528,7 @@
         <div class="panel health-card-panel">
           <div class="health-card">
             <svg class="health-card-watermark" viewBox="0 0 220 60" preserveAspectRatio="none"><path d="M0,30 L50,30 L58,14 L66,46 L74,30 L120,30 L128,18 L136,30 L180,30 L188,12 L196,48 L204,30 L220,30" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <div class="health-card-top">
-              <span class="health-card-brand">PAK HEALTH · PATIENT ID</span>
+            <div class="health-card-top" style="justify-content:flex-end;">
               <span class="badge unverified" id="pat-badge">Unverified</span>
             </div>
             <div class="health-card-body">
@@ -539,7 +538,6 @@
               </button>
               <div class="health-card-info">
                 <div class="health-card-name" id="card-name">—</div>
-                <div class="health-card-phone" id="card-phone">No phone on file</div>
               </div>
             </div>
             <div class="health-card-code-row">
@@ -553,6 +551,7 @@
           <input type="file" accept="image/*" id="pat-avatar-input" class="hidden">
           <div class="copy-note" id="pat-dash-copy-note"></div>
           <ul class="checklist" id="pat-checklist"></ul>
+          <button class="btn btn-secondary btn-block" id="pat-account-settings-btn" style="margin-top:16px;">Account settings</button>
           <div class="privacy-note">Anyone holding this code can view your record. Only share it with a doctor you trust.</div>
         </div>
       </div>
@@ -602,6 +601,25 @@
         <dt>Ordered by</dt><dd id="test-modal-doctor">—</dd>
         <dt>Result summary</dt><dd class="block" id="test-modal-result">—</dd>
       </dl>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="pat-profile-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="pat-profile-close" aria-label="Close">&times;</button>
+      <span class="eyebrow">Access code</span>
+      <div class="code mono" id="pat-modal-code" style="font-size:1.3rem; margin:10px 0 16px;">0000 0000</div>
+
+      <h3>Account settings</h3>
+      <p class="panel-sub">Complete email and phone to get verified.</p>
+      <div class="field"><label for="pat-name">Full name</label><input type="text" id="pat-name" placeholder="Jordan Rivers"></div>
+      <div class="field"><label for="pat-email">Email</label><input type="email" id="pat-email" placeholder="you@example.com"></div>
+      <div class="field"><label for="pat-phone">Phone</label><input type="tel" id="pat-phone" placeholder="+45 00 00 00 00"></div>
+
+      <div class="save-row">
+        <button class="btn btn-primary btn-block" id="pat-save-btn">Save changes</button>
+      </div>
+      <span class="save-note" id="pat-save-note">Saved</span>
     </div>
   </div>
 </div>
@@ -1102,12 +1120,18 @@
     $('pat-tab-signin').classList.add('active'); $('pat-tab-signup').classList.remove('active');
     $('pat-signin-pane').classList.remove('hidden'); $('pat-signup-pane').classList.add('hidden');
   });
+  function emailIndexKey(email){ return 'patient-email:' + email.trim().toLowerCase(); }
+  async function linkPatientEmail(email, code){
+    if (!email) return;
+    await storeSet(emailIndexKey(email), code);
+  }
   async function createPatientAccount(name, phone, email, password){
     var code = await generatePatientCode();
     var passwordHash = password ? await hashPassword(password) : '';
     var data = { code:code, name:name||'', email:email||'', phone:phone||'', dob:'', idNumber:'', bloodType:'', emergencyContact:'', allergies:'', conditions:'', medications:'', photoUrl:'', passwordHash:passwordHash, visits: sampleVisits(), tests: sampleTests(), createdAt: Date.now() };
     data.verified = isPatientVerified(data);
     await savePatient(code, data);
+    await linkPatientEmail(email, code);
     session = { type:'patient', id:code };
     await enterPatientDash(code);
   }
@@ -1157,15 +1181,22 @@
     }
   });
   $('pat-signin-btn').addEventListener('click', async function(){
-    var code = $('pat-signin-code').value.replace(/[^0-9]/g,'');
+    var raw = $('pat-signin-code').value.trim();
     var password = $('pat-signin-password').value;
-    if (code.length !== 8){
-      showError($('pat-signin-error'), 'We couldn\u2019t find an account with that code.');
+    var code = null;
+    if (raw.indexOf('@') !== -1){
+      code = await storeGet(emailIndexKey(raw));
+    } else {
+      var digits = raw.replace(/[^0-9]/g,'');
+      if (digits.length === 8) code = digits;
+    }
+    if (!code){
+      showError($('pat-signin-error'), 'We couldn\u2019t find an account with that code or email.');
       return;
     }
     var data = await loadPatient(code);
     if (!data){
-      showError($('pat-signin-error'), 'We couldn\u2019t find an account with that code.');
+      showError($('pat-signin-error'), 'We couldn\u2019t find an account with that code or email.');
       return;
     }
     if (data.passwordHash){
@@ -1203,7 +1234,6 @@
   }
   function renderHealthCard(data){
     $('card-name').textContent = data.name || 'Unnamed patient';
-    $('card-phone').textContent = data.phone || 'No phone on file';
     if (data.photoUrl){
       $('pat-avatar-img').src = data.photoUrl;
       $('pat-avatar-img').classList.remove('hidden');
@@ -1231,6 +1261,7 @@
     switchPatientTab('visits');
     closeVisitModal();
     closeTestModal();
+    closePatProfileModal();
     showView('view-patient-dash');
   }
   function renderPatientVerification(data){
@@ -1248,6 +1279,40 @@
     });
     $('pat-checklist').innerHTML = html;
   }
+
+  function openPatProfileModal(){
+    $('pat-modal-code').textContent = formatCode(session.id);
+    $('pat-name').value = (currentPatientData && currentPatientData.name) || '';
+    $('pat-email').value = (currentPatientData && currentPatientData.email) || '';
+    $('pat-phone').value = (currentPatientData && currentPatientData.phone) || '';
+    $('pat-profile-modal').classList.remove('hidden');
+  }
+  function closePatProfileModal(){
+    $('pat-profile-modal').classList.add('hidden');
+  }
+  $('pat-account-settings-btn').addEventListener('click', openPatProfileModal);
+  $('pat-profile-close').addEventListener('click', closePatProfileModal);
+  $('pat-profile-modal').addEventListener('click', function(e){
+    if (e.target === $('pat-profile-modal')) closePatProfileModal();
+  });
+  $('pat-save-btn').addEventListener('click', async function(){
+    var email = $('pat-email').value.trim();
+    var data = Object.assign({}, currentPatientData, {
+      code: session.id,
+      name: $('pat-name').value.trim(),
+      email: email,
+      phone: $('pat-phone').value.trim()
+    });
+    data.verified = isPatientVerified(data);
+    await savePatient(session.id, data);
+    await linkPatientEmail(email, session.id);
+    currentPatientData = data;
+    renderHealthCard(data);
+    renderPatientVerification(data);
+    var note = $('pat-save-note');
+    note.classList.add('show');
+    setTimeout(function(){ note.classList.remove('show'); }, 1800);
+  });
 
   $('pat-dash-copy').addEventListener('click', function(){
     copyToClipboard(session.id, $('pat-dash-copy-note'));
@@ -1563,7 +1628,7 @@
     if (e.target === $('doc-profile-modal')) closeDocProfileModal();
   });
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeDocStatsModal(); }
+    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeDocStatsModal(); closePatProfileModal(); }
   });
 
   function escapeHtml(s){

@@ -33,6 +33,12 @@ open it directly in a browser. All styling and logic live in that one file (inli
   credentials are filled in, the app silently runs on tier (3) exactly as before.
 - **Data keys**: `patient:<8-digit-code>` and `doctor:<DR-XXXXXX>`, stored as JSON
   strings, `shared: true` so a doctor's browser can look up a patient's record by code.
+  A third key shape, `patient-email:<lowercased-email>`, stores just the plain-text
+  code as its value — a secondary index so a patient can sign in with their email
+  instead of their code. Written at signup and re-written whenever a patient saves a
+  new email in Account settings; the old key isn't cleaned up if the email changes
+  (harmless — it would just also resolve to the same patient), so this can drift into
+  a few orphaned rows over time.
 - **Auth**: password is optional at signup (deliberately, to keep trying the app
   frictionless). If set, it's SHA-256 hashed client-side via `crypto.subtle` (no salt —
   not real security, just better than plaintext) with a non-cryptographic fallback hash
@@ -62,11 +68,15 @@ doctor: {
 ## Key flows already built
 
 - Landing page → doctor / individual choice → sign up (name, phone, email, optional
-  password) or sign in (code/ID + password if one was set) → dashboard. "Continue with
-  Google" is a **demo only** (asks for name/email inline, no real OAuth).
+  password) or sign in → dashboard. Doctors sign in with their doctor ID; patients can
+  sign in with either their 8-digit code **or** their email (detected by whether the
+  input contains `@`), both plus a password if one was set. "Continue with Google" is
+  a **demo only** (asks for name/email inline, no real OAuth).
 - Both roles get an ID-card-style visual (health card / doctor card) with a real
   card aspect ratio, a photo upload (stored as base64 `photoUrl`), and a verified badge
-  (patient: email + phone; doctor: email + phone + license).
+  (patient: email + phone; doctor: email + phone + license). The patient card shows
+  just avatar + name + access code — no phone line or "Pak Health" brand text on the
+  card itself, unlike the doctor card which still shows both.
 - Doctor dashboard: enter a patient's code → their code-entry box disappears and is
   replaced by the patient's name/badge, a "Search a different patient" link, and
   **Visits / Tests tabs** — same list-and-detail-modal pattern as the patient's own
@@ -74,7 +84,11 @@ doctor: {
   open a form modal; saving writes directly into that patient's record, so the patient
   sees it immediately next time they sign in. This is the core loop of the app.
 - Patient dashboard: health card, Visits tab, Tests tab (both seeded with sample data
-  on first load if empty, so the UI never looks broken/empty during a demo).
+  on first load if empty, so the UI never looks broken/empty during a demo), and an
+  "Account settings" modal (name, email, phone) mirroring the doctor's — this is what
+  lets a patient add or fix their email/phone *after* signup so the verification
+  checklist and badge can actually update; before this existed there was no way to
+  edit those fields post-signup at all.
 - Doctor clinics: a "Currently seeing patients at" dropdown on the doctor dashboard,
   fed by a `clinics` list the doctor builds in Account settings (add/remove chips).
   Whichever clinic is selected as `currentClinic` is stamped onto every new visit note
@@ -119,9 +133,11 @@ doctor: {
 
 ## Going live (Supabase + static hosting)
 
-Steps 1–3 (Supabase project, `kv_store` table + RLS, credentials in `pakHealth.html`)
-are **done** — the app is live-connected to a real Supabase project. What's left is
-hosting (step 4) so testers can reach it at a URL instead of a local file.
+Steps 1–4 are **done**. The app is live at
+https://mudabbirtufail.github.io/Pak-Health/pakHealth.html, connected to a real
+Supabase project, served from the `mudabbirtufail/Pak-Health` GitHub repo (branch
+`main`) via GitHub Pages. A real cross-device signup/sign-in round trip has been
+verified against the deployed URL itself, not just locally.
 
 1. **Create a free Supabase project** at supabase.com (no credit card needed for the
    free tier). Once it's provisioned, go to Settings → API and copy the **Project

@@ -6,6 +6,7 @@
 <title>Pak Health</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root{
     --bg: #F1F4F2;
@@ -264,6 +265,7 @@
     position:relative; background: var(--paper); border-radius: var(--radius); box-shadow: var(--shadow);
     max-width: 440px; width:100%; max-height: 80vh; overflow-y:auto; padding: 30px;
   }
+  .modal-card-wide{ max-width: 640px; }
   .modal-close{
     position:absolute; top:14px; right:14px; background:none; border:none; font-size:1.5rem;
     line-height:1; color: var(--muted); padding:4px;
@@ -321,6 +323,22 @@
   .health-card-code-row .btn-secondary:hover{ background: rgba(255,255,255,0.28); border-color: rgba(255,255,255,0.75); }
   .health-card-panel .copy-note{ margin-top:10px; }
   .health-card-panel .checklist{ margin-top:16px; }
+
+  /* ---------- Clinic chips ---------- */
+  .chip-list{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{
+    display:inline-flex; align-items:center; gap:8px; background: var(--teal-wash); color: var(--teal-dark);
+    border-radius:999px; padding:6px 8px 6px 12px; font-size:0.82rem; font-weight:600;
+  }
+  .chip button{ background:none; border:none; color: var(--teal-dark); opacity:0.7; font-size:1rem; line-height:1; padding:0 2px; }
+  .chip button:hover{ opacity:1; color: var(--red); }
+
+  /* ---------- Stats ---------- */
+  .stats-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-top:18px; }
+  @media (max-width: 420px){ .stats-grid{ grid-template-columns: 1fr; } }
+  .stat-tile{ background: var(--bg); border-radius:8px; padding:14px 16px; }
+  .stat-tile .stat-value{ font-family:'Spectral', serif; font-weight:600; font-size:1.5rem; color: var(--ink); }
+  .stat-tile .stat-label{ font-size:0.78rem; color: var(--muted); margin-top:4px; }
 </style>
 </head>
 <body>
@@ -566,6 +584,7 @@
       <span class="eyebrow" id="visit-modal-date">—</span>
       <h3 id="visit-modal-doctor" style="margin-top:6px;">—</h3>
       <dl class="kv" style="margin-top:18px;">
+        <dt>Clinic</dt><dd id="visit-modal-clinic">—</dd>
         <dt>Symptoms</dt><dd class="block" id="visit-modal-symptoms">—</dd>
         <dt>Diagnosis</dt><dd class="block" id="visit-modal-diagnosis">—</dd>
         <dt>Prescription</dt><dd class="block" id="visit-modal-prescription">—</dd>
@@ -627,7 +646,13 @@
           <input type="file" accept="image/*" id="doc-avatar-input" class="hidden">
           <div class="copy-note" id="doc-dash-copy-note"></div>
           <ul class="checklist" id="doc-checklist"></ul>
-          <button class="btn btn-secondary btn-block" id="doc-account-settings-btn" style="margin-top:16px;">Account settings</button>
+          <div class="field" style="margin-top:16px;">
+            <label for="doc-current-clinic">Currently seeing patients at</label>
+            <select id="doc-current-clinic"><option value="">No clinic selected</option></select>
+            <div class="hint" id="doc-clinic-hint">Add clinics in account settings to select one here.</div>
+          </div>
+          <button class="btn btn-secondary btn-block" id="doc-account-settings-btn" style="margin-top:12px;">Account settings</button>
+          <button class="btn btn-secondary btn-block" id="doc-stats-btn" style="margin-top:10px;">My statistics</button>
         </div>
       </div>
 
@@ -695,6 +720,15 @@
       <div class="field"><label for="doc-education">Education & qualifications</label><textarea id="doc-education" placeholder="Degrees, residency, board certifications..."></textarea></div>
       <div class="field"><label for="doc-about">About</label><textarea id="doc-about" placeholder="A short bio patients can see when you're verified."></textarea></div>
 
+      <hr>
+      <h4 class="subhead">Clinics</h4>
+      <p class="panel-sub" style="margin-bottom:12px;">Add the clinics or hospitals you work from. Pick which one you're currently at from the dashboard — it's added automatically to visit notes you write.</p>
+      <div class="chip-list" id="doc-clinics-list" style="margin-bottom:12px;"></div>
+      <div class="lookup-row">
+        <input type="text" id="doc-clinic-input" placeholder="e.g. City General Hospital">
+        <button class="btn btn-secondary" id="doc-clinic-add-btn">Add</button>
+      </div>
+
       <div class="save-row">
         <button class="btn btn-primary btn-block" id="doc-save-btn">Save changes</button>
       </div>
@@ -738,6 +772,7 @@
       <span class="eyebrow" id="doc-visit-modal-date">—</span>
       <h3 id="doc-visit-modal-doctor" style="margin-top:6px;">—</h3>
       <dl class="kv" style="margin-top:18px;">
+        <dt>Clinic</dt><dd id="doc-visit-modal-clinic">—</dd>
         <dt>Symptoms</dt><dd class="block" id="doc-visit-modal-symptoms">—</dd>
         <dt>Diagnosis</dt><dd class="block" id="doc-visit-modal-diagnosis">—</dd>
         <dt>Prescription</dt><dd class="block" id="doc-visit-modal-prescription">—</dd>
@@ -766,6 +801,21 @@
       </div>
     </div>
   </div>
+
+  <div class="modal-overlay hidden" id="doc-stats-modal">
+    <div class="modal-card modal-card-wide">
+      <button class="modal-close" id="doc-stats-close" aria-label="Close">&times;</button>
+      <span class="eyebrow">Your activity</span>
+      <h3 style="margin-top:6px;">Statistics</h3>
+      <p class="panel-sub" style="margin-top:8px;">Based on visit notes you've added through Pak Health.</p>
+      <div class="stats-grid" id="doc-stats-grid"></div>
+      <div class="empty-state" id="doc-stats-empty">No visits recorded yet — stats will appear after you add your first visit note.</div>
+      <div id="doc-stats-chart-section" class="hidden">
+        <h4 class="subhead">Patients attended per day</h4>
+        <div id="doc-stats-chart-wrap"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -786,8 +836,22 @@
   }
   function formatCode(code){ return code.slice(0,4) + ' ' + code.slice(4); }
 
-  // In-memory fallback store, used if window.storage is unavailable or errors out,
-  // so the app still works (for this browser tab) even without persistence.
+  // Real persistence for a live deploy: a Supabase project with a single `kv_store`
+  // table (key text primary key, value text) mirrors this file's get/set-by-key
+  // interface almost exactly, so the rest of the app didn't need to change.
+  // Fill these in once you have a Supabase project (Settings > API) — until then
+  // they're left as placeholders and the app quietly skips straight to the
+  // in-memory fallback below, exactly like before.
+  var SUPABASE_URL = 'https://topuupugxzulubrbkuzo.supabase.co';
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvcHV1cHVneHp1bHVicmJrdXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3ODA4NzQsImV4cCI6MjEwMjM1Njg3NH0.0DLPi6wP2NgibwJjf7ZSkazUQos81RAL6aM8JO7MLb4';
+  var supabaseClient = null;
+  if (window.supabase && SUPABASE_URL.indexOf('YOUR_') !== 0 && SUPABASE_ANON_KEY.indexOf('YOUR_') !== 0){
+    try{ supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); }catch(e){}
+  }
+
+  // In-memory fallback store, used if window.storage and Supabase are both
+  // unavailable or error out, so the app still works (for this browser tab) even
+  // without persistence.
   var memoryStore = {};
   async function storeGet(key){
     if (window.storage && typeof window.storage.get === 'function'){
@@ -795,7 +859,15 @@
         var r = await window.storage.get(key, true);
         return r ? r.value : null;
       }catch(e){
-        // treat as "not found" and fall through to memory below
+        // treat as "not found" and fall through below
+      }
+    }
+    if (supabaseClient){
+      try{
+        var res = await supabaseClient.from('kv_store').select('value').eq('key', key).maybeSingle();
+        if (!res.error) return res.data ? res.data.value : null;
+      }catch(e){
+        // fall through to memory below
       }
     }
     return Object.prototype.hasOwnProperty.call(memoryStore, key) ? memoryStore[key] : null;
@@ -805,6 +877,13 @@
     if (window.storage && typeof window.storage.set === 'function'){
       try{
         await window.storage.set(key, value, true);
+      }catch(e){
+        // keep the memory copy so the app still works this session
+      }
+    }
+    if (supabaseClient){
+      try{
+        await supabaseClient.from('kv_store').upsert({ key: key, value: value, updated_at: new Date().toISOString() });
       }catch(e){
         // keep the memory copy so the app still works this session
       }
@@ -922,7 +1001,7 @@
   async function createDoctorAccount(name, phone, email, password){
     var id = await generateDoctorId();
     var passwordHash = password ? await hashPassword(password) : '';
-    var data = { doctorId:id, name:name||'', email:email||'', phone:phone||'', license:'', specialty:'', education:'', about:'', photoUrl:'', passwordHash:passwordHash, createdAt: Date.now() };
+    var data = { doctorId:id, name:name||'', email:email||'', phone:phone||'', license:'', specialty:'', education:'', about:'', photoUrl:'', passwordHash:passwordHash, clinics:[], currentClinic:'', visitLog:[], createdAt: Date.now() };
     data.verified = isDoctorVerified(data);
     await saveDoctor(id, data);
     session = { type:'doctor', id:id };
@@ -1234,7 +1313,7 @@
     listEl.innerHTML = visits.map(function(v, i){
       return '<div class="list-item" data-idx="'+i+'">'
         + '<div><div class="li-title">'+escapeHtml(v.doctorName || 'Doctor')+'</div>'
-        + '<div class="li-sub">'+escapeHtml(formatDateDisplay(v.date))+(v.time ? ' · '+escapeHtml(v.time) : '')+'</div></div>'
+        + '<div class="li-sub">'+escapeHtml(formatDateDisplay(v.date))+(v.time ? ' · '+escapeHtml(v.time) : '')+(v.clinicName ? ' · '+escapeHtml(v.clinicName) : '')+'</div></div>'
         + chevronSvg + '</div>';
     }).join('');
     listEl.querySelectorAll('.list-item').forEach(function(el){
@@ -1267,6 +1346,7 @@
   function openVisitModal(v){
     $('visit-modal-date').textContent = formatDateDisplay(v.date) + (v.time ? ' · ' + v.time : '');
     $('visit-modal-doctor').textContent = v.doctorName || 'Doctor';
+    $('visit-modal-clinic').textContent = v.clinicName || 'Not recorded';
     $('visit-modal-symptoms').textContent = v.symptoms || 'Not recorded';
     $('visit-modal-diagnosis').textContent = v.diagnosis || 'Not recorded';
     $('visit-modal-prescription').textContent = v.prescription || 'Not recorded';
@@ -1312,6 +1392,9 @@
   async function enterDoctorDash(id){
     var data = await loadDoctor(id);
     if (!data) data = { doctorId:id };
+    if (!data.clinics) data.clinics = [];
+    if (!data.currentClinic) data.currentClinic = '';
+    if (!data.visitLog) data.visitLog = [];
     currentDoctorData = data;
     $('doc-dash-id').textContent = id;
     $('doc-modal-id').textContent = id;
@@ -1324,6 +1407,7 @@
     $('doc-about').value = data.about || '';
     renderDoctorCard(data);
     renderDoctorVerification(data);
+    renderClinicSelect(data);
     $('lookup-code').value = '';
     $('lookup-row').classList.remove('hidden');
     $('lookup-subtitle').classList.remove('hidden');
@@ -1337,6 +1421,7 @@
     closeDocVisitModal();
     closeAddTestModal();
     closeDocTestModal();
+    closeDocStatsModal();
     showView('view-doctor-dash');
   }
   function renderDoctorVerification(data){
@@ -1355,6 +1440,62 @@
     });
     $('doc-checklist').innerHTML = html;
   }
+
+  // ---- Clinics ----
+  function renderClinicSelect(data){
+    var clinics = data.clinics || [];
+    var select = $('doc-current-clinic');
+    var current = data.currentClinic || '';
+    select.innerHTML = '<option value="">No clinic selected</option>' + clinics.map(function(c){
+      return '<option value="'+escapeHtml(c)+'"'+(c === current ? ' selected' : '')+'>'+escapeHtml(c)+'</option>';
+    }).join('');
+    $('doc-clinic-hint').classList.toggle('hidden', clinics.length > 0);
+  }
+  function renderClinicsList(data){
+    var clinics = data.clinics || [];
+    var listEl = $('doc-clinics-list');
+    if (!clinics.length){
+      listEl.innerHTML = '<span class="hint">No clinics added yet.</span>';
+      return;
+    }
+    listEl.innerHTML = clinics.map(function(c, i){
+      return '<span class="chip">'+escapeHtml(c)+'<button type="button" data-idx="'+i+'" aria-label="Remove clinic">&times;</button></span>';
+    }).join('');
+    listEl.querySelectorAll('button').forEach(function(btn){
+      btn.addEventListener('click', async function(){
+        var idx = parseInt(btn.getAttribute('data-idx'), 10);
+        var removed = currentDoctorData.clinics.splice(idx, 1)[0];
+        if (currentDoctorData.currentClinic === removed) currentDoctorData.currentClinic = '';
+        await saveDoctor(session.id, currentDoctorData);
+        renderClinicsList(currentDoctorData);
+        renderClinicSelect(currentDoctorData);
+      });
+    });
+  }
+  $('doc-clinic-add-btn').addEventListener('click', async function(){
+    var input = $('doc-clinic-input');
+    var name = input.value.trim();
+    if (!name) return;
+    if (!currentDoctorData.clinics) currentDoctorData.clinics = [];
+    var exists = currentDoctorData.clinics.some(function(c){ return c.toLowerCase() === name.toLowerCase(); });
+    if (!exists){
+      currentDoctorData.clinics.push(name);
+      if (!currentDoctorData.currentClinic) currentDoctorData.currentClinic = name;
+      await saveDoctor(session.id, currentDoctorData);
+      renderClinicsList(currentDoctorData);
+      renderClinicSelect(currentDoctorData);
+    }
+    input.value = '';
+    input.focus();
+  });
+  $('doc-clinic-input').addEventListener('keydown', function(e){
+    if (e.key === 'Enter'){ e.preventDefault(); $('doc-clinic-add-btn').click(); }
+  });
+  $('doc-current-clinic').addEventListener('change', async function(){
+    currentDoctorData.currentClinic = $('doc-current-clinic').value;
+    await saveDoctor(session.id, currentDoctorData);
+  });
+
   $('doc-save-btn').addEventListener('click', async function(){
     var data = Object.assign({}, currentDoctorData, {
       doctorId: session.id,
@@ -1409,6 +1550,8 @@
   });
 
   function openDocProfileModal(){
+    renderClinicsList(currentDoctorData);
+    $('doc-clinic-input').value = '';
     $('doc-profile-modal').classList.remove('hidden');
   }
   function closeDocProfileModal(){
@@ -1420,7 +1563,7 @@
     if (e.target === $('doc-profile-modal')) closeDocProfileModal();
   });
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); }
+    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeDocStatsModal(); }
   });
 
   function escapeHtml(s){
@@ -1443,7 +1586,7 @@
     listEl.innerHTML = visits.map(function(v, i){
       return '<div class="list-item" data-idx="'+i+'">'
         + '<div><div class="li-title">'+escapeHtml(v.doctorName || 'Doctor')+'</div>'
-        + '<div class="li-sub">'+escapeHtml(formatDateDisplay(v.date))+(v.time ? ' · '+escapeHtml(v.time) : '')+'</div></div>'
+        + '<div class="li-sub">'+escapeHtml(formatDateDisplay(v.date))+(v.time ? ' · '+escapeHtml(v.time) : '')+(v.clinicName ? ' · '+escapeHtml(v.clinicName) : '')+'</div></div>'
         + chevronSvg + '</div>';
     }).join('');
     listEl.querySelectorAll('.list-item').forEach(function(el){
@@ -1455,6 +1598,7 @@
   function openDocVisitModal(v){
     $('doc-visit-modal-date').textContent = formatDateDisplay(v.date) + (v.time ? ' · ' + v.time : '');
     $('doc-visit-modal-doctor').textContent = v.doctorName || 'Doctor';
+    $('doc-visit-modal-clinic').textContent = v.clinicName || 'Not recorded';
     $('doc-visit-modal-symptoms').textContent = v.symptoms || 'Not recorded';
     $('doc-visit-modal-diagnosis').textContent = v.diagnosis || 'Not recorded';
     $('doc-visit-modal-prescription').textContent = v.prescription || 'Not recorded';
@@ -1599,6 +1743,7 @@
     clearError($('add-visit-error'));
     var visit = {
       doctorName: currentDoctorDisplayName(),
+      clinicName: (currentDoctorData && currentDoctorData.currentClinic) || '',
       date: date,
       time: $('visit-time').value.trim(),
       symptoms: $('visit-symptoms').value.trim(),
@@ -1619,6 +1764,11 @@
       await savePatient(currentLookupCode, data);
       currentLookupData = data;
       renderDoctorVisitsList(data.visits);
+      if (currentDoctorData){
+        if (!currentDoctorData.visitLog) currentDoctorData.visitLog = [];
+        currentDoctorData.visitLog.push({ patientCode: currentLookupCode, patientName: data.name || '', date: date });
+        try{ await saveDoctor(session.id, currentDoctorData); }catch(err){}
+      }
       closeAddVisitModal();
       var note = $('add-visit-note');
       note.classList.add('show');
@@ -1695,6 +1845,140 @@
       $('add-test-save').textContent = 'Save test';
     }
   });
+
+  // ---- Doctor statistics ----
+  function localDateStr(d){
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+  function parseLocalDate(str){
+    var parts = (str || '').split('-').map(Number);
+    return new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+  }
+  function formatDateShort(dateStr){
+    var d = parseLocalDate(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+  }
+  function computeDailyCounts(log){
+    var counts = {};
+    (log || []).forEach(function(entry){
+      if (!entry.date) return;
+      counts[entry.date] = (counts[entry.date] || 0) + 1;
+    });
+    var dates = Object.keys(counts).sort();
+    if (!dates.length) return [];
+    var cur = parseLocalDate(dates[0]);
+    var end = parseLocalDate(localDateStr(new Date()));
+    if (end < cur) end = cur;
+    var series = [];
+    while (cur <= end){
+      var key = localDateStr(cur);
+      series.push({ date: key, count: counts[key] || 0 });
+      cur.setDate(cur.getDate() + 1);
+    }
+    return series;
+  }
+  function renderDoctorTrendChart(series){
+    var wrap = $('doc-stats-chart-wrap');
+    if (!series.length){
+      wrap.innerHTML = '';
+      return;
+    }
+    var w = 580, h = 200, padL = 30, padR = 12, padT = 14, padB = 26;
+    var innerW = w - padL - padR, innerH = h - padT - padB;
+    var n = series.length;
+    var maxCount = 0;
+    series.forEach(function(p){ if (p.count > maxCount) maxCount = p.count; });
+    var yMax = Math.max(1, maxCount);
+    function x(i){ return padL + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW); }
+    function y(v){ return padT + innerH - (v / yMax) * innerH; }
+
+    var yTicks = yMax <= 1 ? [0, 1] : [0, Math.round(yMax / 2), yMax];
+    yTicks = yTicks.filter(function(v, i, a){ return a.indexOf(v) === i; });
+    var gridHtml = yTicks.map(function(t){
+      var yy = y(t);
+      return '<line x1="'+padL+'" y1="'+yy+'" x2="'+(w-padR)+'" y2="'+yy+'" stroke="var(--line)" stroke-width="1"/>'
+        + '<text x="'+(padL-8)+'" y="'+(yy+3)+'" text-anchor="end" font-size="9" fill="var(--muted)" font-family=\'IBM Plex Mono, monospace\'>'+t+'</text>';
+    }).join('');
+
+    var labelCount = Math.min(5, n);
+    var labelIdxs = [];
+    for (var i = 0; i < labelCount; i++){
+      labelIdxs.push(Math.round(i * (n - 1) / Math.max(1, labelCount - 1)));
+    }
+    labelIdxs = labelIdxs.filter(function(v, i, a){ return a.indexOf(v) === i; });
+    var xLabelsHtml = labelIdxs.map(function(i){
+      return '<text x="'+x(i)+'" y="'+(h-8)+'" text-anchor="middle" font-size="9" fill="var(--muted)" font-family=\'IBM Plex Mono, monospace\'>'+escapeHtml(formatDateShort(series[i].date))+'</text>';
+    }).join('');
+
+    var linePoints = series.map(function(p, i){ return x(i) + ',' + y(p.count); }).join(' ');
+    var areaPath = 'M' + x(0) + ',' + (padT + innerH) + ' L' + series.map(function(p, i){ return x(i) + ',' + y(p.count); }).join(' L') + ' L' + x(n - 1) + ',' + (padT + innerH) + ' Z';
+    var showDots = n <= 60;
+    var dotsHtml = showDots ? series.map(function(p, i){
+      return '<circle cx="'+x(i)+'" cy="'+y(p.count)+'" r="3" fill="var(--teal)"><title>'+escapeHtml(formatDateDisplay(p.date))+': '+p.count+' patient'+(p.count === 1 ? '' : 's')+'</title></circle>';
+    }).join('') : '';
+
+    wrap.innerHTML = '<svg viewBox="0 0 '+w+' '+h+'" width="100%" style="display:block;">'
+      + gridHtml
+      + '<path d="'+areaPath+'" fill="var(--teal-wash)" stroke="none"/>'
+      + '<polyline points="'+linePoints+'" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+      + dotsHtml
+      + xLabelsHtml
+      + '</svg>';
+  }
+  function computeDoctorStats(data){
+    var log = (data && data.visitLog) || [];
+    var todayStr = localDateStr(new Date());
+    var todayYear = todayStr.slice(0, 4);
+    var todayMonth = todayStr.slice(0, 7);
+    var allPatients = {}, todayPatients = {}, monthPatients = {}, yearPatients = {};
+    log.forEach(function(entry){
+      if (!entry.patientCode) return;
+      allPatients[entry.patientCode] = true;
+      var d = entry.date || '';
+      if (d === todayStr) todayPatients[entry.patientCode] = true;
+      if (d.slice(0, 7) === todayMonth) monthPatients[entry.patientCode] = true;
+      if (d.slice(0, 4) === todayYear) yearPatients[entry.patientCode] = true;
+    });
+    return {
+      hasData: log.length > 0,
+      totalVisits: log.length,
+      totalPatients: Object.keys(allPatients).length,
+      todayPatients: Object.keys(todayPatients).length,
+      monthPatients: Object.keys(monthPatients).length,
+      yearPatients: Object.keys(yearPatients).length
+    };
+  }
+  function openDocStatsModal(){
+    var stats = computeDoctorStats(currentDoctorData);
+    if (!stats.hasData){
+      $('doc-stats-grid').innerHTML = '';
+      $('doc-stats-empty').classList.remove('hidden');
+      $('doc-stats-chart-section').classList.add('hidden');
+    } else {
+      $('doc-stats-empty').classList.add('hidden');
+      var tiles = [
+        { value: stats.totalPatients, label: 'Total patients seen' },
+        { value: stats.totalVisits, label: 'Total visits logged' },
+        { value: stats.todayPatients, label: 'Patients seen today' },
+        { value: stats.monthPatients, label: 'Patients seen this month' },
+        { value: stats.yearPatients, label: 'Patients seen this year' }
+      ];
+      $('doc-stats-grid').innerHTML = tiles.map(function(t){
+        return '<div class="stat-tile"><div class="stat-value">'+t.value+'</div><div class="stat-label">'+t.label+'</div></div>';
+      }).join('');
+      $('doc-stats-chart-section').classList.remove('hidden');
+      renderDoctorTrendChart(computeDailyCounts(currentDoctorData && currentDoctorData.visitLog));
+    }
+    $('doc-stats-modal').classList.remove('hidden');
+  }
+  function closeDocStatsModal(){ $('doc-stats-modal').classList.add('hidden'); }
+  $('doc-stats-btn').addEventListener('click', openDocStatsModal);
+  $('doc-stats-close').addEventListener('click', closeDocStatsModal);
+  $('doc-stats-modal').addEventListener('click', function(e){ if (e.target === $('doc-stats-modal')) closeDocStatsModal(); });
 
   showView('view-landing');
 })();

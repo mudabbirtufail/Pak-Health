@@ -53,7 +53,8 @@ patient: {
   code, name, email, phone, photoUrl, passwordHash, verified,
   bloodType, emergencyContact, allergies, conditions, medications,  // no longer editable in UI, kept for compat
   visits: [{ doctorName, clinicName, date, time, symptoms, diagnosis, prescription, notes }],
-  tests:  [{ name, date, doctorName, resultSummary }]
+  tests:  [{ name, date, doctorName, resultSummary }],
+  eyeEntries: [{ date, sphL, cylL, axisL, sphR, cylR, axisR }]  // self-entered, patient-only, see "My Eyes" below
 }
 
 doctor: {
@@ -88,7 +89,20 @@ doctor: {
   "Account settings" modal (name, email, phone) mirroring the doctor's — this is what
   lets a patient add or fix their email/phone *after* signup so the verification
   checklist and badge can actually update; before this existed there was no way to
-  edit those fields post-signup at all.
+  edit those fields post-signup at all. The verification checklist shows the actual
+  email/phone value once provided (not just a static "Email address" label), and also
+  has its own "My statistics" modal (total visits, unique doctors seen).
+- Patient "My Eyes": a separate panel in the left column, below the health-card panel
+  (its own `.panel`, sibling to the health-card one — not a tab next to Visits/Tests,
+  since its content is richer than a plain list). A "My Eyes" button there opens a
+  wide modal (`.modal-card-wide`) with self-entered eyeglass prescription tracking —
+  SPH, CYL, and axis for each eye, one entry per date, newest first, click a row for
+  the full detail. Two hand-drawn inline SVG line charts (same no-dependency approach
+  as the doctor's trend chart) plot SPH-over-time and CYL-over-time, each with a teal
+  line for the left eye and a red line for the right eye plotted together so trends
+  are easy to compare at a glance; hover a point for the exact date and value. Doctors
+  have no visibility into this — it's entirely patient-owned data, unlike visits/tests
+  which doctors write.
 - Doctor clinics: a "Currently seeing patients at" dropdown on the doctor dashboard,
   fed by a `clinics` list the doctor builds in Account settings (add/remove chips).
   Whichever clinic is selected as `currentClinic` is stamped onto every new visit note
@@ -130,6 +144,16 @@ doctor: {
    "City General Hospital" slightly differently produce two unrelated entries. Fine for
    a demo; would need a shared `clinic:<id>` record (like patients/doctors) to dedupe
    for real.
+7. **Race condition on rapid-fire saves.** Adding a visit or test does load record →
+   modify → save, not an atomic append. Confirmed by reproduction: scripting six visit
+   adds back-to-back lost five of them, because overlapping saves can complete
+   out of order and the last write wins, silently discarding whichever save's data
+   didn't make it into that snapshot — no error is shown either time. Unlikely to bite
+   during normal one-at-a-time human use, but a real gap if two doctors ever save to
+   the same patient close together, or a slow connection causes a double-submit. Real
+   fix needs either a per-record write queue client-side or moving visits/tests to
+   proper relational rows with atomic inserts instead of one big JSON blob per patient.
+   Noted, not yet fixed — deliberately deferred.
 
 ## Going live (Supabase + static hosting)
 
@@ -165,6 +189,17 @@ verified against the deployed URL itself, not just locally.
 5. Before wider rollout (not required just to let a few testers try it): add rate
    limiting on code lookups, since 8-digit codes aren't currently brute-force
    protected.
+
+## Next version: a real access model
+
+The current 8-digit code is a bearer token — anyone who has it gets permanent read/write
+access, silently, with no way to revoke it. A full redesign has been worked out for the
+next version (real per-user auth, a single-use 3-minute access code for ad-hoc visits, a
+separate "Trusted" doctor tier for standing relationships, patient-controlled revocation,
+an access-history log) and is written up in [`ACCESS-MODEL.md`](ACCESS-MODEL.md). Nothing
+in it is built yet — it's kept as a separate file rather than folded in here because it
+describes a different, not-yet-built architecture, not the current prototype's actual
+state.
 
 ## Natural next steps (in rough priority order)
 

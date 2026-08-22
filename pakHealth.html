@@ -339,6 +339,10 @@
   .stat-tile{ background: var(--bg); border-radius:8px; padding:14px 16px; }
   .stat-tile .stat-value{ font-family:'Spectral', serif; font-weight:600; font-size:1.5rem; color: var(--ink); }
   .stat-tile .stat-label{ font-size:0.78rem; color: var(--muted); margin-top:4px; }
+
+  /* ---------- Chart legend ---------- */
+  .chart-legend{ display:flex; gap:16px; margin-top:8px; font-size:0.78rem; color: var(--muted); align-items:center; }
+  .chart-legend .legend-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:middle; }
 </style>
 </head>
 <body>
@@ -552,7 +556,14 @@
           <div class="copy-note" id="pat-dash-copy-note"></div>
           <ul class="checklist" id="pat-checklist"></ul>
           <button class="btn btn-secondary btn-block" id="pat-account-settings-btn" style="margin-top:16px;">Account settings</button>
+          <button class="btn btn-secondary btn-block" id="pat-stats-btn" style="margin-top:10px;">My statistics</button>
           <div class="privacy-note">Anyone holding this code can view your record. Only share it with a doctor you trust.</div>
+        </div>
+
+        <div class="panel">
+          <h3>Eye health</h3>
+          <p class="panel-sub">Track your eyeglass prescription over time.</p>
+          <button class="btn btn-secondary btn-block" id="pat-eyes-btn">My Eyes</button>
         </div>
       </div>
 
@@ -604,6 +615,63 @@
     </div>
   </div>
 
+  <div class="modal-overlay hidden" id="pat-eyes-modal">
+    <div class="modal-card modal-card-wide">
+      <button class="modal-close" id="pat-eyes-close" aria-label="Close">&times;</button>
+      <span class="eyebrow">Eye health</span>
+      <h3 style="margin-top:6px;">My Eyes</h3>
+      <p class="panel-sub" style="margin-top:8px;">Your eyeglass prescription over time.</p>
+      <button class="btn btn-primary btn-block" id="add-eye-btn" style="margin-top:14px;">Add eye check</button>
+      <span class="save-note" id="add-eye-note" style="display:block; text-align:center; margin:8px 0 6px;">Eye check added</span>
+      <div id="pat-eyes-charts" class="hidden">
+        <h4 class="subhead">SPH over time</h4>
+        <div id="eyes-sph-chart-wrap"></div>
+        <h4 class="subhead">CYL over time</h4>
+        <div id="eyes-cyl-chart-wrap"></div>
+        <h4 class="subhead">History</h4>
+      </div>
+      <div id="pat-eyes-list"></div>
+      <div class="empty-state" id="pat-eyes-empty">No eye checks recorded yet. Add your first one to start tracking your prescription over time.</div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="add-eye-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="add-eye-close" aria-label="Close">&times;</button>
+      <h3>Add eye check</h3>
+      <div class="field"><label for="eye-date">Date</label><input type="date" id="eye-date"></div>
+      <h4 class="subhead">Left eye</h4>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="field"><label for="eye-sph-l">SPH</label><input type="number" step="0.25" id="eye-sph-l" placeholder="-2.00"></div>
+        <div class="field"><label for="eye-cyl-l">CYL</label><input type="number" step="0.25" id="eye-cyl-l" placeholder="-0.50"></div>
+        <div class="field"><label for="eye-axis-l">Axis</label><input type="number" min="0" max="180" id="eye-axis-l" placeholder="90"></div>
+      </div>
+      <h4 class="subhead">Right eye</h4>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="field"><label for="eye-sph-r">SPH</label><input type="number" step="0.25" id="eye-sph-r" placeholder="-2.25"></div>
+        <div class="field"><label for="eye-cyl-r">CYL</label><input type="number" step="0.25" id="eye-cyl-r" placeholder="-0.75"></div>
+        <div class="field"><label for="eye-axis-r">Axis</label><input type="number" min="0" max="180" id="eye-axis-r" placeholder="85"></div>
+      </div>
+      <div class="error-text" id="add-eye-error"></div>
+      <div class="save-row">
+        <button class="btn btn-primary" id="add-eye-save">Save eye check</button>
+        <button class="btn btn-secondary" id="add-eye-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="eye-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="eye-modal-close" aria-label="Close">&times;</button>
+      <span class="eyebrow" id="eye-modal-date">—</span>
+      <h3 style="margin-top:6px;">Eye check</h3>
+      <dl class="kv" style="margin-top:16px;">
+        <dt>Left — SPH / CYL / Axis</dt><dd id="eye-modal-left">—</dd>
+        <dt>Right — SPH / CYL / Axis</dt><dd id="eye-modal-right">—</dd>
+      </dl>
+    </div>
+  </div>
+
   <div class="modal-overlay hidden" id="pat-profile-modal">
     <div class="modal-card">
       <button class="modal-close" id="pat-profile-close" aria-label="Close">&times;</button>
@@ -620,6 +688,17 @@
         <button class="btn btn-primary btn-block" id="pat-save-btn">Save changes</button>
       </div>
       <span class="save-note" id="pat-save-note">Saved</span>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="pat-stats-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="pat-stats-close" aria-label="Close">&times;</button>
+      <span class="eyebrow">Your activity</span>
+      <h3 style="margin-top:6px;">Statistics</h3>
+      <p class="panel-sub" style="margin-top:8px;">Based on the visits recorded in your record.</p>
+      <div class="stats-grid" id="pat-stats-grid"></div>
+      <div class="empty-state" id="pat-stats-empty">No visits recorded yet.</div>
     </div>
   </div>
 </div>
@@ -1251,6 +1330,7 @@
     var seeded = false;
     if (!data.visits || !data.visits.length){ data.visits = sampleVisits(); seeded = true; }
     if (!data.tests || !data.tests.length){ data.tests = sampleTests(); seeded = true; }
+    if (!data.eyeEntries) data.eyeEntries = [];
     currentPatientData = data;
     if (seeded){ try{ await savePatient(code, data); }catch(e){} }
     $('pat-dash-code').textContent = formatCode(code);
@@ -1258,10 +1338,15 @@
     renderPatientVerification(data);
     renderVisitsList(data.visits);
     renderTestsList(data.tests);
+    renderEyesList(data.eyeEntries);
     switchPatientTab('visits');
     closeVisitModal();
     closeTestModal();
     closePatProfileModal();
+    closePatStatsModal();
+    closePatEyesModal();
+    closeAddEyeModal();
+    closeEyeModal();
     showView('view-patient-dash');
   }
   function renderPatientVerification(data){
@@ -1270,12 +1355,12 @@
     badge.textContent = verified ? 'Verified' : 'Unverified';
     badge.className = 'badge ' + (verified ? 'verified' : 'unverified');
     var items = [
-      { label:'Email address', done: !!data.email },
-      { label:'Phone number', done: !!data.phone }
+      { label: data.email || 'Email address', done: !!data.email },
+      { label: data.phone || 'Phone number', done: !!data.phone }
     ];
     var html = '';
     items.forEach(function(it){
-      html += '<li class="'+(it.done?'done':'')+'"><span class="dot"></span>'+it.label+'</li>';
+      html += '<li class="'+(it.done?'done':'')+'"><span class="dot"></span>'+escapeHtml(it.label)+'</li>';
     });
     $('pat-checklist').innerHTML = html;
   }
@@ -1313,6 +1398,41 @@
     note.classList.add('show');
     setTimeout(function(){ note.classList.remove('show'); }, 1800);
   });
+
+  function computePatientStats(data){
+    var visits = (data && data.visits) || [];
+    var doctors = {};
+    visits.forEach(function(v){
+      var name = (v.doctorName || '').trim().toLowerCase();
+      if (name) doctors[name] = true;
+    });
+    return {
+      hasData: visits.length > 0,
+      totalVisits: visits.length,
+      doctorsSeen: Object.keys(doctors).length
+    };
+  }
+  function openPatStatsModal(){
+    var stats = computePatientStats(currentPatientData);
+    if (!stats.hasData){
+      $('pat-stats-grid').innerHTML = '';
+      $('pat-stats-empty').classList.remove('hidden');
+    } else {
+      $('pat-stats-empty').classList.add('hidden');
+      var tiles = [
+        { value: stats.totalVisits, label: 'Total visits so far' },
+        { value: stats.doctorsSeen, label: 'Doctors you’ve been to' }
+      ];
+      $('pat-stats-grid').innerHTML = tiles.map(function(t){
+        return '<div class="stat-tile"><div class="stat-value">'+t.value+'</div><div class="stat-label">'+t.label+'</div></div>';
+      }).join('');
+    }
+    $('pat-stats-modal').classList.remove('hidden');
+  }
+  function closePatStatsModal(){ $('pat-stats-modal').classList.add('hidden'); }
+  $('pat-stats-btn').addEventListener('click', openPatStatsModal);
+  $('pat-stats-close').addEventListener('click', closePatStatsModal);
+  $('pat-stats-modal').addEventListener('click', function(e){ if (e.target === $('pat-stats-modal')) closePatStatsModal(); });
 
   $('pat-dash-copy').addEventListener('click', function(){
     copyToClipboard(session.id, $('pat-dash-copy-note'));
@@ -1432,6 +1552,178 @@
   function closeTestModal(){ $('pat-test-modal').classList.add('hidden'); }
   $('pat-test-modal-close').addEventListener('click', closeTestModal);
   $('pat-test-modal').addEventListener('click', function(e){ if (e.target === $('pat-test-modal')) closeTestModal(); });
+
+  // ---- My Eyes ----
+  function openPatEyesModal(){
+    renderEyesList((currentPatientData && currentPatientData.eyeEntries) || []);
+    $('pat-eyes-modal').classList.remove('hidden');
+  }
+  function closePatEyesModal(){ $('pat-eyes-modal').classList.add('hidden'); }
+  $('pat-eyes-btn').addEventListener('click', openPatEyesModal);
+  $('pat-eyes-close').addEventListener('click', closePatEyesModal);
+  $('pat-eyes-modal').addEventListener('click', function(e){ if (e.target === $('pat-eyes-modal')) closePatEyesModal(); });
+
+  function fmtDiopter(v){
+    var n = parseFloat(v);
+    if (v === '' || v === null || v === undefined || isNaN(n)) return '—';
+    return (n > 0 ? '+' : '') + n.toFixed(2);
+  }
+  function renderEyesList(entries){
+    var listEl = $('pat-eyes-list');
+    var emptyEl = $('pat-eyes-empty');
+    var chartsEl = $('pat-eyes-charts');
+    if (!entries || !entries.length){
+      listEl.innerHTML = '';
+      emptyEl.classList.remove('hidden');
+      chartsEl.classList.add('hidden');
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    chartsEl.classList.remove('hidden');
+    listEl.innerHTML = entries.map(function(e, i){
+      return '<div class="list-item" data-idx="'+i+'">'
+        + '<div><div class="li-title">'+escapeHtml(formatDateDisplay(e.date))+'</div>'
+        + '<div class="li-sub">L '+escapeHtml(fmtDiopter(e.sphL))+' / '+escapeHtml(fmtDiopter(e.cylL))+' / '+escapeHtml(e.axisL || '—')+'°'
+        + ' · R '+escapeHtml(fmtDiopter(e.sphR))+' / '+escapeHtml(fmtDiopter(e.cylR))+' / '+escapeHtml(e.axisR || '—')+'°</div></div>'
+        + chevronSvg + '</div>';
+    }).join('');
+    listEl.querySelectorAll('.list-item').forEach(function(el){
+      el.addEventListener('click', function(){
+        openEyeModal(entries[parseInt(el.getAttribute('data-idx'), 10)]);
+      });
+    });
+    renderEyeMetricChart('eyes-sph-chart-wrap', entries, 'sphL', 'sphR');
+    renderEyeMetricChart('eyes-cyl-chart-wrap', entries, 'cylL', 'cylR');
+  }
+  function renderEyeMetricChart(containerId, entries, leftKey, rightKey){
+    var wrap = $(containerId);
+    var sorted = entries.filter(function(e){ return e.date; }).slice().sort(function(a, b){
+      return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0);
+    });
+    var n = sorted.length;
+    if (!n){ wrap.innerHTML = ''; return; }
+    var vals = [];
+    sorted.forEach(function(e){
+      var l = parseFloat(e[leftKey]); if (!isNaN(l)) vals.push(l);
+      var r = parseFloat(e[rightKey]); if (!isNaN(r)) vals.push(r);
+    });
+    if (!vals.length){ wrap.innerHTML = ''; return; }
+    var minV = Math.min.apply(null, vals), maxV = Math.max.apply(null, vals);
+    if (minV === maxV){ minV -= 1; maxV += 1; }
+    var pad = (maxV - minV) * 0.2;
+    minV -= pad; maxV += pad;
+
+    var w = 580, h = 200, padL = 38, padR = 12, padT = 14, padB = 26;
+    var innerW = w - padL - padR, innerH = h - padT - padB;
+    function x(i){ return padL + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW); }
+    function y(v){ return padT + innerH - ((v - minV) / (maxV - minV)) * innerH; }
+
+    function buildLine(key, color){
+      var pts = [];
+      sorted.forEach(function(e, i){
+        var v = parseFloat(e[key]);
+        if (!isNaN(v)) pts.push({ i: i, v: v });
+      });
+      if (!pts.length) return '';
+      var line = pts.map(function(p){ return x(p.i) + ',' + y(p.v); }).join(' ');
+      var dots = pts.map(function(p){
+        return '<circle cx="'+x(p.i)+'" cy="'+y(p.v)+'" r="3" fill="'+color+'"><title>'+escapeHtml(formatDateDisplay(sorted[p.i].date))+': '+fmtDiopter(p.v)+'</title></circle>';
+      }).join('');
+      return '<polyline points="'+line+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' + dots;
+    }
+
+    var yTicks = [minV, (minV + maxV) / 2, maxV];
+    var gridHtml = yTicks.map(function(t){
+      var yy = y(t);
+      return '<line x1="'+padL+'" y1="'+yy+'" x2="'+(w-padR)+'" y2="'+yy+'" stroke="var(--line)" stroke-width="1"/>'
+        + '<text x="'+(padL-8)+'" y="'+(yy+3)+'" text-anchor="end" font-size="9" fill="var(--muted)" font-family=\'IBM Plex Mono, monospace\'>'+fmtDiopter(t)+'</text>';
+    }).join('');
+
+    var labelCount = Math.min(5, n);
+    var labelIdxs = [];
+    for (var i = 0; i < labelCount; i++){
+      labelIdxs.push(Math.round(i * (n - 1) / Math.max(1, labelCount - 1)));
+    }
+    labelIdxs = labelIdxs.filter(function(v, i, a){ return a.indexOf(v) === i; });
+    var xLabelsHtml = labelIdxs.map(function(i){
+      return '<text x="'+x(i)+'" y="'+(h-8)+'" text-anchor="middle" font-size="9" fill="var(--muted)" font-family=\'IBM Plex Mono, monospace\'>'+escapeHtml(formatDateShort(sorted[i].date))+'</text>';
+    }).join('');
+
+    wrap.innerHTML = '<svg viewBox="0 0 '+w+' '+h+'" width="100%" style="display:block;">'
+      + gridHtml
+      + buildLine(leftKey, 'var(--teal)')
+      + buildLine(rightKey, 'var(--red)')
+      + xLabelsHtml
+      + '</svg>'
+      + '<div class="chart-legend"><span><span class="legend-dot" style="background:var(--teal);"></span>Left eye</span>'
+      + '<span><span class="legend-dot" style="background:var(--red);"></span>Right eye</span></div>';
+  }
+  function openEyeModal(e){
+    $('eye-modal-date').textContent = formatDateDisplay(e.date);
+    $('eye-modal-left').textContent = fmtDiopter(e.sphL) + ' / ' + fmtDiopter(e.cylL) + ' / ' + (e.axisL || '—') + '°';
+    $('eye-modal-right').textContent = fmtDiopter(e.sphR) + ' / ' + fmtDiopter(e.cylR) + ' / ' + (e.axisR || '—') + '°';
+    $('eye-modal').classList.remove('hidden');
+  }
+  function closeEyeModal(){ $('eye-modal').classList.add('hidden'); }
+  $('eye-modal-close').addEventListener('click', closeEyeModal);
+  $('eye-modal').addEventListener('click', function(e){ if (e.target === $('eye-modal')) closeEyeModal(); });
+
+  function openAddEyeModal(){
+    $('eye-date').value = new Date().toISOString().slice(0, 10);
+    $('eye-sph-l').value = '';
+    $('eye-cyl-l').value = '';
+    $('eye-axis-l').value = '';
+    $('eye-sph-r').value = '';
+    $('eye-cyl-r').value = '';
+    $('eye-axis-r').value = '';
+    clearError($('add-eye-error'));
+    $('add-eye-modal').classList.remove('hidden');
+  }
+  function closeAddEyeModal(){ $('add-eye-modal').classList.add('hidden'); }
+  $('add-eye-btn').addEventListener('click', openAddEyeModal);
+  $('add-eye-close').addEventListener('click', closeAddEyeModal);
+  $('add-eye-cancel').addEventListener('click', closeAddEyeModal);
+  $('add-eye-modal').addEventListener('click', function(e){ if (e.target === $('add-eye-modal')) closeAddEyeModal(); });
+  $('add-eye-save').addEventListener('click', async function(){
+    var date = $('eye-date').value;
+    if (!date){
+      showError($('add-eye-error'), 'Please choose a date.');
+      return;
+    }
+    clearError($('add-eye-error'));
+    var entry = {
+      date: date,
+      sphL: $('eye-sph-l').value.trim(),
+      cylL: $('eye-cyl-l').value.trim(),
+      axisL: $('eye-axis-l').value.trim(),
+      sphR: $('eye-sph-r').value.trim(),
+      cylR: $('eye-cyl-r').value.trim(),
+      axisR: $('eye-axis-r').value.trim()
+    };
+    $('add-eye-save').disabled = true;
+    $('add-eye-save').textContent = 'Saving...';
+    try{
+      var data = await loadPatient(session.id);
+      if (!data){
+        showError($('add-eye-error'), 'Your record could not be found anymore.');
+        return;
+      }
+      if (!data.eyeEntries) data.eyeEntries = [];
+      data.eyeEntries.unshift(entry);
+      await savePatient(session.id, data);
+      currentPatientData = data;
+      renderEyesList(data.eyeEntries);
+      closeAddEyeModal();
+      var note = $('add-eye-note');
+      note.classList.add('show');
+      setTimeout(function(){ note.classList.remove('show'); }, 2200);
+    }catch(err){
+      showError($('add-eye-error'), 'Something went wrong saving this entry. Please try again.');
+    }finally{
+      $('add-eye-save').disabled = false;
+      $('add-eye-save').textContent = 'Save eye check';
+    }
+  });
 
   // ================= DOCTOR DASHBOARD =================
   var currentDoctorData = null;
@@ -1628,7 +1920,7 @@
     if (e.target === $('doc-profile-modal')) closeDocProfileModal();
   });
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeDocStatsModal(); closePatProfileModal(); }
+    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeDocStatsModal(); closePatProfileModal(); closePatStatsModal(); closePatEyesModal(); closeAddEyeModal(); closeEyeModal(); }
   });
 
   function escapeHtml(s){

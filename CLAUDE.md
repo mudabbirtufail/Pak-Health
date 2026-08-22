@@ -1,8 +1,11 @@
 # Pak Health
 
 A patient records platform prototype. Two user roles — **individuals** (patients) and
-**doctors** — with a code-based access model: patients get an 8-digit code, doctors
-enter that code to look up a patient's record.
+**doctors** — with a grant-based access model: a patient's permanent 8-digit account ID
+identifies their record but no longer grants access on its own. A doctor gets in either
+by redeeming a single-use, 3-minute live code the patient generates and shows them in
+person (good for one hour from redemption), or through a standing "Trusted" grant the
+patient creates and can revoke at any time. See "Access model" below.
 
 ## Current state
 
@@ -39,6 +42,12 @@ open it directly in a browser. All styling and logic live in that one file (inli
   new email in Account settings; the old key isn't cleaned up if the email changes
   (harmless — it would just also resolve to the same patient), so this can drift into
   a few orphaned rows over time.
+- **Access grants** (see "Access model" below) live in two real Postgres tables,
+  `access_codes` and `access_grants`, separate from `kv_store` — this is structured,
+  queryable data (expiry, redemption, revocation), not a fit for the JSON-blob shape
+  everything else uses. Same fallback pattern as the rest of storage: if these tables
+  aren't there yet, grant helpers fall back to in-memory arrays for that browser tab's
+  session only.
 - **Auth**: password is optional at signup (deliberately, to keep trying the app
   frictionless). If set, it's SHA-256 hashed client-side via `crypto.subtle` (no salt —
   not real security, just better than plaintext) with a non-cryptographic fallback hash
@@ -52,8 +61,9 @@ open it directly in a browser. All styling and logic live in that one file (inli
 patient: {
   code, name, email, phone, photoUrl, passwordHash, verified,
   bloodType, emergencyContact, allergies, conditions, medications,  // no longer editable in UI, kept for compat
-  visits: [{ doctorName, clinicName, date, time, symptoms, diagnosis, prescription, notes }],
-  tests:  [{ name, date, doctorName, resultSummary }],
+  visits: [{ doctorName, clinicName, date, time, symptoms, diagnosis, prescription, notes,
+             writtenViaGrantId, unverified }],  // last two added with the access model, see below
+  tests:  [{ name, date, doctorName, resultSummary, writtenViaGrantId, unverified }],
   eyeEntries: [{ date, sphL, cylL, axisL, sphR, cylR, axisR }]  // self-entered, patient-only, see "My Eyes" below
 }
 
@@ -64,7 +74,19 @@ doctor: {
   currentClinic: string,   // which one of `clinics` they're currently at; stamped onto new visits as clinicName
   visitLog: [{ patientCode, patientName, date }]  // one entry per visit note this doctor has added, used for stats
 }
+
+// Postgres tables, not part of the patient/doctor JSON blobs — see "Access model" below.
+access_codes:  { id, patient_id, code, created_at, expires_at, redeemed_at, redeemed_by_doctor_id }
+access_grants: { id, patient_id, doctor_id, granted_via: 'code'|'trust', source_code_id,
+                  granted_at, expires_at, revoked_at }
 ```
+
+`writtenViaGrantId` on a visit/test entry is the `access_grants.id` that authorized the
+write — no audit-log UI reads it yet, but it's captured at write time so nothing has to
+be reconstructed later. `unverified` is a **snapshot** of the writing doctor's
+verification status at that moment (not a live lookup) — if it were live, an entry
+written while unverified would silently lose its tag the moment that doctor later got
+verified, which would defeat the point of having the tag at all.
 
 ## Key flows already built
 
@@ -76,14 +98,30 @@ doctor: {
 - Both roles get an ID-card-style visual (health card / doctor card) with a real
   card aspect ratio, a photo upload (stored as base64 `photoUrl`), and a verified badge
   (patient: email + phone; doctor: email + phone + license). The patient card shows
-  just avatar + name + access code — no phone line or "Pak Health" brand text on the
+  just avatar + name + account ID — no phone line or "Pak Health" brand text on the
   card itself, unlike the doctor card which still shows both.
-- Doctor dashboard: enter a patient's code → their code-entry box disappears and is
-  replaced by the patient's name/badge, a "Search a different patient" link, and
-  **Visits / Tests tabs** — same list-and-detail-modal pattern as the patient's own
-  dashboard. "Add visit note" and "Add test / report" buttons sit above each list and
-  open a form modal; saving writes directly into that patient's record, so the patient
-  sees it immediately next time they sign in. This is the core loop of the app.
+- **Access model** (see [`ACCESS-MODEL.md`](ACCESS-MODEL.md) for the full design — this
+  is Phase 1 of it, the core grant mechanism, built directly into this file): a
+  patient's "Share with a doctor" panel generates a 6-digit live code, good for 3
+  minutes and one redemption (a countdown runs client-side; generating a new code
+  silently retires the previous one). A doctor redeems it in "Find a patient → Enter a
+  code," which creates a one-hour `access_grants` row instead of handing over standing
+  access. Separately, a patient's "Manage access" modal lets them trust a doctor by ID
+  for standing, revocable access (patient-initiated only — a doctor can never request
+  it), shown in that doctor's "Find a patient → My patients" roster with no code
+  needed. Revoking takes effect on the next load, not mid-session, because every
+  lookup and every visit/test save re-checks grant validity rather than caching it.
+  Auth itself is unchanged (see Known limitations) — grants are enforced in app code
+  against the existing doctorId/patientCode session, not via Postgres RLS.
+- Doctor dashboard: redeem a patient's live code (or pick them from the roster) → the
+  find-a-patient box is replaced by the patient's name/badge, an access note (standing
+  trust vs. one-time code with its remaining time), a "Search a different patient"
+  link, and **Visits / Tests tabs** — same list-and-detail-modal pattern as the
+  patient's own dashboard. "Add visit note" and "Add test / report" buttons sit above
+  each list and open a form modal; saving re-validates the grant, stamps
+  `writtenViaGrantId` and an `unverified` snapshot, then writes directly into that
+  patient's record, so the patient sees it immediately next time they sign in. This is
+  the core loop of the app.
 - Patient dashboard: health card, Visits tab, Tests tab (both seeded with sample data
   on first load if empty, so the UI never looks broken/empty during a demo), and an
   "Account settings" modal (name, email, phone) mirroring the doctor's — this is what
@@ -124,26 +162,34 @@ doctor: {
 ## Known limitations (the honest list)
 
 1. **Backend is now connected.** `SUPABASE_URL` / `SUPABASE_ANON_KEY` in the `<script>`
-   point at a live Supabase project (`kv_store` table + RLS policies created per
-   "Going live" below), and a real cross-reload signup/sign-in round trip has been
-   verified against it. `window.storage` (Claude.ai viewer) and the in-memory object
-   are still there as fallbacks, tried in that order, only if Supabase is unreachable.
-   Remaining caveat: the anon-key RLS policies intentionally allow anyone to read/write
-   any row (matching the app's existing "anyone with the code" trust model) — there's
-   no rate limiting on 8-digit code lookups, so this should stay a testing deploy, not
-   a public production one, until that's addressed.
-2. **No real authentication.** Password hashing is client-side SHA-256, no salt, no
-   rate limiting, no session tokens. Fine for a demo, not remotely production-grade.
+   point at a live Supabase project (`kv_store`, `access_codes`, and `access_grants`
+   tables + RLS policies created per "Going live" below), and a real cross-reload
+   signup/sign-in round trip has been verified against it. `window.storage` (Claude.ai
+   viewer) and the in-memory object are still there as fallbacks, tried in that order,
+   only if Supabase is unreachable. Remaining caveat: the anon-key RLS policies
+   intentionally allow anyone to read/write any row (matching the app's existing trust
+   model) — there's no rate limiting on code lookups, so this should stay a testing
+   deploy, not a public production one, until that's addressed.
+2. **No real authentication, so access grants aren't database-enforced either.**
+   Password hashing is client-side SHA-256, no salt, no rate limiting, no session
+   tokens. The access model (live codes, trust, revocation — see "Access model" above)
+   is real in the sense that the app won't show or write a record without a valid
+   grant, but that check happens in app code against the existing doctorId/patientCode
+   session, not in Postgres RLS keyed to a real identity — because there isn't one yet.
+   Fine for a demo of the *mechanism*; someone bypassing the app entirely and hitting
+   Supabase directly with the anon key still isn't stopped by anything but the same
+   trust model `kv_store` already has. Real Supabase Auth (see Next version) is what
+   would let RLS enforce this instead of the client.
 3. **No delete/edit** on visits or tests once added.
 4. **Test "reports"** are just a name/date/short text summary — no file upload, no
    structured lab-value data. Deliberately deferred.
-5. **No doctor-facing patient list** — doctors can only find patients by already
-   having their code; `visitLog` (added for stats) has the raw data for a "patients
-   I've seen" view, but there's no UI for it yet.
-6. **Clinics are per-doctor free text**, not a shared directory — two doctors typing
+5. **Clinics are per-doctor free text**, not a shared directory — two doctors typing
    "City General Hospital" slightly differently produce two unrelated entries. Fine for
    a demo; would need a shared `clinic:<id>` record (like patients/doctors) to dedupe
    for real.
+6. **No access-history log yet.** `writtenViaGrantId` is captured on every visit/test so
+   nothing has to be reconstructed later, but there's no UI that reads it — matches
+   ACCESS-MODEL.md's own deferred list (§7/§10).
 7. **Race condition on rapid-fire saves.** Adding a visit or test does load record →
    modify → save, not an atomic append. Confirmed by reproduction: scripting six visit
    adds back-to-back lost five of them, because overlapping saves can complete
@@ -161,7 +207,9 @@ Steps 1–4 are **done**. The app is live at
 https://mudabbirtufail.github.io/Pak-Health/pakHealth.html, connected to a real
 Supabase project, served from the `mudabbirtufail/Pak-Health` GitHub repo (branch
 `main`) via GitHub Pages. A real cross-device signup/sign-in round trip has been
-verified against the deployed URL itself, not just locally.
+verified against the deployed URL itself, not just locally. Step 3b (the access-model
+migration) is a newer addition — confirm it's been run against the live project before
+relying on cross-device grant persistence there.
 
 1. **Create a free Supabase project** at supabase.com (no credit card needed for the
    free tier). Once it's provisioned, go to Settings → API and copy the **Project
@@ -183,31 +231,76 @@ verified against the deployed URL itself, not just locally.
 3. **Paste the Project URL and anon key** into `SUPABASE_URL` / `SUPABASE_ANON_KEY`
    near the top of the `<script>` in `pakHealth.html` (replacing the `YOUR_...`
    placeholders). The app picks this up automatically — no other code changes needed.
+3b. **Access-model migration** — run this in the same SQL editor to add the two tables
+    the access model (above) needs. If this hasn't been run yet in the live project,
+    the app still works, it just falls back to in-memory grants for that browser tab
+    (no persistence, no cross-device redemption) until it is:
+    ```sql
+    create table if not exists public.access_codes (
+      id uuid primary key default gen_random_uuid(),
+      patient_id text not null,
+      code text not null,
+      created_at timestamptz not null default now(),
+      expires_at timestamptz not null,
+      redeemed_at timestamptz,
+      redeemed_by_doctor_id text
+    );
+    create index if not exists access_codes_patient_idx on public.access_codes(patient_id, created_at desc);
+    alter table public.access_codes enable row level security;
+    create policy "anon all access_codes" on public.access_codes for all using (true) with check (true);
+
+    create table if not exists public.access_grants (
+      id uuid primary key default gen_random_uuid(),
+      patient_id text not null,
+      doctor_id text not null,
+      granted_via text not null check (granted_via in ('code','trust')),
+      source_code_id uuid references public.access_codes(id),
+      granted_at timestamptz not null default now(),
+      expires_at timestamptz,
+      revoked_at timestamptz
+    );
+    create index if not exists access_grants_lookup_idx on public.access_grants(patient_id, doctor_id);
+    create index if not exists access_grants_doctor_idx on public.access_grants(doctor_id) where revoked_at is null;
+    alter table public.access_grants enable row level security;
+    create policy "anon all access_grants" on public.access_grants for all using (true) with check (true);
+    ```
 4. **Host the static file** — since it's still just one HTML file, any static host
    works: GitHub Pages, Netlify, Vercel, or Cloudflare Pages all have free tiers that
    deploy a repo (or a drag-and-dropped file) in a couple of minutes.
 5. Before wider rollout (not required just to let a few testers try it): add rate
-   limiting on code lookups, since 8-digit codes aren't currently brute-force
-   protected.
+   limiting on code redemption, since the 6-digit live code isn't currently
+   brute-force protected (the 3-minute expiry and single-use narrow the window, but
+   don't replace real rate limiting).
 
 ## Next version: a real access model
 
-The current 8-digit code is a bearer token — anyone who has it gets permanent read/write
-access, silently, with no way to revoke it. A full redesign has been worked out for the
-next version (real per-user auth, a single-use 3-minute access code for ad-hoc visits, a
-separate "Trusted" doctor tier for standing relationships, patient-controlled revocation,
-an access-history log) and is written up in [`ACCESS-MODEL.md`](ACCESS-MODEL.md). Nothing
-in it is built yet — it's kept as a separate file rather than folded in here because it
-describes a different, not-yet-built architecture, not the current prototype's actual
-state.
+[`ACCESS-MODEL.md`](ACCESS-MODEL.md) is the full design doc for a real access-control
+redesign: real per-user auth, a single-use 3-minute access code for ad-hoc visits, a
+"Trusted" doctor tier for standing relationships, patient-controlled revocation, and an
+access-history log. **Its core mechanism (§1, §5, §6 — single-use codes, trust grants,
+revocation) is now built**, described above in "Access model" and "Data model." What's
+still not built, matching the doc's own scope and deferred list:
+
+- **Real Supabase Auth / Google OAuth.** Grants are checked in app code against the
+  existing custom session, not enforced by Postgres RLS keyed to a real identity — see
+  Known limitations.
+- **The mobile-only PIN lock.** There's no separate mobile app in this repo, so the
+  live-code and manage-access screens live in the web patient dashboard instead — a
+  deliberate scope call for this phase, not what the doc originally describes.
+  Revisit if a real mobile app ever gets built.
+- **Access-history log** — deferred in the doc itself (§7/§10); `writtenViaGrantId` is
+  captured so it can be added later without a data migration.
+- **CNIC-linked emergency access, verification review queue, doctor MFA, appointment
+  booking** — all explicitly deferred in the doc (§10/§11).
 
 ## Natural next steps (in rough priority order)
 
 1. Real auth via Supabase (email/password *and* real Google OAuth, so the current
    fake Google button becomes real) instead of the current custom SHA-256 password
-   flow — the Supabase storage tier above only replaces persistence, not auth.
+   flow — the Supabase storage tier above only replaces persistence, not auth. This is
+   also what would let access grants move from app-code-enforced to RLS-enforced.
 2. Edit/delete for visits and tests.
-3. A doctor-facing "recent patients" list instead of only code lookup.
+3. Access-history log UI, now that `writtenViaGrantId` is already being captured.
 4. Mobile pass — responsive breakpoints exist but haven't been stress-tested on an
    actual phone.
 5. Real file upload for test reports (once there's a real backend with file storage).

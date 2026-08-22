@@ -546,7 +546,7 @@
             </div>
             <div class="health-card-code-row">
               <div>
-                <span class="health-card-code-label">Access code</span>
+                <span class="health-card-code-label">Account ID</span>
                 <div class="health-card-code mono" id="pat-dash-code">0000 0000</div>
               </div>
               <button class="btn btn-secondary btn-sm" id="pat-dash-copy">Copy</button>
@@ -557,7 +557,22 @@
           <ul class="checklist" id="pat-checklist"></ul>
           <button class="btn btn-secondary btn-block" id="pat-account-settings-btn" style="margin-top:16px;">Account settings</button>
           <button class="btn btn-secondary btn-block" id="pat-stats-btn" style="margin-top:10px;">My statistics</button>
-          <div class="privacy-note">Anyone holding this code can view your record. Only share it with a doctor you trust.</div>
+          <div class="privacy-note">Your account ID identifies your record — it doesn't grant access on its own. A doctor needs a live code (below) or your standing trust to see anything.</div>
+        </div>
+
+        <div class="panel">
+          <h3>Share with a doctor</h3>
+          <p class="panel-sub">A fresh code, good for 3 minutes and one use. Hand it over in person — never post or text it.</p>
+          <div class="tearoff" id="pat-livecode-tearoff">
+            <span class="eyebrow" id="pat-livecode-eyebrow">Live code</span>
+            <div class="code mono" id="pat-live-code">— — — — — —</div>
+            <div class="code-actions">
+              <button class="btn btn-secondary btn-sm" id="pat-live-code-copy">Copy</button>
+            </div>
+          </div>
+          <div class="copy-note" id="pat-live-code-copy-note" style="text-align:center;"></div>
+          <button class="btn btn-primary btn-block" id="pat-gen-code-btn">Generate a code</button>
+          <button class="btn btn-secondary btn-block" id="pat-access-manage-btn" style="margin-top:10px;">Manage access</button>
         </div>
 
         <div class="panel">
@@ -701,6 +716,33 @@
       <div class="empty-state" id="pat-stats-empty">No visits recorded yet.</div>
     </div>
   </div>
+
+  <div class="modal-overlay hidden" id="pat-access-modal">
+    <div class="modal-card modal-card-wide">
+      <button class="modal-close" id="pat-access-close" aria-label="Close">&times;</button>
+      <span class="eyebrow">Access</span>
+      <h3 style="margin-top:6px;">Manage access</h3>
+      <p class="panel-sub" style="margin-top:8px;">Trusted doctors have standing access until you revoke it. A live code only ever grants one hour, and only to whoever redeems it.</p>
+
+      <h4 class="subhead">Trusted doctors</h4>
+      <div id="pat-trusted-list"></div>
+      <div class="empty-state" id="pat-trusted-empty">You haven't trusted any doctors yet.</div>
+
+      <hr>
+      <h4 class="subhead">Trust a doctor</h4>
+      <p class="panel-sub" style="margin-bottom:12px;">Only you can grant trust — a doctor can never request it. Ask them for their doctor ID.</p>
+      <div class="lookup-row">
+        <input type="text" id="pat-trust-input" placeholder="DR-482913">
+        <button class="btn btn-secondary" id="pat-trust-add-btn">Trust</button>
+      </div>
+      <div class="error-text" id="pat-trust-error"></div>
+
+      <hr>
+      <h4 class="subhead">Active now</h4>
+      <div id="pat-adhoc-list"></div>
+      <div class="empty-state" id="pat-adhoc-empty">No one has an active one-time code right now.</div>
+    </div>
+  </div>
 </div>
 
 <!-- ============ DOCTOR DASHBOARD ============ -->
@@ -755,20 +797,33 @@
 
       <div class="center-col">
         <div class="panel">
-          <h3>Look up a patient</h3>
-          <p class="panel-sub" id="lookup-subtitle">Enter the 8-digit code your patient gave you.</p>
-          <div class="lookup-row" id="lookup-row">
-            <input type="text" id="lookup-code" placeholder="8-digit patient code">
-            <button class="btn btn-primary" id="lookup-btn">View record</button>
+          <h3>Find a patient</h3>
+          <div class="tabs">
+            <button class="tab active" id="doc-find-tab-code">Enter a code</button>
+            <button class="tab" id="doc-find-tab-roster">My patients</button>
           </div>
-          <div class="not-found hidden" id="lookup-not-found">No patient found with that code. Double-check it with your patient.</div>
+
+          <div id="doc-find-code-pane">
+            <p class="panel-sub" id="lookup-subtitle">Enter the one-time code your patient just showed you — it's only valid for 3 minutes.</p>
+            <div class="lookup-row" id="lookup-row">
+              <input type="text" id="lookup-code" placeholder="6-digit live code">
+              <button class="btn btn-primary" id="lookup-btn">View record</button>
+            </div>
+            <div class="not-found hidden" id="lookup-not-found">No patient found with that code. Double-check it with your patient.</div>
+          </div>
+
+          <div id="doc-find-roster-pane" class="hidden">
+            <p class="panel-sub">Patients who currently trust you — no code needed.</p>
+            <div id="doc-roster-list"></div>
+            <div class="empty-state" id="doc-roster-empty">No patient has trusted you yet.</div>
+          </div>
 
           <div class="patient-result hidden" id="patient-result">
             <div class="name-row">
               <h3 id="res-name">—</h3>
               <span class="badge" id="res-badge">Unverified</span>
             </div>
-            <div class="copy-note" style="margin:-8px 0 4px; color:var(--muted);">Code: <span class="mono" id="res-code">—</span></div>
+            <div class="copy-note" style="margin:-8px 0 4px; color:var(--muted);" id="res-access-note">—</div>
             <button class="link-btn" id="lookup-change-btn" style="margin-bottom:16px;">Search a different patient</button>
 
             <div class="tabs">
@@ -1016,6 +1071,192 @@
   }
   function isPatientVerified(d){ return !!(d.email && d.phone); }
   function isDoctorVerified(d){ return !!(d.email && d.phone && d.license); }
+
+  // ---------- Access grants (see ACCESS-MODEL.md) ----------
+  // A doctor never gets standing access just by knowing a patient's permanent account
+  // code. Access is either a single-use, 3-minute code redeemed in person (good for one
+  // hour from redemption) or a standing "Trusted" grant the patient creates and can
+  // revoke any time. Both produce the same kind of row here, checked the same way:
+  // valid = exists a grant for (patient, doctor) with revoked_at null and
+  // (expires_at null or expires_at > now). Real persistence needs the access_codes /
+  // access_grants tables (see the SQL in the access-model plan); if they're not there
+  // yet, these fall back to in-memory arrays for this tab's session only, same spirit
+  // as the kv_store fallback above.
+  var memoryAccessCodes = [];
+  var memoryAccessGrants = [];
+  function uid(){
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
+      var r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
+      return v.toString(16);
+    });
+  }
+  async function createAccessCode(patientId){
+    var row = {
+      id: uid(), patient_id: patientId, code: randomDigits(6),
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 3*60*1000).toISOString(),
+      redeemed_at: null, redeemed_by_doctor_id: null
+    };
+    if (supabaseClient){
+      try{
+        var res = await supabaseClient.from('access_codes').insert(row).select().maybeSingle();
+        if (!res.error && res.data) return res.data;
+      }catch(e){}
+    }
+    memoryAccessCodes.push(row);
+    return row;
+  }
+  async function getLatestAccessCode(patientId){
+    if (supabaseClient){
+      try{
+        var res = await supabaseClient.from('access_codes').select('*').eq('patient_id', patientId).order('created_at', { ascending:false }).limit(1).maybeSingle();
+        if (!res.error) return res.data || null;
+      }catch(e){}
+    }
+    var mine = memoryAccessCodes.filter(function(r){ return r.patient_id === patientId; });
+    if (!mine.length) return null;
+    mine.sort(function(a,b){ return a.created_at < b.created_at ? 1 : -1; });
+    return mine[0];
+  }
+  async function markCodeRedeemed(row, doctorId){
+    row.redeemed_at = new Date().toISOString();
+    row.redeemed_by_doctor_id = doctorId;
+    if (supabaseClient){
+      try{ await supabaseClient.from('access_codes').update({ redeemed_at: row.redeemed_at, redeemed_by_doctor_id: doctorId }).eq('id', row.id); return; }catch(e){}
+    }
+    // memory row was mutated in place above
+  }
+  async function insertGrant(row){
+    if (supabaseClient){
+      try{
+        var res = await supabaseClient.from('access_grants').insert(row).select().maybeSingle();
+        if (!res.error && res.data) return res.data;
+      }catch(e){}
+    }
+    memoryAccessGrants.push(row);
+    return row;
+  }
+  async function createTrustGrant(patientId, doctorId){
+    var existing = await getActiveGrant(patientId, doctorId);
+    if (existing && !existing.expires_at) return existing;
+    return await insertGrant({
+      id: uid(), patient_id: patientId, doctor_id: doctorId, granted_via:'trust',
+      source_code_id: null, granted_at: new Date().toISOString(), expires_at: null, revoked_at: null
+    });
+  }
+  async function revokeGrant(grantId){
+    if (supabaseClient){
+      try{ await supabaseClient.from('access_grants').update({ revoked_at: new Date().toISOString() }).eq('id', grantId); }catch(e){}
+    }
+    memoryAccessGrants.forEach(function(g){ if (g.id === grantId) g.revoked_at = new Date().toISOString(); });
+  }
+  async function listGrantsForPatient(patientId){
+    var rows = [];
+    if (supabaseClient){
+      try{
+        var res = await supabaseClient.from('access_grants').select('*').eq('patient_id', patientId);
+        if (!res.error && res.data) rows = res.data;
+      }catch(e){}
+    }
+    memoryAccessGrants.forEach(function(g){ if (g.patient_id === patientId && rows.indexOf(g) === -1 && !rows.some(function(r){ return r.id === g.id; })) rows.push(g); });
+    return rows;
+  }
+  async function listGrantsForDoctor(doctorId){
+    var rows = [];
+    if (supabaseClient){
+      try{
+        var res = await supabaseClient.from('access_grants').select('*').eq('doctor_id', doctorId);
+        if (!res.error && res.data) rows = res.data;
+      }catch(e){}
+    }
+    memoryAccessGrants.forEach(function(g){ if (g.doctor_id === doctorId && !rows.some(function(r){ return r.id === g.id; })) rows.push(g); });
+    return rows;
+  }
+  function isGrantActive(g){
+    if (!g || g.revoked_at) return false;
+    if (!g.expires_at) return true;
+    return new Date(g.expires_at).getTime() > Date.now();
+  }
+  async function getActiveGrant(patientId, doctorId){
+    var rows = (await listGrantsForPatient(patientId)).filter(function(g){ return g.doctor_id === doctorId; });
+    var active = rows.filter(isGrantActive);
+    if (!active.length) return null;
+    // Prefer the trust grant if both exist somehow.
+    active.sort(function(a,b){ return a.granted_via === 'trust' ? -1 : 1; });
+    return active[0];
+  }
+  async function redeemAccessCode(code, doctorId){
+    var latest = null;
+    // We need the code across all patients, not just one — search isn't scoped to a
+    // patient the doctor already knows, so query directly.
+    if (supabaseClient){
+      try{
+        var res = await supabaseClient.from('access_codes').select('*').eq('code', code).order('created_at', { ascending:false }).limit(1).maybeSingle();
+        if (!res.error) latest = res.data || null;
+      }catch(e){}
+    }
+    if (!latest){
+      var candidates = memoryAccessCodes.filter(function(r){ return r.code === code; });
+      candidates.sort(function(a,b){ return a.created_at < b.created_at ? 1 : -1; });
+      latest = candidates[0] || null;
+    }
+    if (!latest) return { ok:false, reason:'not-found' };
+    // Only the most recent code issued for that patient is ever valid (v3 design —
+    // generating a fresh code silently retires the previous one).
+    var current = await getLatestAccessCode(latest.patient_id);
+    if (!current || current.id !== latest.id || current.code !== code) return { ok:false, reason:'not-found' };
+    if (latest.redeemed_at) return { ok:false, reason:'redeemed' };
+    if (new Date(latest.expires_at).getTime() <= Date.now()) return { ok:false, reason:'expired' };
+
+    var trustGrant = await getActiveGrant(latest.patient_id, doctorId);
+    if (trustGrant && trustGrant.granted_via === 'trust'){
+      // Trusted doctor redeeming a code is pure navigation — mark the code used, but
+      // don't create a separate one-hour grant that would just shadow the standing one.
+      await markCodeRedeemed(latest, doctorId);
+      return { ok:true, patientId: latest.patient_id, grant: trustGrant };
+    }
+    await markCodeRedeemed(latest, doctorId);
+    var grant = await insertGrant({
+      id: uid(), patient_id: latest.patient_id, doctor_id: doctorId, granted_via:'code',
+      source_code_id: latest.id, granted_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 60*60*1000).toISOString(), revoked_at: null
+    });
+    return { ok:true, patientId: latest.patient_id, grant: grant };
+  }
+  function maskPhone(phone){
+    if (!phone) return 'No phone on file';
+    var digits = phone.replace(/\D/g, '');
+    if (digits.length < 4) return phone;
+    return '••• ' + digits.slice(-4);
+  }
+  async function listTrustedDoctorsForPatient(patientId){
+    var grants = (await listGrantsForPatient(patientId)).filter(function(g){ return g.granted_via === 'trust' && isGrantActive(g); });
+    var out = [];
+    for (var i=0;i<grants.length;i++){
+      var d = await loadDoctor(grants[i].doctor_id);
+      out.push({ grant: grants[i], doctor: d || { doctorId: grants[i].doctor_id, name:'' } });
+    }
+    return out;
+  }
+  async function listActiveAdhocGrantsForPatient(patientId){
+    var grants = (await listGrantsForPatient(patientId)).filter(function(g){ return g.granted_via === 'code' && isGrantActive(g); });
+    var out = [];
+    for (var i=0;i<grants.length;i++){
+      var d = await loadDoctor(grants[i].doctor_id);
+      out.push({ grant: grants[i], doctor: d || { doctorId: grants[i].doctor_id, name:'' } });
+    }
+    return out;
+  }
+  async function listTrustedPatientsForDoctor(doctorId){
+    var grants = (await listGrantsForDoctor(doctorId)).filter(function(g){ return g.granted_via === 'trust' && isGrantActive(g); });
+    var out = [];
+    for (var i=0;i<grants.length;i++){
+      var p = await loadPatient(grants[i].patient_id);
+      if (p) out.push({ grant: grants[i], patient: p });
+    }
+    return out;
+  }
+
   async function hashPassword(password){
     if (!password) return '';
     try{
@@ -1347,8 +1588,150 @@
     closePatEyesModal();
     closeAddEyeModal();
     closeEyeModal();
+    closePatAccessModal();
+    await refreshPatientLiveCode();
     showView('view-patient-dash');
   }
+
+  // ---- Live access code (patient side) ----
+  var liveCodeTimer = null;
+  function stopLiveCodeTimer(){
+    if (liveCodeTimer){ clearInterval(liveCodeTimer); liveCodeTimer = null; }
+  }
+  function renderLiveCodeState(row){
+    stopLiveCodeTimer();
+    var codeEl = $('pat-live-code');
+    var eyebrowEl = $('pat-livecode-eyebrow');
+    var genBtn = $('pat-gen-code-btn');
+    function tick(){
+      if (!row || row.redeemed_at){
+        codeEl.textContent = row && row.redeemed_at ? 'Redeemed' : '— — — — — —';
+        eyebrowEl.textContent = row && row.redeemed_at ? 'Already used' : 'Live code';
+        genBtn.textContent = 'Generate a code';
+        stopLiveCodeTimer();
+        return;
+      }
+      var msLeft = new Date(row.expires_at).getTime() - Date.now();
+      if (msLeft <= 0){
+        codeEl.textContent = 'Expired';
+        eyebrowEl.textContent = 'Expired';
+        genBtn.textContent = 'Generate a new code';
+        stopLiveCodeTimer();
+        return;
+      }
+      var secs = Math.ceil(msLeft / 1000);
+      var m = Math.floor(secs / 60), s = secs % 60;
+      codeEl.textContent = row.code.slice(0,3) + ' ' + row.code.slice(3);
+      eyebrowEl.textContent = 'Live code — expires in ' + m + ':' + String(s).padStart(2,'0');
+      genBtn.textContent = 'Generate a new code';
+    }
+    tick();
+    if (row && !row.redeemed_at) liveCodeTimer = setInterval(tick, 1000);
+  }
+  async function refreshPatientLiveCode(){
+    var row = await getLatestAccessCode(session.id);
+    renderLiveCodeState(row);
+  }
+  $('pat-gen-code-btn').addEventListener('click', async function(){
+    $('pat-gen-code-btn').disabled = true;
+    try{
+      var row = await createAccessCode(session.id);
+      renderLiveCodeState(row);
+    }finally{
+      $('pat-gen-code-btn').disabled = false;
+    }
+  });
+  $('pat-live-code-copy').addEventListener('click', function(){
+    var text = $('pat-live-code').textContent.replace(/\s+/g,'');
+    if (/^\d{6}$/.test(text)) copyToClipboard(text, $('pat-live-code-copy-note'));
+  });
+
+  // ---- Manage access (patient side) ----
+  function openPatAccessModal(){
+    renderTrustedList();
+    renderAdhocList();
+    $('pat-trust-input').value = '';
+    clearError($('pat-trust-error'));
+    $('pat-access-modal').classList.remove('hidden');
+  }
+  function closePatAccessModal(){ $('pat-access-modal').classList.add('hidden'); }
+  $('pat-access-manage-btn').addEventListener('click', openPatAccessModal);
+  $('pat-access-close').addEventListener('click', closePatAccessModal);
+  $('pat-access-modal').addEventListener('click', function(e){ if (e.target === $('pat-access-modal')) closePatAccessModal(); });
+
+  function renderGrantRow(entry, showRevoke, subtext){
+    var d = entry.doctor;
+    var name = d.name ? ('Dr. ' + d.name.replace(/^Dr\.?\s*/i,'')) : (d.doctorId || 'Unknown doctor');
+    var verified = d.email && d.phone && d.license;
+    return '<div class="list-item" data-grant="'+entry.grant.id+'" style="cursor:default;">'
+      + '<div><div class="li-title">'+escapeHtml(name)+' <span class="badge '+(verified?'verified':'unverified')+'" style="margin-left:6px;">'+(verified?'Verified':'Unverified')+'</span></div>'
+      + '<div class="li-sub">'+escapeHtml(maskPhone(d.phone))+(subtext ? ' · '+subtext : '')+'</div></div>'
+      + (showRevoke ? '<button class="btn btn-secondary btn-sm revoke-grant-btn" data-grant="'+entry.grant.id+'">Revoke</button>' : '')
+      + '</div>';
+  }
+  async function renderTrustedList(){
+    var listEl = $('pat-trusted-list');
+    var emptyEl = $('pat-trusted-empty');
+    var entries = await listTrustedDoctorsForPatient(session.id);
+    if (!entries.length){
+      listEl.innerHTML = '';
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = entries.map(function(e){ return renderGrantRow(e, true, 'Standing access'); }).join('');
+    listEl.querySelectorAll('.revoke-grant-btn').forEach(function(btn){
+      btn.addEventListener('click', async function(){
+        btn.disabled = true;
+        await revokeGrant(btn.getAttribute('data-grant'));
+        renderTrustedList();
+      });
+    });
+  }
+  async function renderAdhocList(){
+    var listEl = $('pat-adhoc-list');
+    var emptyEl = $('pat-adhoc-empty');
+    var entries = await listActiveAdhocGrantsForPatient(session.id);
+    if (!entries.length){
+      listEl.innerHTML = '';
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = entries.map(function(e){
+      var mins = Math.max(0, Math.ceil((new Date(e.grant.expires_at).getTime() - Date.now()) / 60000));
+      return renderGrantRow(e, true, 'One-time code · ends in ~'+mins+'m');
+    }).join('');
+    listEl.querySelectorAll('.revoke-grant-btn').forEach(function(btn){
+      btn.addEventListener('click', async function(){
+        btn.disabled = true;
+        await revokeGrant(btn.getAttribute('data-grant'));
+        renderAdhocList();
+      });
+    });
+  }
+  $('pat-trust-add-btn').addEventListener('click', async function(){
+    var raw = $('pat-trust-input').value.trim().toUpperCase();
+    var id = raw.indexOf('DR-') === 0 ? raw : 'DR-' + raw.replace(/[^0-9]/g,'');
+    clearError($('pat-trust-error'));
+    if (!/^DR-\d{6}$/.test(id)){
+      showError($('pat-trust-error'), 'Enter a valid doctor ID, like DR-482913.');
+      return;
+    }
+    var doc = await loadDoctor(id);
+    if (!doc){
+      showError($('pat-trust-error'), 'No doctor found with that ID.');
+      return;
+    }
+    $('pat-trust-add-btn').disabled = true;
+    try{
+      await createTrustGrant(session.id, id);
+      $('pat-trust-input').value = '';
+      renderTrustedList();
+    }finally{
+      $('pat-trust-add-btn').disabled = false;
+    }
+  });
   function renderPatientVerification(data){
     var verified = isPatientVerified(data);
     var badge = $('pat-badge');
@@ -1463,6 +1846,7 @@
     reader.readAsDataURL(file);
   });
   $('pat-signout').addEventListener('click', function(){
+    stopLiveCodeTimer();
     session = { type:null, id:null };
     showView('view-landing');
   });
@@ -1497,7 +1881,7 @@
     emptyEl.classList.add('hidden');
     listEl.innerHTML = visits.map(function(v, i){
       return '<div class="list-item" data-idx="'+i+'">'
-        + '<div><div class="li-title">'+escapeHtml(v.doctorName || 'Doctor')+'</div>'
+        + '<div><div class="li-title">'+escapeHtml(v.doctorName || 'Doctor')+unverifiedTagHtml(v)+'</div>'
         + '<div class="li-sub">'+escapeHtml(formatDateDisplay(v.date))+(v.time ? ' · '+escapeHtml(v.time) : '')+(v.clinicName ? ' · '+escapeHtml(v.clinicName) : '')+'</div></div>'
         + chevronSvg + '</div>';
     }).join('');
@@ -1518,7 +1902,7 @@
     emptyEl.classList.add('hidden');
     listEl.innerHTML = tests.map(function(t, i){
       return '<div class="list-item" data-idx="'+i+'">'
-        + '<div><div class="li-title">'+escapeHtml(t.name || 'Test')+'</div>'
+        + '<div><div class="li-title">'+escapeHtml(t.name || 'Test')+unverifiedTagHtml(t)+'</div>'
         + '<div class="li-sub">'+escapeHtml(formatDateDisplay(t.date))+'</div></div>'
         + chevronSvg + '</div>';
     }).join('');
@@ -1530,7 +1914,7 @@
   }
   function openVisitModal(v){
     $('visit-modal-date').textContent = formatDateDisplay(v.date) + (v.time ? ' · ' + v.time : '');
-    $('visit-modal-doctor').textContent = v.doctorName || 'Doctor';
+    $('visit-modal-doctor').innerHTML = escapeHtml(v.doctorName || 'Doctor') + unverifiedTagHtml(v);
     $('visit-modal-clinic').textContent = v.clinicName || 'Not recorded';
     $('visit-modal-symptoms').textContent = v.symptoms || 'Not recorded';
     $('visit-modal-diagnosis').textContent = v.diagnosis || 'Not recorded';
@@ -1544,7 +1928,7 @@
 
   function openTestModal(t){
     $('test-modal-date').textContent = formatDateDisplay(t.date);
-    $('test-modal-name').textContent = t.name || 'Test';
+    $('test-modal-name').innerHTML = escapeHtml(t.name || 'Test') + unverifiedTagHtml(t);
     $('test-modal-doctor').textContent = t.doctorName || 'Not recorded';
     $('test-modal-result').textContent = t.resultSummary || 'No result summary added yet.';
     $('pat-test-modal').classList.remove('hidden');
@@ -1773,6 +2157,9 @@
     $('lookup-empty').classList.remove('hidden');
     currentLookupCode = null;
     currentLookupData = null;
+    currentLookupGrant = null;
+    switchFindTab('code');
+    renderRoster();
     closeDocProfileModal();
     closeAddVisitModal();
     closeDocVisitModal();
@@ -1780,6 +2167,44 @@
     closeDocTestModal();
     closeDocStatsModal();
     showView('view-doctor-dash');
+  }
+
+  // ---- Find a patient: code vs. roster ----
+  function switchFindTab(tab){
+    var code = tab === 'code';
+    $('doc-find-tab-code').classList.toggle('active', code);
+    $('doc-find-tab-roster').classList.toggle('active', !code);
+    $('doc-find-code-pane').classList.toggle('hidden', !code);
+    $('doc-find-roster-pane').classList.toggle('hidden', code);
+    if ($('patient-result').classList.contains('hidden')){
+      $('lookup-empty').classList.toggle('hidden', !code);
+    }
+  }
+  $('doc-find-tab-code').addEventListener('click', function(){ switchFindTab('code'); });
+  $('doc-find-tab-roster').addEventListener('click', function(){ switchFindTab('roster'); renderRoster(); });
+  async function renderRoster(){
+    var listEl = $('doc-roster-list');
+    var emptyEl = $('doc-roster-empty');
+    var entries = await listTrustedPatientsForDoctor(session.id);
+    if (!entries.length){
+      listEl.innerHTML = '';
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = entries.map(function(e, i){
+      var p = e.patient;
+      return '<div class="list-item" data-idx="'+i+'">'
+        + '<div><div class="li-title">'+escapeHtml(p.name || 'Unnamed patient')+'</div>'
+        + '<div class="li-sub">'+escapeHtml(maskPhone(p.phone))+'</div></div>'
+        + chevronSvg + '</div>';
+    }).join('');
+    listEl.querySelectorAll('.list-item').forEach(function(el){
+      el.addEventListener('click', function(){
+        var e = entries[parseInt(el.getAttribute('data-idx'), 10)];
+        showLookupResult(e.patient.code, e.patient, e.grant);
+      });
+    });
   }
   function renderDoctorVerification(data){
     var verified = isDoctorVerified(data);
@@ -1920,7 +2345,7 @@
     if (e.target === $('doc-profile-modal')) closeDocProfileModal();
   });
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeDocStatsModal(); closePatProfileModal(); closePatStatsModal(); closePatEyesModal(); closeAddEyeModal(); closeEyeModal(); }
+    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeDocStatsModal(); closePatProfileModal(); closePatStatsModal(); closePatEyesModal(); closeAddEyeModal(); closeEyeModal(); closePatAccessModal(); }
   });
 
   function escapeHtml(s){
@@ -1928,8 +2353,12 @@
     d.textContent = s;
     return d.innerHTML;
   }
+  function unverifiedTagHtml(entry){
+    return entry && entry.unverified ? ' <span class="badge unverified" style="padding:2px 8px; font-size:0.68rem;">Unverified</span>' : '';
+  }
   var currentLookupCode = null;
   var currentLookupData = null;
+  var currentLookupGrant = null;
 
   function renderDoctorVisitsList(visits){
     var listEl = $('doc-visits-list');
@@ -1942,7 +2371,7 @@
     emptyEl.classList.add('hidden');
     listEl.innerHTML = visits.map(function(v, i){
       return '<div class="list-item" data-idx="'+i+'">'
-        + '<div><div class="li-title">'+escapeHtml(v.doctorName || 'Doctor')+'</div>'
+        + '<div><div class="li-title">'+escapeHtml(v.doctorName || 'Doctor')+unverifiedTagHtml(v)+'</div>'
         + '<div class="li-sub">'+escapeHtml(formatDateDisplay(v.date))+(v.time ? ' · '+escapeHtml(v.time) : '')+(v.clinicName ? ' · '+escapeHtml(v.clinicName) : '')+'</div></div>'
         + chevronSvg + '</div>';
     }).join('');
@@ -1954,7 +2383,7 @@
   }
   function openDocVisitModal(v){
     $('doc-visit-modal-date').textContent = formatDateDisplay(v.date) + (v.time ? ' · ' + v.time : '');
-    $('doc-visit-modal-doctor').textContent = v.doctorName || 'Doctor';
+    $('doc-visit-modal-doctor').innerHTML = escapeHtml(v.doctorName || 'Doctor') + unverifiedTagHtml(v);
     $('doc-visit-modal-clinic').textContent = v.clinicName || 'Not recorded';
     $('doc-visit-modal-symptoms').textContent = v.symptoms || 'Not recorded';
     $('doc-visit-modal-diagnosis').textContent = v.diagnosis || 'Not recorded';
@@ -1977,7 +2406,7 @@
     emptyEl.classList.add('hidden');
     listEl.innerHTML = tests.map(function(t, i){
       return '<div class="list-item" data-idx="'+i+'">'
-        + '<div><div class="li-title">'+escapeHtml(t.name || 'Test')+'</div>'
+        + '<div><div class="li-title">'+escapeHtml(t.name || 'Test')+unverifiedTagHtml(t)+'</div>'
         + '<div class="li-sub">'+escapeHtml(formatDateDisplay(t.date))+'</div></div>'
         + chevronSvg + '</div>';
     }).join('');
@@ -1989,7 +2418,7 @@
   }
   function openDocTestModal(t){
     $('doc-test-modal-date').textContent = formatDateDisplay(t.date);
-    $('doc-test-modal-name').textContent = t.name || 'Test';
+    $('doc-test-modal-name').innerHTML = escapeHtml(t.name || 'Test') + unverifiedTagHtml(t);
     $('doc-test-modal-doctor').textContent = t.doctorName || 'Not recorded';
     $('doc-test-modal-result').textContent = t.resultSummary || 'No result summary added yet.';
     $('doc-test-modal').classList.remove('hidden');
@@ -2008,12 +2437,16 @@
   $('doc-tab-visits').addEventListener('click', function(){ switchDoctorResultTab('visits'); });
   $('doc-tab-tests').addEventListener('click', function(){ switchDoctorResultTab('tests'); });
 
-  function showLookupResult(code, data){
+  function showLookupResult(code, data, grant){
     currentLookupCode = code;
     currentLookupData = data;
+    currentLookupGrant = grant || null;
     $('lookup-row').classList.add('hidden');
     $('lookup-subtitle').classList.add('hidden');
+    $('doc-find-code-pane').classList.add('hidden');
+    $('doc-find-roster-pane').classList.add('hidden');
     $('lookup-not-found').classList.add('hidden');
+    $('lookup-empty').classList.add('hidden');
     $('patient-result').classList.remove('hidden');
     var verified = isPatientVerified(data);
     $('res-name').textContent = data.name || 'Unnamed patient';
@@ -2021,7 +2454,12 @@
     var badge = $('res-badge');
     badge.textContent = verified ? 'Verified' : 'Unverified';
     badge.className = 'badge ' + (verified ? 'verified' : 'unverified');
-    $('res-code').textContent = formatCode(code);
+    var accessNote = 'Access: standing trust';
+    if (currentLookupGrant && currentLookupGrant.granted_via === 'code' && currentLookupGrant.expires_at){
+      var mins = Math.max(0, Math.ceil((new Date(currentLookupGrant.expires_at).getTime() - Date.now()) / 60000));
+      accessNote = 'Access: one-time code · ends in ~' + mins + 'm';
+    }
+    $('res-access-note').textContent = accessNote;
     renderDoctorVisitsList(data.visits || []);
     renderDoctorTestsList(data.tests || []);
     switchDoctorResultTab('visits');
@@ -2029,7 +2467,9 @@
   function resetLookup(){
     currentLookupCode = null;
     currentLookupData = null;
+    currentLookupGrant = null;
     $('lookup-code').value = '';
+    switchFindTab('code');
     $('lookup-row').classList.remove('hidden');
     $('lookup-subtitle').classList.remove('hidden');
     $('patient-result').classList.add('hidden');
@@ -2040,22 +2480,37 @@
   $('lookup-btn').addEventListener('click', async function(){
     var code = $('lookup-code').value.replace(/[^0-9]/g,'');
     $('lookup-empty').classList.add('hidden');
-    if (code.length !== 8){
+    if (code.length !== 6){
       $('patient-result').classList.add('hidden');
       $('lookup-not-found').classList.remove('hidden');
+      $('lookup-not-found').textContent = 'Enter the 6-digit live code your patient showed you.';
       currentLookupCode = null;
       currentLookupData = null;
       return;
     }
-    var data = await loadPatient(code);
-    if (!data){
-      $('patient-result').classList.add('hidden');
-      $('lookup-not-found').classList.remove('hidden');
-      currentLookupCode = null;
-      currentLookupData = null;
-      return;
+    $('lookup-btn').disabled = true;
+    try{
+      var result = await redeemAccessCode(code, session.id);
+      if (!result.ok){
+        $('patient-result').classList.add('hidden');
+        $('lookup-not-found').classList.remove('hidden');
+        $('lookup-not-found').textContent =
+          result.reason === 'expired' ? 'That code has expired — ask your patient to generate a new one.' :
+          result.reason === 'redeemed' ? 'That code has already been used — ask your patient for a new one.' :
+          'No active code found. Double-check it with your patient.';
+        return;
+      }
+      var data = await loadPatient(result.patientId);
+      if (!data){
+        $('patient-result').classList.add('hidden');
+        $('lookup-not-found').classList.remove('hidden');
+        $('lookup-not-found').textContent = 'That patient’s record could not be found.';
+        return;
+      }
+      showLookupResult(result.patientId, data, result.grant);
+    }finally{
+      $('lookup-btn').disabled = false;
     }
-    showLookupResult(code, data);
   });
   $('lookup-code').addEventListener('keydown', function(e){
     if (e.key === 'Enter') $('lookup-btn').click();
@@ -2098,19 +2553,26 @@
       return;
     }
     clearError($('add-visit-error'));
-    var visit = {
-      doctorName: currentDoctorDisplayName(),
-      clinicName: (currentDoctorData && currentDoctorData.currentClinic) || '',
-      date: date,
-      time: $('visit-time').value.trim(),
-      symptoms: $('visit-symptoms').value.trim(),
-      diagnosis: $('visit-diagnosis').value.trim(),
-      prescription: $('visit-prescription').value.trim(),
-      notes: $('visit-notes').value.trim()
-    };
     $('add-visit-save').disabled = true;
     $('add-visit-save').textContent = 'Saving...';
     try{
+      var activeGrant = await getActiveGrant(currentLookupCode, session.id);
+      if (!activeGrant){
+        showError($('add-visit-error'), 'Your access to this patient has expired or been revoked. Ask them for a new code or to re-trust you.');
+        return;
+      }
+      var visit = {
+        doctorName: currentDoctorDisplayName(),
+        clinicName: (currentDoctorData && currentDoctorData.currentClinic) || '',
+        date: date,
+        time: $('visit-time').value.trim(),
+        symptoms: $('visit-symptoms').value.trim(),
+        diagnosis: $('visit-diagnosis').value.trim(),
+        prescription: $('visit-prescription').value.trim(),
+        notes: $('visit-notes').value.trim(),
+        writtenViaGrantId: activeGrant.id,
+        unverified: !isDoctorVerified(currentDoctorData || {})
+      };
       var data = await loadPatient(currentLookupCode);
       if (!data){
         showError($('add-visit-error'), 'This patient record could not be found anymore.');
@@ -2172,15 +2634,22 @@
       return;
     }
     clearError($('add-test-error'));
-    var test = {
-      name: name,
-      date: date,
-      doctorName: currentDoctorDisplayName(),
-      resultSummary: $('test-result').value.trim()
-    };
     $('add-test-save').disabled = true;
     $('add-test-save').textContent = 'Saving...';
     try{
+      var activeGrant = await getActiveGrant(currentLookupCode, session.id);
+      if (!activeGrant){
+        showError($('add-test-error'), 'Your access to this patient has expired or been revoked. Ask them for a new code or to re-trust you.');
+        return;
+      }
+      var test = {
+        name: name,
+        date: date,
+        doctorName: currentDoctorDisplayName(),
+        resultSummary: $('test-result').value.trim(),
+        writtenViaGrantId: activeGrant.id,
+        unverified: !isDoctorVerified(currentDoctorData || {})
+      };
       var data = await loadPatient(currentLookupCode);
       if (!data){
         showError($('add-test-error'), 'This patient record could not be found anymore.');

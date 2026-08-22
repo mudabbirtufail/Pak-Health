@@ -30,6 +30,9 @@ records securely, running **alongside** the existing paper-based system, not rep
   requirement, and nothing here is designed to force that pace.
 - Everything in [§ 11](#11-explicitly-out-of-scope) was seriously discussed for the national
   version and deliberately left out here — not forgotten, declined.
+- Every account on the currently deployed prototype is a test account. This design ships as
+  a clean relaunch, not a migration — nothing here needs to preserve or carry forward old
+  data.
 
 ## 3. Two platforms, one doing double duty
 
@@ -148,22 +151,26 @@ Nothing else bounds a trust grant over time. Not a timer, not a policy — just 
 patient goes and looks, and whether revoking is a single obvious tap when they do. This
 screen isn't a settings-page afterthought; it's load-bearing.
 
+**Decided — revocation timing:** revoking isn't instant against an already-open session. It
+takes effect the next time something loads — the next page view, the next app open — not
+mid-session. Simpler to build than pushing a live kill signal into an active session, and a
+reasonable bar for v1.
+
 ## 7. Transparency, without the noise
 
 No push notification on every view. That's a considered choice, not a shortcut.
 
 In the old bearer-code design, a notification on every access was doing real work — it was
 the only thing that ever told the patient a stranger had their code. Here, that awareness
-has already happened earlier: the patient consciously swiped to trust this doctor, or
-handed over a code they generated themselves seconds ago. A push alert every time a chart
-gets opened afterward is mostly just repeating something already agreed to — and a doctor
-checking labs three times during one admission would turn that repetition into noise the
-patient learns to swipe away.
+happens earlier instead: the patient consciously swiped to trust this doctor, or handed
+over a code they generated themselves seconds ago.
 
-What stays: a plain **access history** screen inside the app — who viewed or wrote, and
-when — that the patient can check on their own terms. Not pushed at them, just there. Gets
-the deterrence and the "did this actually happen" value, without the interruption, and
-without turning the notification itself into a disclosure risk on a shared household phone.
+**Deferred:** a historical access-history log (who viewed or wrote, and when) was planned as
+an additional, passive transparency layer on top of that — but it's cut from v1 to keep the
+build simple, and picked up in a later version (§ 10). For now, transparency lives entirely
+in the grant itself: a patient knows who has access because they're the one who granted it,
+and can check the current state — not the history — any time on the manage-access screen
+(§ 6).
 
 ## 8. Patient recourse against a bad entry
 
@@ -189,10 +196,14 @@ defensible bar for a v1 — and each one is honest about what it actually does.
 
 1. **Scarcity** — One-time, three minutes, only the patient can ever mint a valid one.
    Minimizes the odds of an illegitimate redemption happening at all.
-2. **Visibility** — The access history log means nothing written or viewed happens
-   invisibly, even if it happens without a live push alert.
-3. **Trust signal** — The unverified tag tells anyone reading the record how much weight to
+2. **Trust signal** — The unverified tag tells anyone reading the record how much weight to
    give an entry, before real verification exists to gate writing outright.
+
+> **Known gap, accepted for v1:** with the access-history log deferred (§ 7), a Trusted
+> doctor's activity between being granted and being revoked leaves no audit trail inside the
+> app. The only real check on that relationship is the revoke button itself — which is part
+> of why trust being just as easy to revoke as it is to grant matters more than it otherwise
+> would.
 
 ## 10. Deferred to later, not designed away
 
@@ -205,6 +216,13 @@ corrections.
   case where an automatic notification still earns its keep.
 - **Verification gates writing.** Eventually, only verified doctors can write at all, and
   the unverified tier disappears rather than growing forever.
+- **Doctor MFA.** A compromised doctor account exposes every patient who's trusted them; a
+  compromised patient account exposes one. That asymmetry is a real argument for stronger
+  auth on the doctor side specifically — but v1 keeps auth simple for both roles, and adds
+  this once there's a reason to.
+- **Access-history log.** Who viewed or wrote, and when, as a passive screen the patient can
+  check on their own terms — designed in § 7, cut from v1 to keep the build simple, picked
+  up once the core mechanism is proven out.
 - **Appointment booking.** A genuinely good, separate feature — book a doctor online.
   Sequenced after the access model ships and holds up, not bundled into the same release.
   Nice side effect: patients who use it open the app more, which keeps their live codes

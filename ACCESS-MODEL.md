@@ -54,6 +54,29 @@ PIN.
 Patient accounts are just accounts — real auth, no different from any other product. Doctor
 accounts carry one more fact: whether anyone has actually confirmed the license.
 
+### Auth provider & the mobile PIN
+
+**Supabase Auth** for both roles — not just because it's already the storage platform, but
+because it fits the data model in [§ 13](#13-data-model) directly: Postgres RLS policies can
+check `auth.uid()` against `access_grants` rows, so the access-check query becomes something
+the database itself enforces, not something the client is trusted to respect. It also makes
+"Continue with Google" real for the first time — the current prototype's version just asks
+for a name/email inline, no actual OAuth.
+
+**The PIN is local to the device, not server-checked.** Real authentication happens once —
+email/password or Google, through Supabase Auth — and that session is stored securely on the
+device. The PIN's only job afterward is unlocking the already-authenticated app on that
+specific phone, the same way a lock screen works — not a second password checked against the
+server. That keeps it symmetric with biometric unlock, which is inherently device-local
+anyway. Every real action is still authorized by the underlying session token, never by the
+PIN itself; enough wrong PIN attempts should fall back to a full real login rather than allow
+unlimited local guessing.
+
+> **Not to be confused with the access code:** both are short numbers a patient deals with,
+> but they're unrelated. The PIN is long-lived, chosen once, and opens the app. The code
+> ([§ 5](#5-the-access-mechanism)) is auto-generated, dies in three minutes, and exists only
+> to hand to a doctor.
+
 **Verification, deferred on purpose.** A doctor can upload a license to become **Verified**.
 For v1 this is not required to sign up or to write to a record — the review workflow that
 would make "verified" mean something doesn't exist yet, and building it isn't worth delaying
@@ -248,3 +271,54 @@ patient can lose.
 None outstanding as of this update — the design's access model is fully decided. New
 questions will surface once implementation starts; add them here rather than letting them
 live only in chat.
+
+## 13. Data model
+
+A first schema sketch — five entities, and one deliberate choice underneath: the one-time
+code and Trusted status both produce the same kind of row, not two separate mechanisms with
+two separate validity checks.
+
+### The core query
+
+Every access check in the app answers the same question, the same way, regardless of how
+access was granted:
+
+```
+access is valid if: EXISTS grant WHERE patient = X AND doctor = Y
+                     AND revoked_at IS NULL
+                     AND (expires_at IS NULL OR expires_at > now())
+```
+
+Trusted = a grant with `expires_at = null`. A code redemption = a grant with
+`expires_at = granted_at + 1 hour`.
+
+### Entities
+
+**`patients`** / **`doctors`** — accounts. Doctors add `verified` (boolean) and a license
+document reference. (Mobile PIN storage/verification is deliberately not specified here —
+see the still-open "auth specifics" thread.)
+
+**`access_codes`** — the ephemeral, 3-minute code, separate from what it produces:
+
+- `id, patient_id, code, created_at, expires_at, redeemed_at, redeemed_by_doctor_id`
+- "Renews on login" needs no extra write to invalidate the previous code — validity requires
+  matching the *most recent* row for that patient, so an older code stops mattering
+  automatically the instant a newer one exists.
+
+**`access_grants`** — the actual authorization ledger:
+
+- `id, patient_id, doctor_id, granted_via ('code'|'trust'), source_code_id, granted_at,
+  expires_at, revoked_at`
+- The roster ([§ Finding the patient on a return visit](#the-access-mechanism)) is
+  `WHERE granted_via = 'trust' AND revoked_at IS NULL`. Revoking is `SET revoked_at = now()`.
+
+**Record entries** (visits, tests, whatever the clinical content ends up being):
+
+- `authored_by_doctor_id`
+- `written_via_grant_id` — traceable back to the exact grant that authorized the write, even
+  though there's no log UI yet (§ 7). Costs one column now; means nothing has to be
+  reconstructed later once the log actually gets built.
+- `unverified` — a **snapshot** captured from the doctor's verification status at the moment
+  of writing, not a live lookup. If it were live, an entry written while unverified would
+  silently lose its tag the moment that doctor later got verified — quietly contradicting the
+  whole reason the tag exists (§ 4: "no retrofitting trust signals onto old data").

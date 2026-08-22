@@ -9,13 +9,14 @@ version (same content): https://claude.ai/code/artifact/9e5aeba6-0a20-4835-92ba-
 
 ## 1. Identity is not authorization
 
-The running prototype's entire security model is one 8-digit code: whoever has it can read
-and write the record, forever, with no way to know it happened. That's a bearer token
-wearing a patient ID's clothes — a leak is silent and permanent.
+A code should say *which* record. A separate, revocable decision should say *whether* this
+clinician may act on it. The two must never be the same fact — that's the one idea
+everything below is built on.
 
-Everything below is one idea, worked all the way through: a code should say *which* record.
-A separate, revocable decision should say *whether* this clinician may act on it. The two
-must never be the same fact.
+The running prototype breaks this today: its single 8-digit code does both jobs at once,
+so whoever has it gets full, permanent, invisible access — a leak is silent and never ends.
+§ 5 covers exactly how the new mechanism avoids that, and what got tried and rejected along
+the way.
 
 ## 2. What this is — and isn't
 
@@ -104,6 +105,25 @@ allows it.
 > set up in advance. The specialist falls back to the one-time code at the first actual
 > visit, and the patient can promote them to trusted afterward if the relationship
 > continues. A deliberate simplicity trade, not an oversight.
+
+### Finding the patient on a return visit
+
+Trust removes the need for *authorization* on each visit, but not the need to *locate* the
+right chart — the single-code redesign removed the old standalone lookup identifier, so
+trust needs its own answer here. Two paths, either usable, neither mandatory:
+
+- **The patient shares the live one-time code, same as always.** The doctor redeems it and
+  lands directly on the right chart. For a trusted doctor this is pure navigation, not a
+  fresh grant — their standing access already covers everything the code would otherwise
+  unlock, so redeeming one doesn't add anything or start some separate one-hour window.
+- **Or the doctor searches their own "my patients" roster by name** — a list populated
+  automatically by who currently trusts them, no code exchange needed at all. Useful when
+  the doctor already recognizes a regular patient and there's nothing to ask them for.
+
+Two things worth building into the roster from the start: entries need something beyond a
+name to disambiguate ("John Smith" isn't unique) — date of birth or a masked phone number
+alongside it — and the list has to reflect live trust exactly, so a revoked patient
+disappears from it immediately rather than lingering grayed out.
 
 ### Verified × Trusted — two axes, not one
 

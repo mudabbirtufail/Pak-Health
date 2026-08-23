@@ -1,3 +1,10 @@
 dataBasePass.txt
 *.env
 .env
+
+# Source photos for the record-list tiles — only the compressed, cropped copies
+# embedded as base64 in pakHealth.html are actually needed to run the app.
+visits.jpg
+lab results.jpg
+medicine.jpg
+eyes.jpg

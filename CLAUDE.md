@@ -21,9 +21,20 @@ open it directly in a browser. All styling and logic live in that one file (inli
 
 - **No framework** — vanilla JS, `document.getElementById`, manual DOM updates.
 - **View switching**: every top-level screen (landing, doctor auth, patient auth,
-  doctor dashboard, patient dashboard) is a `<div class="view">`. `showView(id)` hides
-  all of them and un-hides one. Tabs within a page use the same hide/show pattern one
-  level deeper (e.g. Visits vs. Tests).
+  doctor/patient dashboards, and the patient's record pages — Visits, Lab Results, My
+  Prescriptions, My Eyes) is a `<div class="view">`. `showView(id)` hides all of them
+  and un-hides one. Tabs within a page use the same hide/show pattern one level deeper
+  (e.g. doctor-side Visits vs. Tests).
+- **Real browser back/forward**: `showView(id)` also mirrors each switch into history
+  (`pushState`/`replaceState` with `#view-id` as the hash — no server routes, it's
+  just used as a state label) so the actual browser back/forward buttons move between
+  views instead of leaving the app, which they'd otherwise do since none of this is
+  real navigation. A `popstate` listener re-applies the view without re-pushing, and
+  redirects to `view-landing` if the target needs a session (`PATIENT_ONLY_VIEWS` /
+  `DOCTOR_ONLY_VIEWS`) that no longer exists — e.g. pressing back after signing out.
+  There's still no session persistence across a real page reload, so a reload always
+  restarts at landing regardless of the hash in the URL (deep-linking into an
+  authenticated view isn't supported, and isn't attempted).
 - **Storage**: three tiers, tried in order, all behind the same `storeGet`/`storeSet`
   interface so the rest of the app never branches on which one is active. (1)
   `window.storage` (Claude.ai artifact persistent storage API) when running inside
@@ -132,19 +143,29 @@ verified, which would defeat the point of having the tag at all.
   `writtenViaGrantId` and an `unverified` snapshot, then writes directly into that
   patient's record, so the patient sees it immediately next time they sign in. This is
   the core loop of the app.
-- Patient dashboard: health card (avatar + name + live code) and, in the center
-  column, a **record list** — Visits, Lab Results, My Prescriptions, My Eyes — each a
-  wide rectangular row with a flat-illustration icon on the left (fading into white
-  where the title sits) and a chevron on the right. Tapping one navigates to a real
-  full-screen page (its own `<div class="view">`, shown via the same `showView()`
-  top-level view-switching the rest of the app already uses, with a "← Back to
-  dashboard" link in its topbar) rather than opening a modal — these were promoted to
-  pages specifically because they're primary destinations now, unlike incidental
-  detail popups (Account settings, Stats, Manage access) which stay modals. Within
-  each page, clicking a row still opens the existing detail modal (visit/test/eye
-  entry) on top of the page. **My Prescriptions is derived, not stored separately** —
-  it scans every visit for a non-empty, non-"None" `prescription` field and lists
-  those, clicking through to the same visit-detail modal. An "Account settings" modal
+- Patient dashboard: a **sidebar** (`.sidebar`, `position: sticky` — stays in place
+  while the record list scrolls past it, disabled below the 860px breakpoint where
+  the layout stacks to one column) with the health card (avatar + name + live code)
+  and, in the center column, a **record list** — Visits, Lab Results, My
+  Prescriptions, My Eyes — each a tall rectangular row with a real photo spanning the
+  full width on top (fading to white top-to-bottom where the title sits below) and a
+  chevron on the right. The four photos are real images the user supplied, cropped to
+  a wide banner ratio and compressed client-side with Pillow, then embedded as base64
+  `<img src="data:image/jpeg;base64,...">` — same "stay a self-contained single file"
+  approach as avatar `photoUrl`s, just baked in at build time instead of at runtime.
+  The dashboard's outer container is intentionally left-aligned rather than centered
+  (`#view-patient-dash .dash-main-wide`) so extra width on wide screens shows up as
+  space to the right instead of being split evenly on both sides. Tapping a row
+  navigates to a real full-screen page (its own `<div class="view">`, shown via the
+  same `showView()` top-level view-switching the rest of the app already uses, with a
+  "← Back to dashboard" link in its topbar) rather than opening a modal — these were
+  promoted to pages specifically because they're primary destinations now, unlike
+  incidental detail popups (Account settings, Stats, Manage access) which stay
+  modals. Within each page, clicking a row still opens the existing detail modal
+  (visit/test/eye entry) on top of the page. **My Prescriptions is derived, not
+  stored separately** — it scans every visit for a non-empty, non-"None"
+  `prescription` field and lists those, clicking through to the same visit-detail
+  modal. An "Account settings" modal
   (name, email, phone) mirrors the doctor's — this is what lets a patient add or fix
   their email/phone *after* signup; before this existed there was no way to edit those
   fields post-signup at all. A checklist on the health card shows the actual

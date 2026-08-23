@@ -194,35 +194,35 @@
     <div class="dash-grid">
       <div class="sidebar">
        <div class="sticky-inner">
-        <div class="panel health-card-panel">
-          <div class="health-card">
-            <svg class="health-card-watermark" viewBox="0 0 220 60" preserveAspectRatio="none"><path d="M0,30 L50,30 L58,14 L66,46 L74,30 L120,30 L128,18 L136,30 L180,30 L188,12 L196,48 L204,30 L220,30" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <div class="health-card-body health-card-body-centered">
-              <button class="avatar-btn avatar-btn-lg" id="pat-avatar-btn" type="button" title="Add a profile picture">
-                <img id="pat-avatar-img" class="avatar-img hidden" alt="">
-                <span class="avatar-fallback" id="pat-avatar-fallback">?</span>
-              </button>
-              <div class="health-card-info">
-                <div class="health-card-name" id="card-name">—</div>
-              </div>
-            </div>
-            <div class="health-card-code-row">
-              <div class="live-code-ring-wrap">
-                <div>
-                  <span class="health-card-code-label">Live code</span>
-                  <div class="health-card-code mono" id="pat-live-code">— — — — — —</div>
-                </div>
-                <svg class="live-code-ring" viewBox="0 0 46 46" width="46" height="46">
-                  <circle class="ring-track" cx="23" cy="23" r="21"></circle>
-                  <circle class="ring-progress" id="pat-live-code-ring" cx="23" cy="23" r="21"></circle>
-                </svg>
-              </div>
-              <button class="btn btn-secondary btn-sm" id="pat-live-code-reset">Reset</button>
+        <div class="health-card">
+          <svg class="health-card-watermark" viewBox="0 0 220 60" preserveAspectRatio="none"><path d="M0,30 L50,30 L58,14 L66,46 L74,30 L120,30 L128,18 L136,30 L180,30 L188,12 L196,48 L204,30 L220,30" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="health-card-body health-card-body-centered">
+            <button class="avatar-btn avatar-btn-lg" id="pat-avatar-btn" type="button" title="Add a profile picture">
+              <img id="pat-avatar-img" class="avatar-img hidden" alt="">
+              <span class="avatar-fallback" id="pat-avatar-fallback">?</span>
+            </button>
+            <div class="health-card-info">
+              <div class="health-card-name" id="card-name">—</div>
             </div>
           </div>
-          <input type="file" accept="image/*" id="pat-avatar-input" class="hidden">
+          <div class="health-card-code-row">
+            <div class="live-code-ring-wrap">
+              <div>
+                <span class="health-card-code-label">Live code</span>
+                <div class="health-card-code mono" id="pat-live-code">— — — — — —</div>
+              </div>
+              <svg class="live-code-ring" viewBox="0 0 46 46" width="46" height="46">
+                <circle class="ring-track" cx="23" cy="23" r="21"></circle>
+                <circle class="ring-progress" id="pat-live-code-ring" cx="23" cy="23" r="21"></circle>
+              </svg>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="pat-live-code-reset">Reset</button>
+          </div>
+        </div>
+        <input type="file" accept="image/*" id="pat-avatar-input" class="hidden">
+
+        <div class="panel">
           <div class="copy-note" id="pat-dash-copy-note"></div>
-          <ul class="checklist" id="pat-checklist"></ul>
           <button class="btn btn-secondary btn-block" id="pat-account-settings-btn" style="margin-top:16px;">Account settings</button>
           <button class="btn btn-secondary btn-block" id="pat-access-manage-btn" style="margin-top:10px;">Manage access</button>
           <button class="btn btn-secondary btn-block" id="pat-stats-btn" style="margin-top:10px;">My statistics</button>
@@ -527,32 +527,33 @@
   <main class="dash-main dash-main-wide">
     <div class="dash-grid">
       <div>
-        <div class="panel health-card-panel">
-          <div class="health-card">
-            <svg class="health-card-watermark" viewBox="0 0 220 60" preserveAspectRatio="none"><path d="M0,30 L50,30 L58,14 L66,46 L74,30 L120,30 L128,18 L136,30 L180,30 L188,12 L196,48 L204,30 L220,30" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <div class="health-card-top">
-              <span class="health-card-brand">PAK HEALTH · DOCTOR ID</span>
-              <span class="badge unverified" id="doc-badge">Unverified</span>
-            </div>
-            <div class="health-card-body">
-              <button class="avatar-btn" id="doc-avatar-btn" type="button" title="Add a profile picture">
-                <img id="doc-avatar-img" class="avatar-img hidden" alt="">
-                <span class="avatar-fallback" id="doc-avatar-fallback">?</span>
-              </button>
-              <div class="health-card-info">
-                <div class="health-card-name" id="doc-card-name">—</div>
-                <div class="health-card-phone" id="doc-card-specialty">Specialty not set</div>
-              </div>
-            </div>
-            <div class="health-card-code-row">
-              <div>
-                <span class="health-card-code-label">Doctor ID</span>
-                <div class="health-card-code mono" id="doc-dash-id">DR-000000</div>
-              </div>
-              <button class="btn btn-secondary btn-sm" id="doc-dash-copy">Copy</button>
+        <div class="health-card">
+          <svg class="health-card-watermark" viewBox="0 0 220 60" preserveAspectRatio="none"><path d="M0,30 L50,30 L58,14 L66,46 L74,30 L120,30 L128,18 L136,30 L180,30 L188,12 L196,48 L204,30 L220,30" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="health-card-top">
+            <span class="health-card-brand">PAK HEALTH · DOCTOR ID</span>
+            <span class="badge unverified" id="doc-badge">Unverified</span>
+          </div>
+          <div class="health-card-body">
+            <button class="avatar-btn" id="doc-avatar-btn" type="button" title="Add a profile picture">
+              <img id="doc-avatar-img" class="avatar-img hidden" alt="">
+              <span class="avatar-fallback" id="doc-avatar-fallback">?</span>
+            </button>
+            <div class="health-card-info">
+              <div class="health-card-name" id="doc-card-name">—</div>
+              <div class="health-card-phone" id="doc-card-specialty">Specialty not set</div>
             </div>
           </div>
-          <input type="file" accept="image/*" id="doc-avatar-input" class="hidden">
+          <div class="health-card-code-row">
+            <div>
+              <span class="health-card-code-label">Doctor ID</span>
+              <div class="health-card-code mono" id="doc-dash-id">DR-000000</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="doc-dash-copy">Copy</button>
+          </div>
+        </div>
+        <input type="file" accept="image/*" id="doc-avatar-input" class="hidden">
+
+        <div class="panel">
           <div class="copy-note" id="doc-dash-copy-note"></div>
           <ul class="checklist" id="doc-checklist"></ul>
           <div class="field" style="margin-top:16px;">

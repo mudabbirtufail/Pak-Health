@@ -143,7 +143,11 @@ verified, which would defeat the point of having the tag at all.
   each list and open a form modal; saving re-validates the grant, stamps
   `writtenViaGrantId` and an `unverified` snapshot, then writes directly into that
   patient's record, so the patient sees it immediately next time they sign in. This is
-  the core loop of the app.
+  the core loop of the app. The doctor card's own checklist only lists "Medical
+  license number" now — email and phone were dropped from it (the "Verified" badge
+  itself still requires all three via `isDoctorVerified()`, which is unaffected; only
+  the checklist's display was trimmed, matching the patient side no longer echoing
+  its own email/phone back on the dashboard either).
 - Patient dashboard: a **sidebar** (`.sidebar`, `position: sticky` — stays in place
   while the record list scrolls past it, disabled below the 860px breakpoint where
   the layout stacks to one column) with the health card (avatar + name + live code)
@@ -177,11 +181,20 @@ verified, which would defeat the point of having the tag at all.
   modal. An "Account settings" modal
   (name, email, phone) mirrors the doctor's — this is what lets a patient add or fix
   their email/phone *after* signup; before this existed there was no way to edit those
-  fields post-signup at all. A checklist on the health card shows the actual
-  email/phone value once provided (not just a static "Email address" label) as a
-  profile-completeness nudge — there's no "verified" concept for patients, only for
-  doctors (license verification). The dashboard also has its own "My statistics" modal
+  fields post-signup at all. There's no "verified" concept for patients (only for
+  doctors, via license verification), and no on-dashboard display of the email/phone
+  values themselves — Account settings is the only place they're shown, on the
+  assumption a patient already knows their own contact info and doesn't need it
+  echoed back on every visit. The dashboard also has its own "My statistics" modal
   (total visits, unique doctors seen).
+
+  Both the patient's and doctor's health cards sit directly on their sidebar with no
+  `.panel` wrapper around them — the rest of each sidebar (buttons, notes, and for the
+  doctor the clinic picker) is a separate `.panel` box below, so the card reads as its
+  own object on the page rather than a bordered white box containing a bordered teal
+  box. `#view-patient-dash .health-card, #view-doctor-dash .health-card` carries the
+  `margin-bottom` that `.panel`'s own spacing used to provide, scoped per-view since
+  `.health-card` is a shared class with no wrapper of its own to hang it on.
 
   Note: since the app has no client-side URL routing (`showView()` just toggles a
   `hidden` class, there's no `history.pushState`/hash routing anywhere), the browser's

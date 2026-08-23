@@ -357,7 +357,11 @@
   .calendar-day.today.has-appt::after{ background:#fff; }
 
   /* ---------- Health card ---------- */
-  .health-card-panel{ padding-bottom:24px; }
+  /* Both the patient and doctor cards sit directly on the page now — no .panel
+     wrapper, no white card box behind the teal one. This margin replaces the
+     spacing .panel's own margin-bottom used to provide, scoped per-view since
+     .health-card is a shared class with no wrapper of its own to hang it on. */
+  #view-patient-dash .health-card, #view-doctor-dash .health-card{ margin-bottom:20px; }
   .health-card{
     position:relative; overflow:hidden; border-radius:14px; padding:20px 22px 18px;
     background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%); color:#fff;
@@ -392,8 +396,6 @@
   .health-card-code{ font-size:1.35rem; font-weight:600; letter-spacing:0.05em; }
   .health-card-code-row .btn-secondary{ background: rgba(255,255,255,0.16); color:#fff; border-color: rgba(255,255,255,0.4); flex-shrink:0; }
   .health-card-code-row .btn-secondary:hover{ background: rgba(255,255,255,0.28); border-color: rgba(255,255,255,0.75); }
-  .health-card-panel .copy-note{ margin-top:10px; }
-  .health-card-panel .checklist{ margin-top:16px; }
   .live-code-ring-wrap{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
   .live-code-ring{ display:block; flex-shrink:0; }
   .live-code-ring .ring-track{ fill:none; stroke: rgba(255,255,255,0.28); stroke-width:3; }

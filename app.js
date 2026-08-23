@@ -643,7 +643,6 @@
     currentPatientData = data;
     if (seeded){ try{ await savePatient(code, data); }catch(e){} }
     renderHealthCard(data);
-    renderPatientVerification(data);
     renderVisitsList(data.visits);
     renderTestsList(data.tests);
     renderPrescriptionsList(data.visits);
@@ -799,17 +798,6 @@
       $('pat-trust-add-btn').disabled = false;
     }
   });
-  function renderPatientVerification(data){
-    var items = [
-      { label: data.email || 'Email address', done: !!data.email },
-      { label: data.phone || 'Phone number', done: !!data.phone }
-    ];
-    var html = '';
-    items.forEach(function(it){
-      html += '<li class="'+(it.done?'done':'')+'"><span class="dot"></span>'+escapeHtml(it.label)+'</li>';
-    });
-    $('pat-checklist').innerHTML = html;
-  }
 
   function openPatProfileModal(){
     $('pat-modal-code').textContent = formatCode(session.id);
@@ -838,7 +826,6 @@
     await linkPatientEmail(email, session.id);
     currentPatientData = data;
     renderHealthCard(data);
-    renderPatientVerification(data);
     var note = $('pat-save-note');
     note.classList.add('show');
     setTimeout(function(){ note.classList.remove('show'); }, 1800);
@@ -1380,8 +1367,6 @@
     badge.textContent = verified ? 'Verified' : 'Unverified';
     badge.className = 'badge ' + (verified ? 'verified' : 'unverified');
     var items = [
-      { label:'Email address', done: !!data.email },
-      { label:'Phone number', done: !!data.phone },
       { label:'Medical license number', done: !!data.license }
     ];
     var html = '';

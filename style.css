@@ -401,6 +401,21 @@
     fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round;
     transform: rotate(-90deg); transform-origin: 23px 23px; transition: stroke-dashoffset 1s linear;
   }
+  @media (max-width: 480px){
+    /* The card's fixed 1.586:1 aspect-ratio is fine down to tablet width, but on a
+       phone the same ratio forces a much shorter box (height = width/1.586) while
+       the avatar circle and fonts stayed full-size — the code row (live code +
+       Reset button) ended up taller than the card itself and got sliced off by
+       .health-card's overflow:hidden. Auto height lets the card grow to fit its
+       real content instead of clipping it; the smaller avatar/fonts below keep it
+       from looking oversized now that nothing forces a fixed short height. */
+    .health-card{ aspect-ratio:auto; padding:18px 18px 16px; }
+    .avatar-btn-lg{ width:72px; height:72px; }
+    .avatar-btn-lg .avatar-fallback{ font-size:1.5rem; }
+    .health-card-body-centered{ gap:12px; }
+    .health-card-name{ font-size:1.05rem; }
+    .health-card-code{ font-size:1.15rem; }
+  }
 
   /* ---------- Clinic chips ---------- */
   .chip-list{ display:flex; flex-wrap:wrap; gap:8px; }

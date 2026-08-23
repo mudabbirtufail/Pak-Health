@@ -150,9 +150,15 @@ verified, which would defeat the point of having the tag at all.
   Prescriptions, My Eyes — each a tall rectangular row with a real photo spanning the
   full width on top (fading to white top-to-bottom where the title sits below) and a
   chevron on the right. The four photos are real images the user supplied, cropped to
-  a wide banner ratio and compressed client-side with Pillow, then embedded as base64
-  `<img src="data:image/jpeg;base64,...">` — same "stay a self-contained single file"
-  approach as avatar `photoUrl`s, just baked in at build time instead of at runtime.
+  a wide banner ratio and compressed with Pillow (a one-off local processing step, not
+  something the running app does), and live as plain files in `images/`
+  (`<img src="images/visits.jpg">` etc.) — unlike avatar `photoUrl`s, which really do
+  need to be base64 since they're arbitrary user uploads handled entirely at runtime
+  with no server to write a file to. `images/` is the one exception so far to the
+  otherwise-single-file app; inlining these as base64 was tried first and reverted —
+  four photos' worth of base64 roughly tripled the file size and made the source
+  unreadable for no real benefit once the app is deployed as a repo rather than
+  handed around as a lone file.
   The dashboard's outer container is intentionally left-aligned rather than centered
   (`#view-patient-dash .dash-main-wide`) so extra width on wide screens shows up as
   space to the right instead of being split evenly on both sides. Tapping a row

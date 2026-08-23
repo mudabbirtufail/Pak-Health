@@ -161,18 +161,60 @@
 
   /* ---------- Dashboard ---------- */
   .dash-main{ flex:1; padding: 32px; max-width:1100px; margin:0 auto; width:100%; }
-  .dash-main-wide{ max-width:1320px; }
-  .dash-grid{ display:grid; grid-template-columns: 420px minmax(0, 620px) 1fr; gap:24px; align-items:start; }
-  .dash-grid .center-col{ width:100%; }
-  @media (max-width: 1180px){ .dash-grid{ grid-template-columns: 420px 1fr; } }
-  @media (max-width: 860px){ .dash-grid{ grid-template-columns: 1fr; } }
+  .dash-main-wide{ max-width:1800px; }
+  .dash-grid{
+    display:grid; grid-template-columns: 420px minmax(0, 700px) minmax(320px, 1fr);
+    grid-template-areas: "sidebar center right"; gap:24px; align-items:start;
+  }
+  .dash-grid .center-col{ width:100%; grid-area:center; }
+  /* align-self:stretch (overriding the grid's own align-items:start) makes these two
+     items fill the full row height — the same height for both, since a single grid
+     row has one height, driven by the tallest item (center-col's tile list). Without
+     this they'd each size to their own content instead, giving .sticky-inner (below)
+     a different amount of room to roam in each column and making the two sticky
+     panels drift out of sync — one running out of "stuck" room and resuming normal
+     scroll before the other. */
+  .dash-grid .sidebar{ grid-area:sidebar; align-self:stretch; }
+  .dash-grid .right-col{ grid-area:right; align-self:stretch; }
+  @media (max-width: 1180px){
+    /* Pair the calendar under the health card in the same (first) column, with the
+       record list as a second column spanning both rows — not a "sidebar+center"
+       row followed by a full-width "right" row below it. The record list runs to
+       four tall photo tiles (~900px), so putting the calendar after it in its own
+       row buried it below a screen's worth of scrolling; this keeps it visible right
+       under the health card instead. */
+    .dash-grid{
+      grid-template-columns: 420px 1fr;
+      grid-template-areas: "sidebar center" "right center";
+    }
+  }
+  @media (max-width: 860px){
+    /* Single column now — put the calendar right after the health card rather than
+       after all four record tiles, for the same reason as the 1180px tier above. */
+    .dash-grid{ grid-template-columns: 1fr; grid-template-areas: "sidebar" "right" "center"; }
+    /* This column can now be the full viewport width, which would blow up the
+       7-column day grid (aspect-ratio 1/1 per cell) the same way the old
+       "right right" row did — cap it and center it, same fix as before. */
+    .dash-grid .right-col{ max-width:360px; width:100%; margin:0 auto; }
+  }
 
-  /* Patient dashboard: same column sizes as before, just left-aligned instead of
-     centered so extra width on wide screens shows up as space on the right instead
-     of being split evenly on both sides. */
+  /* Patient dashboard: left-aligned rather than centered, and the right column's
+     minmax(320px, 1fr) track always claims whatever's left up to dash-main-wide's
+     own cap — so both side columns end up the same distance from their respective
+     page edges as the container's own (symmetric) padding, rather than leftover
+     width pooling unevenly on one side. */
   #view-patient-dash .dash-main-wide{ margin-left: 0; margin-right: auto; }
-  .sidebar{ position: sticky; top: 24px; }
-  @media (max-width: 860px){ .sidebar{ position: static; } }
+  /* The sticky element is this inner wrapper, not .sidebar/.right-col themselves —
+     see the align-self:stretch comment above for why: it needs a containing block
+     that's the full (matching) row height in both columns, not its own content
+     height, so it sits inside a stretched outer item instead of being sticky itself. */
+  .sticky-inner{ position: sticky; top: 24px; }
+  /* Sticky only makes sense while each side column has its own track, with the
+     record list as the thing scrolling past them. Below 1180px the calendar
+     (.right-col) moves into the same column as the health card, stacked below it
+     (see .dash-grid above) — if either stayed sticky there, it would stay pinned on
+     screen and visually cover the other scrolling up underneath it. */
+  @media (max-width: 1180px){ .sticky-inner{ position: static; } }
 
   .panel{
     background: var(--paper); border:1px solid var(--line); border-radius: var(--radius);
@@ -286,6 +328,33 @@
   .list-item .li-title{ font-weight:600; font-size:0.92rem; }
   .list-item .li-sub{ font-size:0.8rem; color: var(--muted); margin-top:2px; }
   .list-item .chevron{ color: var(--muted); flex-shrink:0; }
+  .list-item.static{ cursor:default; }
+  .list-item.static:hover{ background:none; }
+
+  /* ---------- Appointments calendar ---------- */
+  .calendar-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .calendar-month-label{ font-family:'Spectral', serif; font-weight:600; font-size:1.05rem; color: var(--ink); }
+  .cal-nav-btn{
+    background:none; border:1px solid var(--line); border-radius:8px; width:30px; height:30px;
+    font-size:1.2rem; line-height:1; color: var(--ink-soft); cursor:pointer;
+  }
+  .cal-nav-btn:hover{ background: var(--bg); color: var(--ink); }
+  .calendar-weekdays{
+    display:grid; grid-template-columns:repeat(7, 1fr); text-align:center;
+    font-family:'IBM Plex Mono', monospace; font-size:0.68rem; letter-spacing:0.04em;
+    color: var(--muted); margin-bottom:6px;
+  }
+  .calendar-grid{ display:grid; grid-template-columns:repeat(7, 1fr); gap:4px; }
+  .calendar-day{
+    position:relative; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center;
+    font-size:0.82rem; border-radius:8px; color: var(--ink-soft);
+  }
+  .calendar-day.outside{ color: var(--line); }
+  .calendar-day.today{ background: var(--teal); color:#fff; font-weight:600; }
+  .calendar-day.has-appt::after{
+    content:""; position:absolute; bottom:4px; width:5px; height:5px; border-radius:50%; background: var(--red);
+  }
+  .calendar-day.today.has-appt::after{ background:#fff; }
 
   /* ---------- Health card ---------- */
   .health-card-panel{ padding-bottom:24px; }

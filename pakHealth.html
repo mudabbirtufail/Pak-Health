@@ -193,6 +193,7 @@
   <main class="dash-main dash-main-wide">
     <div class="dash-grid">
       <div class="sidebar">
+       <div class="sticky-inner">
         <div class="panel health-card-panel">
           <div class="health-card">
             <svg class="health-card-watermark" viewBox="0 0 220 60" preserveAspectRatio="none"><path d="M0,30 L50,30 L58,14 L66,46 L74,30 L120,30 L128,18 L136,30 L180,30 L188,12 L196,48 L204,30 L220,30" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -227,7 +228,7 @@
           <button class="btn btn-secondary btn-block" id="pat-stats-btn" style="margin-top:10px;">My statistics</button>
           <div class="privacy-note">Your live code refreshes on its own every 3 minutes and works once. Hand it over in person — never post or text it. A doctor you've trusted doesn't need it at all.</div>
         </div>
-
+       </div>
       </div>
 
       <div class="center-col">
@@ -273,8 +274,43 @@
           </button>
         </div>
       </div>
+
+      <div class="right-col">
+       <div class="sticky-inner">
+        <div class="panel">
+          <span class="eyebrow">Appointments</span>
+          <h3 style="margin-top:6px;">Upcoming appointments</h3>
+          <p class="panel-sub" style="margin-top:8px;">Scheduled visits with your doctors.</p>
+          <div id="pat-appts-list"></div>
+          <div class="empty-state hidden" id="pat-appts-empty">No upcoming appointments.</div>
+          <button class="btn btn-primary btn-block" id="pat-book-appt-btn" type="button" style="margin-top:16px;">Book new appointment</button>
+        </div>
+
+        <div class="panel calendar-panel">
+          <div class="calendar-header">
+            <button class="cal-nav-btn" id="pat-cal-prev" type="button" aria-label="Previous month">&lsaquo;</button>
+            <div class="calendar-month-label" id="pat-cal-month-label">—</div>
+            <button class="cal-nav-btn" id="pat-cal-next" type="button" aria-label="Next month">&rsaquo;</button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+          </div>
+          <div class="calendar-grid" id="pat-cal-grid"></div>
+        </div>
+       </div>
+      </div>
     </div>
   </main>
+
+  <div class="modal-overlay hidden" id="pat-book-appt-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="pat-book-appt-close" aria-label="Close">&times;</button>
+      <span class="eyebrow">Appointments</span>
+      <h3 style="margin-top:6px;">Book an appointment</h3>
+      <p class="panel-sub" style="margin-top:8px;">Online booking isn't set up yet — for now, contact your doctor's clinic directly to schedule a visit. This will let you book straight from Pak Health in a future update.</p>
+      <button class="btn btn-secondary btn-block" id="pat-book-appt-ok" style="margin-top:8px;">Got it</button>
+    </div>
+  </div>
 
   <div class="modal-overlay hidden" id="pat-profile-modal">
     <div class="modal-card">

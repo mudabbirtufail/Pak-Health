@@ -75,7 +75,8 @@ patient: {
   visits: [{ doctorName, clinicName, date, time, symptoms, diagnosis, prescription, notes,
              writtenViaGrantId, unverified }],  // last two added with the access model, see below
   tests:  [{ name, date, doctorName, resultSummary, writtenViaGrantId, unverified }],
-  eyeEntries: [{ date, sphL, cylL, axisL, sphR, cylR, axisR }]  // self-entered, patient-only, see "My Eyes" below
+  eyeEntries: [{ date, sphL, cylL, axisL, sphR, cylR, axisR }],  // self-entered, patient-only, see "My Eyes" below
+  appointments: [{ doctorName, clinicName, date, time, reason }]  // display-only for now, see "Appointments" below
 }
 
 doctor: {
@@ -161,7 +162,9 @@ verified, which would defeat the point of having the tag at all.
   handed around as a lone file.
   The dashboard's outer container is intentionally left-aligned rather than centered
   (`#view-patient-dash .dash-main-wide`) so extra width on wide screens shows up as
-  space to the right instead of being split evenly on both sides. Tapping a row
+  space to the right instead of being split evenly on both sides — that space now
+  holds the calendar/appointments column described below, rather than sitting empty.
+  Tapping a row
   navigates to a real full-screen page (its own `<div class="view">`, shown via the
   same `showView()` top-level view-switching the rest of the app already uses, with a
   "← Back to dashboard" link in its topbar) rather than opening a modal — these were
@@ -185,6 +188,25 @@ verified, which would defeat the point of having the tag at all.
   own back/forward buttons don't know about any in-app view change — that's true of
   every screen in this app, not just the new record pages, and is why every screen
   needs its own explicit back/close control instead of relying on browser history.
+- Patient dashboard "Appointments" column: fills the third `.dash-grid` track (the
+  space to the right of the record list on wide screens — see above) with a
+  hand-rolled month-view calendar (`renderAppointmentsCalendar`, no charting/date
+  library, consistent with the rest of the app) and an "Upcoming appointments" panel
+  below it. The calendar has prev/next month navigation and marks the current day plus
+  any day with an appointment (a small dot) using a 42-cell grid that always shows
+  complete leading/trailing weeks from adjacent months, so an appointment just past a
+  month boundary still shows a dot on the dimmed "outside" days. The panel below lists
+  every appointment with `date >= today`, soonest first, non-clickable (`.list-item
+  static` — same visual as visits/tests rows but without the pointer/hover affordance,
+  since there's no detail to open yet), with an empty state when there are none. A
+  "Book new appointment" button opens a modal that's honest about scope: it explains
+  online booking isn't wired up yet rather than pretending to submit a request. Backed
+  by `patient.appointments` (see "Data model" above) — seeded with a couple of
+  relative-date demo entries the same way `visits`/`tests` are (via `sampleAppointments()`,
+  both at signup and as a self-heal backfill for existing accounts with none), since
+  there's no booking flow yet to create real ones. **The booking mechanism itself
+  (who it notifies, whether a doctor confirms it, how it writes into `appointments`) is
+  deliberately not built** — this is UI-only, waiting on that design decision.
 - Patient "My Eyes" page: self-entered eyeglass prescription tracking — SPH, CYL, and
   axis for each eye, one entry per date, newest first, click a row for the full
   detail. Two hand-drawn inline SVG line charts (same no-dependency approach as the
@@ -356,6 +378,11 @@ still not built, matching the doc's own scope and deferred list:
 4. Mobile pass — responsive breakpoints exist but haven't been stress-tested on an
    actual phone.
 5. Real file upload for test reports (once there's a real backend with file storage).
+6. Appointment booking mechanism — the "Book new appointment" button on the patient
+   dashboard currently just explains it's not wired up yet (see "Appointments" above).
+   Needs a design decision: does a doctor confirm/reject a request, does it write
+   straight into `patient.appointments`, does it notify the doctor at all given there's
+   no notification system yet.
 
 ## Design system (for consistency if extending the UI)
 

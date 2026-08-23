@@ -504,7 +504,7 @@
   async function createPatientAccount(name, phone, email, password){
     var code = await generatePatientCode();
     var passwordHash = password ? await hashPassword(password) : '';
-    var data = { code:code, name:name||'', email:email||'', phone:phone||'', dob:'', idNumber:'', bloodType:'', emergencyContact:'', allergies:'', conditions:'', medications:'', photoUrl:'', passwordHash:passwordHash, visits: sampleVisits(), tests: sampleTests(), createdAt: Date.now() };
+    var data = { code:code, name:name||'', email:email||'', phone:phone||'', dob:'', idNumber:'', bloodType:'', emergencyContact:'', allergies:'', conditions:'', medications:'', photoUrl:'', passwordHash:passwordHash, visits: sampleVisits(), tests: sampleTests(), appointments: sampleAppointments(), createdAt: Date.now() };
     await savePatient(code, data);
     await linkPatientEmail(email, code);
     session = { type:'patient', id:code };
@@ -591,6 +591,7 @@
 
   // ================= PATIENT DASHBOARD =================
   var currentPatientData = null;
+  var calViewDate = new Date();
 
   function sampleVisits(){
     return [
@@ -602,6 +603,14 @@
     return [
       { name:'Complete Blood Count (CBC)', date:'2026-02-02' },
       { name:'Chest X-Ray', date:'2026-05-15' }
+    ];
+  }
+  function sampleAppointments(){
+    var d = new Date();
+    function inDays(n){ var t = new Date(d); t.setDate(t.getDate() + n); return t.toISOString().slice(0, 10); }
+    return [
+      { doctorName:'Dr. Ali Raza', clinicName:'City General Hospital', date: inDays(4), time:'11:00 AM', reason:'Follow-up for bronchitis' },
+      { doctorName:'Dr. Fatima Noor', clinicName:'Shifa Clinic', date: inDays(11), time:'4:30 PM', reason:'Annual check-up' }
     ];
   }
   function getInitials(name){
@@ -629,6 +638,7 @@
     var seeded = false;
     if (!data.visits || !data.visits.length){ data.visits = sampleVisits(); seeded = true; }
     if (!data.tests || !data.tests.length){ data.tests = sampleTests(); seeded = true; }
+    if (!data.appointments || !data.appointments.length){ data.appointments = sampleAppointments(); seeded = true; }
     if (!data.eyeEntries) data.eyeEntries = [];
     currentPatientData = data;
     if (seeded){ try{ await savePatient(code, data); }catch(e){} }
@@ -638,6 +648,9 @@
     renderTestsList(data.tests);
     renderPrescriptionsList(data.visits);
     renderEyesList(data.eyeEntries);
+    calViewDate = new Date();
+    renderAppointmentsCalendar(data.appointments);
+    renderAppointmentsList(data.appointments);
     closeVisitModal();
     closeTestModal();
     closePatProfileModal();
@@ -645,8 +658,10 @@
     closeAddEyeModal();
     closeEyeModal();
     closePatAccessModal();
+    closeBookApptModal();
     await regenerateLiveCode();
     showView('view-patient-dash');
+    syncStickyColumnHeights();
   }
 
   // ---- Live access code (patient side) ----
@@ -978,6 +993,102 @@
       });
     });
   }
+
+  // ---- Appointments calendar + upcoming list ----
+  var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function toDateKey(d){
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function renderAppointmentsCalendar(appointments){
+    var apptDays = {};
+    (appointments || []).forEach(function(a){ if (a.date) apptDays[a.date] = true; });
+
+    var year = calViewDate.getFullYear();
+    var month = calViewDate.getMonth();
+    $('pat-cal-month-label').textContent = MONTH_NAMES[month] + ' ' + year;
+
+    var firstOfMonth = new Date(year, month, 1);
+    var startOffset = firstOfMonth.getDay();
+    var gridStart = new Date(year, month, 1 - startOffset);
+    var today = new Date();
+    var todayKey = toDateKey(today);
+
+    var cells = [];
+    for (var i = 0; i < 42; i++){
+      var d = new Date(gridStart);
+      d.setDate(gridStart.getDate() + i);
+      var key = toDateKey(d);
+      var classes = ['calendar-day'];
+      if (d.getMonth() !== month) classes.push('outside');
+      if (key === todayKey) classes.push('today');
+      if (apptDays[key]) classes.push('has-appt');
+      cells.push('<div class="' + classes.join(' ') + '">' + d.getDate() + '</div>');
+    }
+    $('pat-cal-grid').innerHTML = cells.join('');
+  }
+  $('pat-cal-prev').addEventListener('click', function(){
+    calViewDate = new Date(calViewDate.getFullYear(), calViewDate.getMonth() - 1, 1);
+    renderAppointmentsCalendar(currentPatientData && currentPatientData.appointments);
+  });
+  $('pat-cal-next').addEventListener('click', function(){
+    calViewDate = new Date(calViewDate.getFullYear(), calViewDate.getMonth() + 1, 1);
+    renderAppointmentsCalendar(currentPatientData && currentPatientData.appointments);
+  });
+
+  function renderAppointmentsList(appointments){
+    var listEl = $('pat-appts-list');
+    var emptyEl = $('pat-appts-empty');
+    var todayKey = toDateKey(new Date());
+    var upcoming = (appointments || [])
+      .filter(function(a){ return a.date && a.date >= todayKey; })
+      .sort(function(a, b){ return (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')); });
+    if (!upcoming.length){
+      listEl.innerHTML = '';
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = upcoming.map(function(a){
+      return '<div class="list-item static">'
+        + '<div><div class="li-title">'+escapeHtml(a.doctorName || 'Doctor')+'</div>'
+        + '<div class="li-sub">'+escapeHtml(formatDateDisplay(a.date))+(a.time ? ' · '+escapeHtml(a.time) : '')+(a.clinicName ? ' · '+escapeHtml(a.clinicName) : '')+'</div></div>'
+        + '</div>';
+    }).join('');
+  }
+
+  function openBookApptModal(){ $('pat-book-appt-modal').classList.remove('hidden'); }
+  function closeBookApptModal(){ $('pat-book-appt-modal').classList.add('hidden'); }
+  $('pat-book-appt-btn').addEventListener('click', openBookApptModal);
+  $('pat-book-appt-close').addEventListener('click', closeBookApptModal);
+  $('pat-book-appt-ok').addEventListener('click', closeBookApptModal);
+  $('pat-book-appt-modal').addEventListener('click', function(e){ if (e.target === $('pat-book-appt-modal')) closeBookApptModal(); });
+
+  // Above 1180px both the health card and the calendar/appointments column are
+  // position:sticky (see .sticky-inner in style.css). A sticky element's "room to
+  // stay pinned" before it releases depends on its own height relative to its
+  // (shared, equal) container — so when the two sticky panels have different content
+  // heights, the taller one runs out of room and un-sticks before the shorter one,
+  // which looks like it "gives up" scrolling early. Padding the shorter one to match
+  // the taller one's real height keeps both releasing at the same scroll position,
+  // and re-measuring (instead of a hardcoded number) keeps this correct as content
+  // like the checklist or appointment count changes.
+  function syncStickyColumnHeights(){
+    var a = document.querySelector('.sidebar .sticky-inner');
+    var b = document.querySelector('.right-col .sticky-inner');
+    if (!a || !b || $('view-patient-dash').classList.contains('hidden')) return;
+    a.style.minHeight = '';
+    b.style.minHeight = '';
+    if (window.innerWidth <= 1180) return;
+    var max = Math.max(a.getBoundingClientRect().height, b.getBoundingClientRect().height);
+    a.style.minHeight = max + 'px';
+    b.style.minHeight = max + 'px';
+  }
+  var stickyResizeTimer = null;
+  window.addEventListener('resize', function(){
+    clearTimeout(stickyResizeTimer);
+    stickyResizeTimer = setTimeout(syncStickyColumnHeights, 150);
+  });
+
   function openVisitModal(v){
     $('visit-modal-date').textContent = formatDateDisplay(v.date) + (v.time ? ' · ' + v.time : '');
     $('visit-modal-doctor').innerHTML = escapeHtml(v.doctorName || 'Doctor') + unverifiedTagHtml(v);
@@ -1402,7 +1513,7 @@
     if (e.target === $('doc-profile-modal')) closeDocProfileModal();
   });
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeDocStatsModal(); closePatProfileModal(); closePatStatsModal(); closeAddEyeModal(); closeEyeModal(); closePatAccessModal(); }
+    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeDocStatsModal(); closePatProfileModal(); closePatStatsModal(); closeAddEyeModal(); closeEyeModal(); closePatAccessModal(); closeBookApptModal(); }
   });
 
   function escapeHtml(s){

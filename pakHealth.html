@@ -302,14 +302,19 @@
   .health-card-brand{ font-family:'IBM Plex Mono', monospace; font-size:0.68rem; letter-spacing:0.12em; opacity:0.85; }
   .health-card .badge{ background: rgba(255,255,255,0.2); color:#fff; }
   .health-card-body{ display:flex; align-items:center; gap:14px; position:relative; }
+  .health-card-body-centered{
+    flex:1; align-items:center; justify-content:flex-start; gap:16px;
+  }
   .avatar-btn{
-    width:56px; height:56px; border-radius:50%; flex-shrink:0; padding:0; overflow:hidden;
+    width:76px; height:76px; border-radius:50%; flex-shrink:0; padding:0; overflow:hidden;
     background: rgba(255,255,255,0.16); border:2px solid rgba(255,255,255,0.4);
     display:flex; align-items:center; justify-content:center;
   }
   .avatar-btn:hover{ border-color: rgba(255,255,255,0.75); }
+  .avatar-btn-lg{ width:104px; height:104px; }
   .avatar-img{ width:100%; height:100%; object-fit:cover; }
-  .avatar-fallback{ font-family:'Spectral', serif; font-weight:600; font-size:1.15rem; color:#fff; }
+  .avatar-fallback{ font-family:'Spectral', serif; font-weight:600; font-size:1.5rem; color:#fff; }
+  .avatar-btn-lg .avatar-fallback{ font-size:2.1rem; }
   .health-card-info{ min-width:0; }
   .health-card-name{ font-family:'Spectral', serif; font-weight:600; font-size:1.2rem; line-height:1.25; overflow-wrap:anywhere; }
   .health-card-phone{ font-size:0.85rem; opacity:0.88; margin-top:3px; }
@@ -323,6 +328,13 @@
   .health-card-code-row .btn-secondary:hover{ background: rgba(255,255,255,0.28); border-color: rgba(255,255,255,0.75); }
   .health-card-panel .copy-note{ margin-top:10px; }
   .health-card-panel .checklist{ margin-top:16px; }
+  .live-code-ring-wrap{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .live-code-ring{ display:block; flex-shrink:0; }
+  .live-code-ring .ring-track{ fill:none; stroke: rgba(255,255,255,0.28); stroke-width:3; }
+  .live-code-ring .ring-progress{
+    fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round;
+    transform: rotate(-90deg); transform-origin: 23px 23px; transition: stroke-dashoffset 1s linear;
+  }
 
   /* ---------- Clinic chips ---------- */
   .chip-list{ display:flex; flex-wrap:wrap; gap:8px; }
@@ -343,6 +355,33 @@
   /* ---------- Chart legend ---------- */
   .chart-legend{ display:flex; gap:16px; margin-top:8px; font-size:0.78rem; color: var(--muted); align-items:center; }
   .chart-legend .legend-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+
+  /* ---------- Patient record list ---------- */
+  .record-list{ display:flex; flex-direction:column; gap:14px; }
+  .record-row{
+    position:relative; display:flex; align-items:stretch; text-align:left; padding:0; width:100%;
+    background: var(--paper); border:1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow:hidden; min-height:104px; transition: border-color 0.2s ease;
+  }
+  .record-row:hover, .record-row:focus-visible{ border-color: var(--teal); }
+  .record-row-art{
+    position:relative; flex:0 0 136px; display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+  @media (max-width: 480px){ .record-row-art{ flex-basis:96px; } }
+  .record-row-art::after{
+    content:""; position:absolute; inset:0;
+    background: linear-gradient(to right, rgba(255,255,255,0) 35%, var(--paper) 98%);
+  }
+  .record-row-art svg{ width:66%; height:66%; position:relative; z-index:1; }
+  .record-row-art-teal{ background: var(--teal-wash); }
+  .record-row-art-amber{ background: var(--amber-wash); }
+  .record-row-art-red{ background: var(--red-wash); }
+  .record-row-body{
+    flex:1; display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding: 0 20px; min-width:0;
+  }
+  .record-row-title{ font-family:'Spectral', serif; font-weight:600; font-size:1.08rem; color: var(--ink); }
+  .record-row-sub{ font-size:0.82rem; color: var(--muted); margin-top:3px; }
 </style>
 </head>
 <body>
@@ -417,8 +456,8 @@
       <div id="doc-signup-pane">
         <div id="doc-signup-start">
           <p style="color:var(--ink-soft); font-size:0.9rem; margin-bottom:18px; line-height:1.5;">A few basics to get started — add your license later to get verified.</p>
-          <div class="field"><label for="doc-signup-name">Full name</label><input type="text" id="doc-signup-name" placeholder="Dr. Sam Petersen"></div>
-          <div class="field"><label for="doc-signup-phone">Phone</label><input type="tel" id="doc-signup-phone" placeholder="+45 00 00 00 00"></div>
+          <div class="field"><label for="doc-signup-name">Full name</label><input type="text" id="doc-signup-name" placeholder="Dr. Bilal Chaudhry"></div>
+          <div class="field"><label for="doc-signup-phone">Phone</label><input type="tel" id="doc-signup-phone" placeholder="+92 300 1234567"></div>
           <div class="field"><label for="doc-signup-email">Email</label><input type="email" id="doc-signup-email" placeholder="you@clinic.com"></div>
           <div class="field"><label for="doc-signup-password">Password (optional)</label><input type="password" id="doc-signup-password" placeholder="Leave blank to skip for now"></div>
           <div class="field"><label for="doc-signup-password2">Confirm password</label><input type="password" id="doc-signup-password2" placeholder="Re-enter your password"></div>
@@ -431,8 +470,8 @@
           </button>
           <div class="google-panel hidden" id="doc-google-panel">
             <div class="demo-note">Demo Google sign-in — no real Google account is connected. Enter details to continue.</div>
-            <div class="field"><label for="doc-google-name">Name</label><input type="text" id="doc-google-name" placeholder="Dr. Sam Petersen"></div>
-            <div class="field"><label for="doc-google-phone">Phone</label><input type="tel" id="doc-google-phone" placeholder="+45 00 00 00 00"></div>
+            <div class="field"><label for="doc-google-name">Name</label><input type="text" id="doc-google-name" placeholder="Dr. Bilal Chaudhry"></div>
+            <div class="field"><label for="doc-google-phone">Phone</label><input type="tel" id="doc-google-phone" placeholder="+92 300 1234567"></div>
             <div class="field"><label for="doc-google-email">Google email</label><input type="email" id="doc-google-email" placeholder="you@gmail.com"></div>
             <button class="btn btn-primary btn-block" id="doc-google-continue">Continue</button>
             <div class="error-text" id="doc-google-error">Something went wrong creating your account. Please try again.</div>
@@ -478,8 +517,8 @@
       <div id="pat-signup-pane">
         <div id="pat-signup-start">
           <p style="color:var(--ink-soft); font-size:0.9rem; margin-bottom:18px; line-height:1.5;">A few basics to get started — add the rest of your history later.</p>
-          <div class="field"><label for="pat-signup-name">Full name</label><input type="text" id="pat-signup-name" placeholder="Jordan Rivers"></div>
-          <div class="field"><label for="pat-signup-phone">Phone</label><input type="tel" id="pat-signup-phone" placeholder="+45 00 00 00 00"></div>
+          <div class="field"><label for="pat-signup-name">Full name</label><input type="text" id="pat-signup-name" placeholder="Ayesha Khan"></div>
+          <div class="field"><label for="pat-signup-phone">Phone</label><input type="tel" id="pat-signup-phone" placeholder="+92 300 1234567"></div>
           <div class="field"><label for="pat-signup-email">Email</label><input type="email" id="pat-signup-email" placeholder="you@example.com"></div>
           <div class="field"><label for="pat-signup-password">Password (optional)</label><input type="password" id="pat-signup-password" placeholder="Leave blank to skip for now"></div>
           <div class="field"><label for="pat-signup-password2">Confirm password</label><input type="password" id="pat-signup-password2" placeholder="Re-enter your password"></div>
@@ -492,8 +531,8 @@
           </button>
           <div class="google-panel hidden" id="pat-google-panel">
             <div class="demo-note">Demo Google sign-in — no real Google account is connected. Enter details to continue.</div>
-            <div class="field"><label for="pat-google-name">Name</label><input type="text" id="pat-google-name" placeholder="Jordan Rivers"></div>
-            <div class="field"><label for="pat-google-phone">Phone</label><input type="tel" id="pat-google-phone" placeholder="+45 00 00 00 00"></div>
+            <div class="field"><label for="pat-google-name">Name</label><input type="text" id="pat-google-name" placeholder="Ayesha Khan"></div>
+            <div class="field"><label for="pat-google-phone">Phone</label><input type="tel" id="pat-google-phone" placeholder="+92 300 1234567"></div>
             <div class="field"><label for="pat-google-email">Google email</label><input type="email" id="pat-google-email" placeholder="you@gmail.com"></div>
             <button class="btn btn-primary btn-block" id="pat-google-continue">Continue</button>
             <div class="error-text" id="pat-google-error">Something went wrong creating your account. Please try again.</div>
@@ -532,11 +571,8 @@
         <div class="panel health-card-panel">
           <div class="health-card">
             <svg class="health-card-watermark" viewBox="0 0 220 60" preserveAspectRatio="none"><path d="M0,30 L50,30 L58,14 L66,46 L74,30 L120,30 L128,18 L136,30 L180,30 L188,12 L196,48 L204,30 L220,30" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <div class="health-card-top" style="justify-content:flex-end;">
-              <span class="badge unverified" id="pat-badge">Unverified</span>
-            </div>
-            <div class="health-card-body">
-              <button class="avatar-btn" id="pat-avatar-btn" type="button" title="Add a profile picture">
+            <div class="health-card-body health-card-body-centered">
+              <button class="avatar-btn avatar-btn-lg" id="pat-avatar-btn" type="button" title="Add a profile picture">
                 <img id="pat-avatar-img" class="avatar-img hidden" alt="">
                 <span class="avatar-fallback" id="pat-avatar-fallback">?</span>
               </button>
@@ -545,147 +581,97 @@
               </div>
             </div>
             <div class="health-card-code-row">
-              <div>
-                <span class="health-card-code-label">Account ID</span>
-                <div class="health-card-code mono" id="pat-dash-code">0000 0000</div>
+              <div class="live-code-ring-wrap">
+                <div>
+                  <span class="health-card-code-label">Live code</span>
+                  <div class="health-card-code mono" id="pat-live-code">— — — — — —</div>
+                </div>
+                <svg class="live-code-ring" viewBox="0 0 46 46" width="46" height="46">
+                  <circle class="ring-track" cx="23" cy="23" r="21"></circle>
+                  <circle class="ring-progress" id="pat-live-code-ring" cx="23" cy="23" r="21"></circle>
+                </svg>
               </div>
-              <button class="btn btn-secondary btn-sm" id="pat-dash-copy">Copy</button>
+              <button class="btn btn-secondary btn-sm" id="pat-live-code-reset">Reset</button>
             </div>
           </div>
           <input type="file" accept="image/*" id="pat-avatar-input" class="hidden">
           <div class="copy-note" id="pat-dash-copy-note"></div>
           <ul class="checklist" id="pat-checklist"></ul>
           <button class="btn btn-secondary btn-block" id="pat-account-settings-btn" style="margin-top:16px;">Account settings</button>
-          <button class="btn btn-secondary btn-block" id="pat-stats-btn" style="margin-top:10px;">My statistics</button>
-          <div class="privacy-note">Your account ID identifies your record — it doesn't grant access on its own. A doctor needs a live code (below) or your standing trust to see anything.</div>
-        </div>
-
-        <div class="panel">
-          <h3>Share with a doctor</h3>
-          <p class="panel-sub">A fresh code, good for 3 minutes and one use. Hand it over in person — never post or text it.</p>
-          <div class="tearoff" id="pat-livecode-tearoff">
-            <span class="eyebrow" id="pat-livecode-eyebrow">Live code</span>
-            <div class="code mono" id="pat-live-code">— — — — — —</div>
-            <div class="code-actions">
-              <button class="btn btn-secondary btn-sm" id="pat-live-code-copy">Copy</button>
-            </div>
-          </div>
-          <div class="copy-note" id="pat-live-code-copy-note" style="text-align:center;"></div>
-          <button class="btn btn-primary btn-block" id="pat-gen-code-btn">Generate a code</button>
           <button class="btn btn-secondary btn-block" id="pat-access-manage-btn" style="margin-top:10px;">Manage access</button>
+          <button class="btn btn-secondary btn-block" id="pat-stats-btn" style="margin-top:10px;">My statistics</button>
+          <div class="privacy-note">Your live code refreshes on its own every 3 minutes and works once. Hand it over in person — never post or text it. A doctor you've trusted doesn't need it at all.</div>
         </div>
 
-        <div class="panel">
-          <h3>Eye health</h3>
-          <p class="panel-sub">Track your eyeglass prescription over time.</p>
-          <button class="btn btn-secondary btn-block" id="pat-eyes-btn">My Eyes</button>
-        </div>
       </div>
 
       <div class="center-col">
-        <div class="panel">
-          <div class="tabs">
-            <button class="tab active" id="pat-tab-visits">Visits</button>
-            <button class="tab" id="pat-tab-tests">Tests</button>
-          </div>
+        <div class="record-list">
+          <button class="record-row" type="button" data-goto="view-record-visits">
+            <div class="record-row-art record-row-art-teal">
+              <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                <rect x="28" y="14" width="64" height="92" rx="10" fill="#FFFFFF" opacity="0.9"/>
+                <rect x="28" y="14" width="64" height="92" rx="10" fill="none" stroke="#16544B" stroke-width="3"/>
+                <rect x="46" y="8" width="28" height="14" rx="4" fill="#16544B"/>
+                <path d="M38,64 L50,64 L55,48 L64,80 L70,64 L82,64" fill="none" stroke="#A22D3B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                <line x1="40" y1="86" x2="80" y2="86" stroke="#16544B" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+                <line x1="40" y1="94" x2="68" y2="94" stroke="#16544B" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+              </svg>
+            </div>
+            <div class="record-row-body">
+              <div class="record-row-title">Visits</div>
+              <svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            </div>
+          </button>
 
-          <div id="pat-visits-pane">
-            <div id="pat-visits-list"></div>
-            <div class="empty-state" id="pat-visits-empty">No visits recorded yet. Your visit history will appear here after a doctor sees you.</div>
-          </div>
+          <button class="record-row" type="button" data-goto="view-record-tests">
+            <div class="record-row-art record-row-art-amber">
+              <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                <path d="M46,10 H74" stroke="#97672A" stroke-width="4" stroke-linecap="round"/>
+                <path d="M50,10 V56 L34,92 C30,101 36,109 46,109 H74 C84,109 90,101 86,92 L70,56 V10" fill="#FFFFFF" opacity="0.9" stroke="#97672A" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+                <path d="M38,88 C44,84 76,84 82,88 L86,92 C90,101 84,109 74,109 H46 C36,109 30,101 34,92 Z" fill="#97672A" opacity="0.85"/>
+                <circle cx="58" cy="70" r="3" fill="#FFFFFF"/>
+                <circle cx="66" cy="78" r="2" fill="#FFFFFF"/>
+              </svg>
+            </div>
+            <div class="record-row-body">
+              <div class="record-row-title">Lab Results</div>
+              <svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            </div>
+          </button>
 
-          <div id="pat-tests-pane" class="hidden">
-            <div id="pat-tests-list"></div>
-            <div class="empty-state" id="pat-tests-empty">No tests on file yet.</div>
-          </div>
+          <button class="record-row" type="button" data-goto="view-record-prescriptions">
+            <div class="record-row-art record-row-art-red">
+              <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                <g transform="rotate(-30 60 60)">
+                  <rect x="18" y="42" width="84" height="36" rx="18" fill="#FFFFFF" opacity="0.9" stroke="#A22D3B" stroke-width="4"/>
+                  <path d="M60,42 H84 A18,18 0 0 1 84,78 H60 Z" fill="#A22D3B"/>
+                </g>
+              </svg>
+            </div>
+            <div class="record-row-body">
+              <div class="record-row-title">My Prescriptions</div>
+              <svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            </div>
+          </button>
+
+          <button class="record-row" type="button" data-goto="view-patient-eyes">
+            <div class="record-row-art record-row-art-teal">
+              <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10,60 C10,60 34,28 60,28 C86,28 110,60 110,60 C110,60 86,92 60,92 C34,92 10,60 10,60 Z" fill="#FFFFFF" opacity="0.9" stroke="#16544B" stroke-width="4" stroke-linejoin="round"/>
+                <circle cx="60" cy="60" r="18" fill="#16544B"/>
+                <circle cx="54" cy="54" r="5" fill="#FFFFFF"/>
+              </svg>
+            </div>
+            <div class="record-row-body">
+              <div class="record-row-title">My Eyes</div>
+              <svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            </div>
+          </button>
         </div>
       </div>
     </div>
   </main>
-
-  <div class="modal-overlay hidden" id="pat-visit-modal">
-    <div class="modal-card">
-      <button class="modal-close" id="pat-visit-modal-close" aria-label="Close">&times;</button>
-      <span class="eyebrow" id="visit-modal-date">—</span>
-      <h3 id="visit-modal-doctor" style="margin-top:6px;">—</h3>
-      <dl class="kv" style="margin-top:18px;">
-        <dt>Clinic</dt><dd id="visit-modal-clinic">—</dd>
-        <dt>Symptoms</dt><dd class="block" id="visit-modal-symptoms">—</dd>
-        <dt>Diagnosis</dt><dd class="block" id="visit-modal-diagnosis">—</dd>
-        <dt>Prescription</dt><dd class="block" id="visit-modal-prescription">—</dd>
-        <dt>Notes</dt><dd class="block" id="visit-modal-notes">—</dd>
-      </dl>
-    </div>
-  </div>
-
-  <div class="modal-overlay hidden" id="pat-test-modal">
-    <div class="modal-card">
-      <button class="modal-close" id="pat-test-modal-close" aria-label="Close">&times;</button>
-      <span class="eyebrow" id="test-modal-date">—</span>
-      <h3 id="test-modal-name" style="margin-top:6px;">—</h3>
-      <dl class="kv" style="margin-top:16px;">
-        <dt>Ordered by</dt><dd id="test-modal-doctor">—</dd>
-        <dt>Result summary</dt><dd class="block" id="test-modal-result">—</dd>
-      </dl>
-    </div>
-  </div>
-
-  <div class="modal-overlay hidden" id="pat-eyes-modal">
-    <div class="modal-card modal-card-wide">
-      <button class="modal-close" id="pat-eyes-close" aria-label="Close">&times;</button>
-      <span class="eyebrow">Eye health</span>
-      <h3 style="margin-top:6px;">My Eyes</h3>
-      <p class="panel-sub" style="margin-top:8px;">Your eyeglass prescription over time.</p>
-      <button class="btn btn-primary btn-block" id="add-eye-btn" style="margin-top:14px;">Add eye check</button>
-      <span class="save-note" id="add-eye-note" style="display:block; text-align:center; margin:8px 0 6px;">Eye check added</span>
-      <div id="pat-eyes-charts" class="hidden">
-        <h4 class="subhead">SPH over time</h4>
-        <div id="eyes-sph-chart-wrap"></div>
-        <h4 class="subhead">CYL over time</h4>
-        <div id="eyes-cyl-chart-wrap"></div>
-        <h4 class="subhead">History</h4>
-      </div>
-      <div id="pat-eyes-list"></div>
-      <div class="empty-state" id="pat-eyes-empty">No eye checks recorded yet. Add your first one to start tracking your prescription over time.</div>
-    </div>
-  </div>
-
-  <div class="modal-overlay hidden" id="add-eye-modal">
-    <div class="modal-card">
-      <button class="modal-close" id="add-eye-close" aria-label="Close">&times;</button>
-      <h3>Add eye check</h3>
-      <div class="field"><label for="eye-date">Date</label><input type="date" id="eye-date"></div>
-      <h4 class="subhead">Left eye</h4>
-      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
-        <div class="field"><label for="eye-sph-l">SPH</label><input type="number" step="0.25" id="eye-sph-l" placeholder="-2.00"></div>
-        <div class="field"><label for="eye-cyl-l">CYL</label><input type="number" step="0.25" id="eye-cyl-l" placeholder="-0.50"></div>
-        <div class="field"><label for="eye-axis-l">Axis</label><input type="number" min="0" max="180" id="eye-axis-l" placeholder="90"></div>
-      </div>
-      <h4 class="subhead">Right eye</h4>
-      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
-        <div class="field"><label for="eye-sph-r">SPH</label><input type="number" step="0.25" id="eye-sph-r" placeholder="-2.25"></div>
-        <div class="field"><label for="eye-cyl-r">CYL</label><input type="number" step="0.25" id="eye-cyl-r" placeholder="-0.75"></div>
-        <div class="field"><label for="eye-axis-r">Axis</label><input type="number" min="0" max="180" id="eye-axis-r" placeholder="85"></div>
-      </div>
-      <div class="error-text" id="add-eye-error"></div>
-      <div class="save-row">
-        <button class="btn btn-primary" id="add-eye-save">Save eye check</button>
-        <button class="btn btn-secondary" id="add-eye-cancel">Cancel</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay hidden" id="eye-modal">
-    <div class="modal-card">
-      <button class="modal-close" id="eye-modal-close" aria-label="Close">&times;</button>
-      <span class="eyebrow" id="eye-modal-date">—</span>
-      <h3 style="margin-top:6px;">Eye check</h3>
-      <dl class="kv" style="margin-top:16px;">
-        <dt>Left — SPH / CYL / Axis</dt><dd id="eye-modal-left">—</dd>
-        <dt>Right — SPH / CYL / Axis</dt><dd id="eye-modal-right">—</dd>
-      </dl>
-    </div>
-  </div>
 
   <div class="modal-overlay hidden" id="pat-profile-modal">
     <div class="modal-card">
@@ -694,10 +680,10 @@
       <div class="code mono" id="pat-modal-code" style="font-size:1.3rem; margin:10px 0 16px;">0000 0000</div>
 
       <h3>Account settings</h3>
-      <p class="panel-sub">Complete email and phone to get verified.</p>
-      <div class="field"><label for="pat-name">Full name</label><input type="text" id="pat-name" placeholder="Jordan Rivers"></div>
+      <p class="panel-sub">Add your email and phone so doctors can reach you if needed.</p>
+      <div class="field"><label for="pat-name">Full name</label><input type="text" id="pat-name" placeholder="Ayesha Khan"></div>
       <div class="field"><label for="pat-email">Email</label><input type="email" id="pat-email" placeholder="you@example.com"></div>
-      <div class="field"><label for="pat-phone">Phone</label><input type="tel" id="pat-phone" placeholder="+45 00 00 00 00"></div>
+      <div class="field"><label for="pat-phone">Phone</label><input type="tel" id="pat-phone" placeholder="+92 300 1234567"></div>
 
       <div class="save-row">
         <button class="btn btn-primary btn-block" id="pat-save-btn">Save changes</button>
@@ -744,6 +730,151 @@
     </div>
   </div>
 </div>
+
+  <div id="view-record-visits" class="view hidden">
+    <header class="topbar">
+      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="topbar-right">
+        <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
+      </div>
+    </header>
+    <main class="dash-main">
+      <div class="panel">
+        <span class="eyebrow">Records</span>
+        <h3 style="margin-top:6px;">Visits</h3>
+        <p class="panel-sub" style="margin-top:8px;">Every visit a doctor has logged for you.</p>
+        <div id="pat-visits-list"></div>
+        <div class="empty-state" id="pat-visits-empty">No visits recorded yet. Your visit history will appear here after a doctor sees you.</div>
+      </div>
+    </main>
+  </div>
+
+  <div id="view-record-tests" class="view hidden">
+    <header class="topbar">
+      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="topbar-right">
+        <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
+      </div>
+    </header>
+    <main class="dash-main">
+      <div class="panel">
+        <span class="eyebrow">Records</span>
+        <h3 style="margin-top:6px;">Lab Results</h3>
+        <p class="panel-sub" style="margin-top:8px;">Tests and reports on file.</p>
+        <div id="pat-tests-list"></div>
+        <div class="empty-state" id="pat-tests-empty">No tests on file yet.</div>
+      </div>
+    </main>
+  </div>
+
+  <div id="view-record-prescriptions" class="view hidden">
+    <header class="topbar">
+      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="topbar-right">
+        <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
+      </div>
+    </header>
+    <main class="dash-main">
+      <div class="panel">
+        <span class="eyebrow">Records</span>
+        <h3 style="margin-top:6px;">My Prescriptions</h3>
+        <p class="panel-sub" style="margin-top:8px;">Pulled from visit notes where a doctor recorded one.</p>
+        <div id="pat-prescriptions-list"></div>
+        <div class="empty-state" id="pat-prescriptions-empty">No prescriptions on file yet.</div>
+      </div>
+    </main>
+  </div>
+
+  <div id="view-patient-eyes" class="view hidden">
+    <header class="topbar">
+      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="topbar-right">
+        <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
+      </div>
+    </header>
+    <main class="dash-main">
+      <div class="panel">
+        <span class="eyebrow">Eye health</span>
+        <h3 style="margin-top:6px;">My Eyes</h3>
+        <p class="panel-sub" style="margin-top:8px;">Your eyeglass prescription over time.</p>
+        <button class="btn btn-primary btn-block" id="add-eye-btn" style="margin-top:14px;">Add eye check</button>
+        <span class="save-note" id="add-eye-note" style="display:block; text-align:center; margin:8px 0 6px;">Eye check added</span>
+        <div id="pat-eyes-charts" class="hidden">
+          <h4 class="subhead">SPH over time</h4>
+          <div id="eyes-sph-chart-wrap"></div>
+          <h4 class="subhead">CYL over time</h4>
+          <div id="eyes-cyl-chart-wrap"></div>
+          <h4 class="subhead">History</h4>
+        </div>
+        <div id="pat-eyes-list"></div>
+        <div class="empty-state" id="pat-eyes-empty">No eye checks recorded yet. Add your first one to start tracking your prescription over time.</div>
+      </div>
+    </main>
+
+    <div class="modal-overlay hidden" id="add-eye-modal">
+      <div class="modal-card">
+      <button class="modal-close" id="add-eye-close" aria-label="Close">&times;</button>
+      <h3>Add eye check</h3>
+      <div class="field"><label for="eye-date">Date</label><input type="date" id="eye-date"></div>
+      <h4 class="subhead">Left eye</h4>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="field"><label for="eye-sph-l">SPH</label><input type="number" step="0.25" id="eye-sph-l" placeholder="-2.00"></div>
+        <div class="field"><label for="eye-cyl-l">CYL</label><input type="number" step="0.25" id="eye-cyl-l" placeholder="-0.50"></div>
+        <div class="field"><label for="eye-axis-l">Axis</label><input type="number" min="0" max="180" id="eye-axis-l" placeholder="90"></div>
+      </div>
+      <h4 class="subhead">Right eye</h4>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="field"><label for="eye-sph-r">SPH</label><input type="number" step="0.25" id="eye-sph-r" placeholder="-2.25"></div>
+        <div class="field"><label for="eye-cyl-r">CYL</label><input type="number" step="0.25" id="eye-cyl-r" placeholder="-0.75"></div>
+        <div class="field"><label for="eye-axis-r">Axis</label><input type="number" min="0" max="180" id="eye-axis-r" placeholder="85"></div>
+      </div>
+      <div class="error-text" id="add-eye-error"></div>
+      <div class="save-row">
+        <button class="btn btn-primary" id="add-eye-save">Save eye check</button>
+        <button class="btn btn-secondary" id="add-eye-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="eye-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="eye-modal-close" aria-label="Close">&times;</button>
+      <span class="eyebrow" id="eye-modal-date">—</span>
+      <h3 style="margin-top:6px;">Eye check</h3>
+      <dl class="kv" style="margin-top:16px;">
+        <dt>Left — SPH / CYL / Axis</dt><dd id="eye-modal-left">—</dd>
+        <dt>Right — SPH / CYL / Axis</dt><dd id="eye-modal-right">—</dd>
+      </dl>
+    </div>
+  </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="pat-visit-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="pat-visit-modal-close" aria-label="Close">&times;</button>
+      <span class="eyebrow" id="visit-modal-date">—</span>
+      <h3 id="visit-modal-doctor" style="margin-top:6px;">—</h3>
+      <dl class="kv" style="margin-top:18px;">
+        <dt>Clinic</dt><dd id="visit-modal-clinic">—</dd>
+        <dt>Symptoms</dt><dd class="block" id="visit-modal-symptoms">—</dd>
+        <dt>Diagnosis</dt><dd class="block" id="visit-modal-diagnosis">—</dd>
+        <dt>Prescription</dt><dd class="block" id="visit-modal-prescription">—</dd>
+        <dt>Notes</dt><dd class="block" id="visit-modal-notes">—</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="pat-test-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="pat-test-modal-close" aria-label="Close">&times;</button>
+      <span class="eyebrow" id="test-modal-date">—</span>
+      <h3 id="test-modal-name" style="margin-top:6px;">—</h3>
+      <dl class="kv" style="margin-top:16px;">
+        <dt>Ordered by</dt><dd id="test-modal-doctor">—</dd>
+        <dt>Result summary</dt><dd class="block" id="test-modal-result">—</dd>
+      </dl>
+    </div>
+  </div>
 
 <!-- ============ DOCTOR DASHBOARD ============ -->
 <div id="view-doctor-dash" class="view hidden">
@@ -821,7 +952,6 @@
           <div class="patient-result hidden" id="patient-result">
             <div class="name-row">
               <h3 id="res-name">—</h3>
-              <span class="badge" id="res-badge">Unverified</span>
             </div>
             <div class="copy-note" style="margin:-8px 0 4px; color:var(--muted);" id="res-access-note">—</div>
             <button class="link-btn" id="lookup-change-btn" style="margin-bottom:16px;">Search a different patient</button>
@@ -861,9 +991,9 @@
       <h3>Account settings</h3>
       <p class="panel-sub">Complete email, phone and license to get verified.</p>
       <h4 class="subhead">Contact</h4>
-      <div class="field"><label for="doc-name">Full name</label><input type="text" id="doc-name" placeholder="Dr. Sam Petersen"></div>
+      <div class="field"><label for="doc-name">Full name</label><input type="text" id="doc-name" placeholder="Dr. Bilal Chaudhry"></div>
       <div class="field"><label for="doc-email">Email</label><input type="email" id="doc-email" placeholder="you@clinic.com"></div>
-      <div class="field"><label for="doc-phone">Phone</label><input type="tel" id="doc-phone" placeholder="+45 00 00 00 00"></div>
+      <div class="field"><label for="doc-phone">Phone</label><input type="tel" id="doc-phone" placeholder="+92 300 1234567"></div>
       <div class="field"><label for="doc-license">Medical license number</label><input type="text" id="doc-license" placeholder="License / registration no."></div>
 
       <hr>
@@ -877,7 +1007,7 @@
       <p class="panel-sub" style="margin-bottom:12px;">Add the clinics or hospitals you work from. Pick which one you're currently at from the dashboard — it's added automatically to visit notes you write.</p>
       <div class="chip-list" id="doc-clinics-list" style="margin-bottom:12px;"></div>
       <div class="lookup-row">
-        <input type="text" id="doc-clinic-input" placeholder="e.g. City General Hospital">
+        <input type="text" id="doc-clinic-input" placeholder="e.g. Shifa International Hospital">
         <button class="btn btn-secondary" id="doc-clinic-add-btn">Add</button>
       </div>
 
@@ -1069,7 +1199,6 @@
     var v = await storeGet('doctor:'+id);
     try{ return v ? JSON.parse(v) : null; }catch(e){ return null; }
   }
-  function isPatientVerified(d){ return !!(d.email && d.phone); }
   function isDoctorVerified(d){ return !!(d.email && d.phone && d.license); }
 
   // ---------- Access grants (see ACCESS-MODEL.md) ----------
@@ -1449,7 +1578,6 @@
     var code = await generatePatientCode();
     var passwordHash = password ? await hashPassword(password) : '';
     var data = { code:code, name:name||'', email:email||'', phone:phone||'', dob:'', idNumber:'', bloodType:'', emergencyContact:'', allergies:'', conditions:'', medications:'', photoUrl:'', passwordHash:passwordHash, visits: sampleVisits(), tests: sampleTests(), createdAt: Date.now() };
-    data.verified = isPatientVerified(data);
     await savePatient(code, data);
     await linkPatientEmail(email, code);
     session = { type:'patient', id:code };
@@ -1536,8 +1664,8 @@
 
   function sampleVisits(){
     return [
-      { doctorName:'Dr. Elena Cho', date:'2026-05-14', time:'10:30 AM', symptoms:'Persistent cough and mild fever for four days.', diagnosis:'Acute bronchitis', prescription:'Amoxicillin 500mg, 3x daily for 7 days.', notes:'Follow up if symptoms persist beyond 10 days.' },
-      { doctorName:'Dr. Marcus Webb', date:'2026-02-02', time:'3:00 PM', symptoms:'Routine annual check-up, no complaints.', diagnosis:'No concerns found.', prescription:'None', notes:'Recommended an annual blood panel and flu shot.' }
+      { doctorName:'Dr. Ali Raza', date:'2026-05-14', time:'10:30 AM', symptoms:'Persistent cough and mild fever for four days.', diagnosis:'Acute bronchitis', prescription:'Amoxicillin 500mg, 3x daily for 7 days.', notes:'Follow up if symptoms persist beyond 10 days.' },
+      { doctorName:'Dr. Fatima Noor', date:'2026-02-02', time:'3:00 PM', symptoms:'Routine annual check-up, no complaints.', diagnosis:'No concerns found.', prescription:'None', notes:'Recommended an annual blood panel and flu shot.' }
     ];
   }
   function sampleTests(){
@@ -1574,76 +1702,70 @@
     if (!data.eyeEntries) data.eyeEntries = [];
     currentPatientData = data;
     if (seeded){ try{ await savePatient(code, data); }catch(e){} }
-    $('pat-dash-code').textContent = formatCode(code);
     renderHealthCard(data);
     renderPatientVerification(data);
     renderVisitsList(data.visits);
     renderTestsList(data.tests);
+    renderPrescriptionsList(data.visits);
     renderEyesList(data.eyeEntries);
-    switchPatientTab('visits');
     closeVisitModal();
     closeTestModal();
     closePatProfileModal();
     closePatStatsModal();
-    closePatEyesModal();
     closeAddEyeModal();
     closeEyeModal();
     closePatAccessModal();
-    await refreshPatientLiveCode();
+    await regenerateLiveCode();
     showView('view-patient-dash');
   }
 
   // ---- Live access code (patient side) ----
+  // Generated automatically the moment the patient reaches their dashboard — no
+  // button. The ring around it drains over the code's 3-minute life; when it runs
+  // out this tab quietly mints a fresh one, so there's always a live code on screen
+  // to hand to a doctor without the patient having to do anything.
+  var LIVE_CODE_SECONDS = 180;
+  var RING_R = 21;
+  var RING_C = 2 * Math.PI * RING_R;
   var liveCodeTimer = null;
+  var liveCodeGenerating = false;
   function stopLiveCodeTimer(){
     if (liveCodeTimer){ clearInterval(liveCodeTimer); liveCodeTimer = null; }
+  }
+  function setLiveCodeRing(elapsedFraction){
+    var ringEl = $('pat-live-code-ring');
+    ringEl.style.strokeDasharray = RING_C;
+    ringEl.style.strokeDashoffset = RING_C * Math.max(0, Math.min(1, elapsedFraction));
   }
   function renderLiveCodeState(row){
     stopLiveCodeTimer();
     var codeEl = $('pat-live-code');
-    var eyebrowEl = $('pat-livecode-eyebrow');
-    var genBtn = $('pat-gen-code-btn');
     function tick(){
-      if (!row || row.redeemed_at){
-        codeEl.textContent = row && row.redeemed_at ? 'Redeemed' : '— — — — — —';
-        eyebrowEl.textContent = row && row.redeemed_at ? 'Already used' : 'Live code';
-        genBtn.textContent = 'Generate a code';
-        stopLiveCodeTimer();
-        return;
-      }
+      if (!row){ codeEl.textContent = '— — — — — —'; setLiveCodeRing(0); return; }
       var msLeft = new Date(row.expires_at).getTime() - Date.now();
       if (msLeft <= 0){
-        codeEl.textContent = 'Expired';
-        eyebrowEl.textContent = 'Expired';
-        genBtn.textContent = 'Generate a new code';
         stopLiveCodeTimer();
+        regenerateLiveCode();
         return;
       }
-      var secs = Math.ceil(msLeft / 1000);
-      var m = Math.floor(secs / 60), s = secs % 60;
       codeEl.textContent = row.code.slice(0,3) + ' ' + row.code.slice(3);
-      eyebrowEl.textContent = 'Live code — expires in ' + m + ':' + String(s).padStart(2,'0');
-      genBtn.textContent = 'Generate a new code';
+      setLiveCodeRing(1 - (msLeft / (LIVE_CODE_SECONDS * 1000)));
     }
     tick();
-    if (row && !row.redeemed_at) liveCodeTimer = setInterval(tick, 1000);
+    liveCodeTimer = setInterval(tick, 1000);
   }
-  async function refreshPatientLiveCode(){
-    var row = await getLatestAccessCode(session.id);
-    renderLiveCodeState(row);
-  }
-  $('pat-gen-code-btn').addEventListener('click', async function(){
-    $('pat-gen-code-btn').disabled = true;
+  async function regenerateLiveCode(){
+    if (liveCodeGenerating) return;
+    liveCodeGenerating = true;
     try{
       var row = await createAccessCode(session.id);
       renderLiveCodeState(row);
     }finally{
-      $('pat-gen-code-btn').disabled = false;
+      liveCodeGenerating = false;
     }
-  });
-  $('pat-live-code-copy').addEventListener('click', function(){
-    var text = $('pat-live-code').textContent.replace(/\s+/g,'');
-    if (/^\d{6}$/.test(text)) copyToClipboard(text, $('pat-live-code-copy-note'));
+  }
+  $('pat-live-code-reset').addEventListener('click', function(){
+    regenerateLiveCode();
   });
 
   // ---- Manage access (patient side) ----
@@ -1733,10 +1855,6 @@
     }
   });
   function renderPatientVerification(data){
-    var verified = isPatientVerified(data);
-    var badge = $('pat-badge');
-    badge.textContent = verified ? 'Verified' : 'Unverified';
-    badge.className = 'badge ' + (verified ? 'verified' : 'unverified');
     var items = [
       { label: data.email || 'Email address', done: !!data.email },
       { label: data.phone || 'Phone number', done: !!data.phone }
@@ -1771,7 +1889,6 @@
       email: email,
       phone: $('pat-phone').value.trim()
     });
-    data.verified = isPatientVerified(data);
     await savePatient(session.id, data);
     await linkPatientEmail(email, session.id);
     currentPatientData = data;
@@ -1817,9 +1934,6 @@
   $('pat-stats-close').addEventListener('click', closePatStatsModal);
   $('pat-stats-modal').addEventListener('click', function(e){ if (e.target === $('pat-stats-modal')) closePatStatsModal(); });
 
-  $('pat-dash-copy').addEventListener('click', function(){
-    copyToClipboard(session.id, $('pat-dash-copy-note'));
-  });
   $('pat-avatar-btn').addEventListener('click', function(){
     $('pat-avatar-input').click();
   });
@@ -1851,16 +1965,38 @@
     showView('view-landing');
   });
 
-  // ---- Visits / Tests tabs ----
-  function switchPatientTab(tab){
-    var visits = tab === 'visits';
-    $('pat-tab-visits').classList.toggle('active', visits);
-    $('pat-tab-tests').classList.toggle('active', !visits);
-    $('pat-visits-pane').classList.toggle('hidden', !visits);
-    $('pat-tests-pane').classList.toggle('hidden', visits);
+  // ---- Record pages (Visits / Lab Results / Prescriptions / My Eyes) ----
+  // Navigation between these and the dashboard is handled entirely by the generic
+  // [data-goto] + showView() mechanism already wired up near the top of this script —
+  // no per-card open/close handlers needed. Lists just need to be rendered before the
+  // patient can reach them, which enterPatientDash already does at sign-in.
+  function isMeaningfulPrescription(p){
+    if (!p) return false;
+    var t = p.trim().toLowerCase();
+    return t !== '' && t !== 'none' && t !== 'n/a' && t !== 'na' && t !== '-';
   }
-  $('pat-tab-visits').addEventListener('click', function(){ switchPatientTab('visits'); });
-  $('pat-tab-tests').addEventListener('click', function(){ switchPatientTab('tests'); });
+  function renderPrescriptionsList(visits){
+    var listEl = $('pat-prescriptions-list');
+    var emptyEl = $('pat-prescriptions-empty');
+    var entries = (visits || []).map(function(v, i){ return { v: v, i: i }; }).filter(function(e){ return isMeaningfulPrescription(e.v.prescription); });
+    if (!entries.length){
+      listEl.innerHTML = '';
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = entries.map(function(e){
+      return '<div class="list-item" data-idx="'+e.i+'">'
+        + '<div><div class="li-title">'+escapeHtml(e.v.prescription)+'</div>'
+        + '<div class="li-sub">'+escapeHtml(e.v.doctorName || 'Doctor')+' · '+escapeHtml(formatDateDisplay(e.v.date))+'</div></div>'
+        + chevronSvg + '</div>';
+    }).join('');
+    listEl.querySelectorAll('.list-item').forEach(function(el){
+      el.addEventListener('click', function(){
+        openVisitModal(visits[parseInt(el.getAttribute('data-idx'), 10)]);
+      });
+    });
+  }
 
   function formatDateDisplay(dateStr){
     if (!dateStr) return '—';
@@ -1938,15 +2074,6 @@
   $('pat-test-modal').addEventListener('click', function(e){ if (e.target === $('pat-test-modal')) closeTestModal(); });
 
   // ---- My Eyes ----
-  function openPatEyesModal(){
-    renderEyesList((currentPatientData && currentPatientData.eyeEntries) || []);
-    $('pat-eyes-modal').classList.remove('hidden');
-  }
-  function closePatEyesModal(){ $('pat-eyes-modal').classList.add('hidden'); }
-  $('pat-eyes-btn').addEventListener('click', openPatEyesModal);
-  $('pat-eyes-close').addEventListener('click', closePatEyesModal);
-  $('pat-eyes-modal').addEventListener('click', function(e){ if (e.target === $('pat-eyes-modal')) closePatEyesModal(); });
-
   function fmtDiopter(v){
     var n = parseFloat(v);
     if (v === '' || v === null || v === undefined || isNaN(n)) return '—';
@@ -2345,7 +2472,7 @@
     if (e.target === $('doc-profile-modal')) closeDocProfileModal();
   });
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeDocStatsModal(); closePatProfileModal(); closePatStatsModal(); closePatEyesModal(); closeAddEyeModal(); closeEyeModal(); closePatAccessModal(); }
+    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeDocStatsModal(); closePatProfileModal(); closePatStatsModal(); closeAddEyeModal(); closeEyeModal(); closePatAccessModal(); }
   });
 
   function escapeHtml(s){
@@ -2448,12 +2575,8 @@
     $('lookup-not-found').classList.add('hidden');
     $('lookup-empty').classList.add('hidden');
     $('patient-result').classList.remove('hidden');
-    var verified = isPatientVerified(data);
     $('res-name').textContent = data.name || 'Unnamed patient';
     $('add-visit-patient-name').textContent = data.name || 'this patient';
-    var badge = $('res-badge');
-    badge.textContent = verified ? 'Verified' : 'Unverified';
-    badge.className = 'badge ' + (verified ? 'verified' : 'unverified');
     var accessNote = 'Access: standing trust';
     if (currentLookupGrant && currentLookupGrant.granted_via === 'code' && currentLookupGrant.expires_at){
       var mins = Math.max(0, Math.ceil((new Date(currentLookupGrant.expires_at).getTime() - Date.now()) / 60000));

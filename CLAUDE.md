@@ -59,7 +59,7 @@ open it directly in a browser. All styling and logic live in that one file (inli
 
 ```
 patient: {
-  code, name, email, phone, photoUrl, passwordHash, verified,
+  code, name, email, phone, photoUrl, passwordHash,  // no "verified" — that's a doctor-only concept, see below
   bloodType, emergencyContact, allergies, conditions, medications,  // no longer editable in UI, kept for compat
   visits: [{ doctorName, clinicName, date, time, symptoms, diagnosis, prescription, notes,
              writtenViaGrantId, unverified }],  // last two added with the access model, see below
@@ -95,26 +95,36 @@ verified, which would defeat the point of having the tag at all.
   sign in with either their 8-digit code **or** their email (detected by whether the
   input contains `@`), both plus a password if one was set. "Continue with Google" is
   a **demo only** (asks for name/email inline, no real OAuth).
-- Both roles get an ID-card-style visual (health card / doctor card) with a real
-  card aspect ratio, a photo upload (stored as base64 `photoUrl`), and a verified badge
-  (patient: email + phone; doctor: email + phone + license). The patient card shows
-  just avatar + name + account ID — no phone line or "Pak Health" brand text on the
-  card itself, unlike the doctor card which still shows both.
+- Both roles get an ID-card-style visual (health card / doctor card) with a real card
+  aspect ratio and a photo upload (stored as base64 `photoUrl`). Only the doctor card
+  carries a verified badge (email + phone + license) — patients aren't a verification
+  concept in this app, so their card has no badge at all. The patient card shows
+  avatar + name + their **live access code** (see "Access model" below), not their
+  permanent account ID — the account ID still exists (it's the storage key and
+  sign-in identifier) but is deliberately not the thing shown front-and-center,
+  since it isn't what grants a doctor access anymore. It's still visible in Account
+  settings for the patient's own reference. The doctor card still shows brand text +
+  doctor ID, unchanged.
 - **Access model** (see [`ACCESS-MODEL.md`](ACCESS-MODEL.md) for the full design — this
-  is Phase 1 of it, the core grant mechanism, built directly into this file): a
-  patient's "Share with a doctor" panel generates a 6-digit live code, good for 3
-  minutes and one redemption (a countdown runs client-side; generating a new code
-  silently retires the previous one). A doctor redeems it in "Find a patient → Enter a
-  code," which creates a one-hour `access_grants` row instead of handing over standing
-  access. Separately, a patient's "Manage access" modal lets them trust a doctor by ID
-  for standing, revocable access (patient-initiated only — a doctor can never request
-  it), shown in that doctor's "Find a patient → My patients" roster with no code
-  needed. Revoking takes effect on the next load, not mid-session, because every
-  lookup and every visit/test save re-checks grant validity rather than caching it.
-  Auth itself is unchanged (see Known limitations) — grants are enforced in app code
-  against the existing doctorId/patientCode session, not via Postgres RLS.
+  is Phase 1 of it, the core grant mechanism, built directly into this file): the
+  moment a patient reaches their dashboard, a 6-digit live code is generated
+  automatically — no button — good for 3 minutes and one redemption, shown right on
+  the health card next to a small circular countdown ring (sized to match the live-code
+  text) and a "Reset" button that manually mints a fresh code and restarts the ring
+  early. When the ring runs out on its own (or a fresh dashboard load happens), a new
+  code is silently minted so there's always a live one on screen; the previous one
+  stops being valid the instant a newer one exists. A doctor redeems it in "Find a
+  patient → Enter a code," which creates a
+  one-hour `access_grants` row instead of handing over standing access. Separately, a
+  patient's "Manage access" modal lets them trust a doctor by ID for standing,
+  revocable access (patient-initiated only — a doctor can never request it), shown in
+  that doctor's "Find a patient → My patients" roster with no code needed. Revoking
+  takes effect on the next load, not mid-session, because every lookup and every
+  visit/test save re-checks grant validity rather than caching it. Auth itself is
+  unchanged (see Known limitations) — grants are enforced in app code against the
+  existing doctorId/patientCode session, not via Postgres RLS.
 - Doctor dashboard: redeem a patient's live code (or pick them from the roster) → the
-  find-a-patient box is replaced by the patient's name/badge, an access note (standing
+  find-a-patient box is replaced by the patient's name, an access note (standing
   trust vs. one-time code with its remaining time), a "Search a different patient"
   link, and **Visits / Tests tabs** — same list-and-detail-modal pattern as the
   patient's own dashboard. "Add visit note" and "Add test / report" buttons sit above
@@ -122,23 +132,38 @@ verified, which would defeat the point of having the tag at all.
   `writtenViaGrantId` and an `unverified` snapshot, then writes directly into that
   patient's record, so the patient sees it immediately next time they sign in. This is
   the core loop of the app.
-- Patient dashboard: health card, Visits tab, Tests tab (both seeded with sample data
-  on first load if empty, so the UI never looks broken/empty during a demo), and an
-  "Account settings" modal (name, email, phone) mirroring the doctor's — this is what
-  lets a patient add or fix their email/phone *after* signup so the verification
-  checklist and badge can actually update; before this existed there was no way to
-  edit those fields post-signup at all. The verification checklist shows the actual
-  email/phone value once provided (not just a static "Email address" label), and also
-  has its own "My statistics" modal (total visits, unique doctors seen).
-- Patient "My Eyes": a separate panel in the left column, below the health-card panel
-  (its own `.panel`, sibling to the health-card one — not a tab next to Visits/Tests,
-  since its content is richer than a plain list). A "My Eyes" button there opens a
-  wide modal (`.modal-card-wide`) with self-entered eyeglass prescription tracking —
-  SPH, CYL, and axis for each eye, one entry per date, newest first, click a row for
-  the full detail. Two hand-drawn inline SVG line charts (same no-dependency approach
-  as the doctor's trend chart) plot SPH-over-time and CYL-over-time, each with a teal
-  line for the left eye and a red line for the right eye plotted together so trends
-  are easy to compare at a glance; hover a point for the exact date and value. Doctors
+- Patient dashboard: health card (avatar + name + live code) and, in the center
+  column, a **record list** — Visits, Lab Results, My Prescriptions, My Eyes — each a
+  wide rectangular row with a flat-illustration icon on the left (fading into white
+  where the title sits) and a chevron on the right. Tapping one navigates to a real
+  full-screen page (its own `<div class="view">`, shown via the same `showView()`
+  top-level view-switching the rest of the app already uses, with a "← Back to
+  dashboard" link in its topbar) rather than opening a modal — these were promoted to
+  pages specifically because they're primary destinations now, unlike incidental
+  detail popups (Account settings, Stats, Manage access) which stay modals. Within
+  each page, clicking a row still opens the existing detail modal (visit/test/eye
+  entry) on top of the page. **My Prescriptions is derived, not stored separately** —
+  it scans every visit for a non-empty, non-"None" `prescription` field and lists
+  those, clicking through to the same visit-detail modal. An "Account settings" modal
+  (name, email, phone) mirrors the doctor's — this is what lets a patient add or fix
+  their email/phone *after* signup; before this existed there was no way to edit those
+  fields post-signup at all. A checklist on the health card shows the actual
+  email/phone value once provided (not just a static "Email address" label) as a
+  profile-completeness nudge — there's no "verified" concept for patients, only for
+  doctors (license verification). The dashboard also has its own "My statistics" modal
+  (total visits, unique doctors seen).
+
+  Note: since the app has no client-side URL routing (`showView()` just toggles a
+  `hidden` class, there's no `history.pushState`/hash routing anywhere), the browser's
+  own back/forward buttons don't know about any in-app view change — that's true of
+  every screen in this app, not just the new record pages, and is why every screen
+  needs its own explicit back/close control instead of relying on browser history.
+- Patient "My Eyes" page: self-entered eyeglass prescription tracking — SPH, CYL, and
+  axis for each eye, one entry per date, newest first, click a row for the full
+  detail. Two hand-drawn inline SVG line charts (same no-dependency approach as the
+  doctor's trend chart) plot SPH-over-time and CYL-over-time, each with a teal line
+  for the left eye and a red line for the right eye plotted together so trends are
+  easy to compare at a glance; hover a point for the exact date and value. Doctors
   have no visibility into this — it's entirely patient-owned data, unlike visits/tests
   which doctors write.
 - Doctor clinics: a "Currently seeing patients at" dropdown on the doctor dashboard,

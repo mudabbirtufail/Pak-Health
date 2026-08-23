@@ -1,0 +1,382 @@
+  :root{
+    --bg: #F1F4F2;
+    --paper: #FFFFFF;
+    --ink: #17242E;
+    --ink-soft: #4C5A62;
+    --muted: #7C8A8F;
+    --line: #D8E0DC;
+    --teal: #1F6F63;
+    --teal-dark: #16544B;
+    --teal-wash: #E4EFEC;
+    --red: #A22D3B;
+    --red-wash: #F6E7E7;
+    --amber: #97672A;
+    --amber-wash: #F3ECDF;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(23,36,46,0.06), 0 8px 24px rgba(23,36,46,0.06);
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  h1,h2,h3{ font-family: 'Spectral', serif; margin: 0; color: var(--ink); }
+  .mono{ font-family: 'IBM Plex Mono', monospace; }
+  a{ color: inherit; }
+  button{ font-family: inherit; cursor: pointer; }
+  ::selection{ background: var(--teal); color: white; }
+  :focus-visible{ outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  .hidden{ display:none !important; }
+  .view{ min-height: 100vh; display:flex; flex-direction:column; }
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 18px 32px; border-bottom: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .wordmark{ display:flex; align-items:center; gap:10px; font-family:'Spectral', serif; font-weight:600; font-size:1.25rem; letter-spacing:0.01em; }
+  .wordmark svg{ flex-shrink:0; }
+  .topbar-right{ display:flex; align-items:center; gap:14px; }
+  .role-chip{
+    font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em;
+    color: var(--muted); border:1px solid var(--line); border-radius:999px; padding:4px 10px;
+  }
+  .link-btn{
+    background:none; border:none; color:var(--ink-soft); font-size:0.88rem; text-decoration:underline;
+    text-underline-offset:3px; padding:4px 2px;
+  }
+  .link-btn:hover{ color: var(--red); }
+
+  /* ---------- Pulse divider (signature motif) ---------- */
+  .pulse{ width:100%; display:block; overflow:hidden; }
+  .pulse path{
+    fill:none; stroke: var(--red); stroke-width:3; stroke-linecap:round; stroke-linejoin:round;
+  }
+  @media (prefers-reduced-motion: no-preference){
+    .pulse.animate path{
+      stroke-dasharray: 2400;
+      stroke-dashoffset: 2400;
+      animation: draw 1.7s ease-out forwards;
+    }
+  }
+  @keyframes draw{ to{ stroke-dashoffset: 0; } }
+
+  /* ---------- Landing ---------- */
+  .landing-main{ flex:1; display:flex; flex-direction:column; }
+  .hero{ padding: 56px 32px 28px; max-width: 900px; }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace; font-size:0.75rem; letter-spacing:0.14em;
+    text-transform:uppercase; color: var(--teal-dark); margin-bottom:14px; display:block;
+  }
+  .hero h1{ font-size: clamp(2.1rem, 5vw, 3.2rem); font-weight:600; line-height:1.08; }
+  .hero p{ color: var(--ink-soft); font-size:1.05rem; max-width:520px; margin-top:14px; line-height:1.55; }
+
+  .choices{ flex:1; display:grid; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 760px){ .choices{ grid-template-columns: 1fr; } }
+  .choice{
+    position:relative; padding: 44px 40px; display:flex; flex-direction:column; justify-content:flex-end;
+    min-height: 320px; border-top:1px solid var(--line); text-align:left;
+    background: var(--paper); border:none; border-left:1px solid var(--line);
+    transition: background 0.25s ease;
+  }
+  .choice:first-child{ border-left:none; }
+  .choice:hover, .choice:focus-visible{ background: var(--teal-wash); }
+  .choice .num{ font-family:'IBM Plex Mono', monospace; font-size:0.78rem; color:var(--muted); margin-bottom:20px; }
+  .choice h2{ font-size:1.7rem; font-weight:600; margin-bottom:10px; }
+  .choice p{ color: var(--ink-soft); font-size:0.96rem; max-width:340px; line-height:1.5; margin-bottom:22px; }
+  .choice .go{ display:flex; align-items:center; gap:8px; font-weight:600; color: var(--teal-dark); font-size:0.94rem; }
+  .choice .go svg{ transition: transform 0.2s ease; }
+  .choice:hover .go svg{ transform: translateX(4px); }
+  .choice-icon{ position:absolute; top:40px; right:40px; opacity:0.9; }
+
+  .landing-footer{
+    padding: 18px 32px; border-top:1px solid var(--line); background: var(--paper);
+    font-size:0.78rem; color: var(--muted); line-height:1.5;
+  }
+
+  /* ---------- Auth ---------- */
+  .auth-wrap{ flex:1; display:flex; align-items:flex-start; justify-content:center; padding: 48px 20px; }
+  .auth-card{
+    width:100%; max-width: 440px; background: var(--paper); border:1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px;
+  }
+  .auth-back{ font-size:0.85rem; color:var(--muted); text-decoration:none; display:inline-flex; align-items:center; gap:6px; margin-bottom:18px; background:none; border:none; padding:0; }
+  .auth-back:hover{ color: var(--red); }
+  .auth-title{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .auth-title h2{ font-size:1.5rem; }
+  .auth-sub{ color: var(--ink-soft); font-size:0.9rem; margin-bottom:22px; }
+
+  .tabs{ display:flex; border-bottom:1px solid var(--line); margin-bottom:22px; }
+  .tab{
+    flex:1; background:none; border:none; padding:10px 0; font-size:0.9rem; font-weight:600;
+    color: var(--muted); border-bottom:2px solid transparent; margin-bottom:-1px;
+  }
+  .tab.active{ color: var(--ink); border-bottom-color: var(--red); }
+
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:0.8rem; font-weight:600; color: var(--ink-soft); margin-bottom:6px; }
+  .field .hint{ font-size:0.76rem; color:var(--muted); margin-top:5px; }
+  input[type=text], input[type=email], input[type=tel], input[type=date], input[type=password], select, textarea{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:6px;
+    font-family:'IBM Plex Sans', sans-serif; font-size:0.94rem; background: var(--paper); color: var(--ink);
+  }
+  input:focus, select:focus, textarea:focus{ border-color: var(--teal); }
+  textarea{ resize: vertical; min-height:70px; line-height:1.5; }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    padding:12px 20px; border-radius:6px; border:1px solid transparent; font-weight:600; font-size:0.92rem;
+  }
+  .btn-primary{ background: var(--teal); color:white; width:100%; }
+  .btn-primary:hover{ background: var(--teal-dark); }
+  .btn-secondary{ background: var(--paper); color: var(--ink); border-color: var(--line); }
+  .btn-secondary:hover{ border-color: var(--ink); }
+  .btn-block{ width:100%; }
+  .btn:disabled{ opacity:0.55; cursor:not-allowed; }
+
+  .error-text{ color: var(--red); font-size:0.85rem; margin-top:10px; display:none; }
+  .error-text.show{ display:block; }
+
+  /* ---------- Tear-off code card ---------- */
+  .tearoff{
+    position:relative; background: var(--paper); border:1.5px dashed var(--muted);
+    border-radius: 10px; padding: 22px 22px 20px; text-align:center; margin: 4px 0 18px;
+  }
+  .tearoff::before, .tearoff::after{
+    content:""; position:absolute; top:50%; width:18px; height:18px; background: var(--bg);
+    border-radius:50%; transform: translateY(-50%);
+  }
+  .tearoff::before{ left:-10px; }
+  .tearoff::after{ right:-10px; }
+  .tearoff .eyebrow{ margin-bottom:8px; }
+  .tearoff .code{ font-family:'IBM Plex Mono', monospace; font-size:2rem; letter-spacing:0.06em; font-weight:600; color: var(--ink); }
+  .tearoff .code-actions{ margin-top:14px; display:flex; gap:10px; justify-content:center; }
+  .copy-note{ font-size:0.78rem; color: var(--teal-dark); margin-top:8px; height:16px; }
+
+  /* ---------- Dashboard ---------- */
+  .dash-main{ flex:1; padding: 32px; max-width:1100px; margin:0 auto; width:100%; }
+  .dash-main-wide{ max-width:1320px; }
+  .dash-grid{ display:grid; grid-template-columns: 420px minmax(0, 620px) 1fr; gap:24px; align-items:start; }
+  .dash-grid .center-col{ width:100%; }
+  @media (max-width: 1180px){ .dash-grid{ grid-template-columns: 420px 1fr; } }
+  @media (max-width: 860px){ .dash-grid{ grid-template-columns: 1fr; } }
+
+  /* Patient dashboard: same column sizes as before, just left-aligned instead of
+     centered so extra width on wide screens shows up as space on the right instead
+     of being split evenly on both sides. */
+  #view-patient-dash .dash-main-wide{ margin-left: 0; margin-right: auto; }
+  .sidebar{ position: sticky; top: 24px; }
+  @media (max-width: 860px){ .sidebar{ position: static; } }
+
+  .panel{
+    background: var(--paper); border:1px solid var(--line); border-radius: var(--radius);
+    padding: 24px; box-shadow: var(--shadow); margin-bottom:20px;
+  }
+  .panel h3{ font-size:1.1rem; margin-bottom:4px; }
+  .panel .panel-sub{ color: var(--muted); font-size:0.85rem; margin-bottom:18px; }
+
+  .badge{
+    display:inline-flex; align-items:center; gap:6px; font-size:0.78rem; font-weight:600;
+    padding:5px 11px; border-radius:999px; letter-spacing:0.02em;
+  }
+  .badge.verified{ background: var(--teal-wash); color: var(--teal-dark); }
+  .badge.unverified{ background: var(--amber-wash); color: var(--amber); }
+
+  .checklist{ list-style:none; padding:0; margin:14px 0 0; font-size:0.84rem; color: var(--ink-soft); }
+  .checklist li{ padding:4px 0; display:flex; align-items:center; gap:8px; }
+  .checklist li.done{ color: var(--teal-dark); }
+  .checklist .dot{ width:6px; height:6px; border-radius:50%; background: var(--muted); flex-shrink:0; }
+  .checklist li.done .dot{ background: var(--teal); }
+
+  .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width: 560px){ .form-grid{ grid-template-columns:1fr; } }
+  .form-grid .span-2{ grid-column: 1 / -1; }
+
+  .save-row{ display:flex; align-items:center; gap:14px; margin-top:6px; }
+  .save-note{ font-size:0.84rem; color: var(--teal-dark); opacity:0; transition: opacity 0.3s ease; }
+  .save-note.show{ opacity:1; }
+
+  .lookup-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .lookup-row input{ flex:1 1 180px; min-width:0; }
+  .lookup-row .btn{ flex-shrink:0; }
+
+  .patient-result{ margin-top:20px; border-top:1px solid var(--line); padding-top:20px; }
+  .patient-result .name-row{ display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+  .patient-result h3{ font-size:1.25rem; }
+  .kv{ display:grid; grid-template-columns: 140px 1fr; gap:8px 14px; font-size:0.9rem; margin-bottom:14px; }
+  .kv dt{ color: var(--muted); }
+  .kv dd{ margin:0; color: var(--ink); }
+  .kv .block{ grid-column: 1 / -1; margin-top:2px; }
+  .empty-state{ color: var(--muted); font-size:0.9rem; padding: 18px 0; }
+  .not-found{ color: var(--red); font-size:0.9rem; padding: 10px 0; }
+
+  .privacy-note{
+    font-size:0.8rem; color: var(--muted); background: var(--bg); border-radius:8px; padding:12px 14px; line-height:1.5; margin-top:16px;
+  }
+
+  /* ---------- Google sign-up ---------- */
+  .divider{ display:flex; align-items:center; gap:12px; margin:18px 0; color: var(--muted); font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em; }
+  .divider::before, .divider::after{ content:""; flex:1; height:1px; background: var(--line); }
+  .btn-google{
+    background: var(--paper); color: var(--ink); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; gap:10px; width:100%;
+  }
+  .btn-google:hover{ border-color: var(--ink-soft); background: var(--bg); }
+  .google-panel{
+    border:1px solid var(--line); border-radius:8px; padding:18px; margin-top:16px; background: var(--bg);
+  }
+  .google-panel .demo-note{ font-size:0.76rem; color: var(--muted); margin-bottom:14px; line-height:1.5; }
+
+  /* ---------- Account dropdown ---------- */
+  .dropdown-wrap{ position:relative; }
+  .dropdown-trigger{
+    display:inline-flex; align-items:center; gap:7px; background: var(--paper); cursor:pointer;
+  }
+  .dropdown-trigger svg{ color: var(--muted); transition: transform 0.15s ease; }
+  .dropdown-trigger[aria-expanded="true"] svg{ transform: rotate(180deg); }
+  .dropdown-menu{
+    position:absolute; top: calc(100% + 8px); right:0; min-width:180px;
+    background: var(--paper); border:1px solid var(--line); border-radius:8px;
+    box-shadow: var(--shadow); overflow:hidden; z-index:30;
+  }
+  .dropdown-menu button{
+    display:block; width:100%; text-align:left; padding:11px 16px; background:none; border:none;
+    font-size:0.88rem; color: var(--ink);
+  }
+  .dropdown-menu button:hover{ background: var(--bg); }
+  .dropdown-menu button.danger:hover{ color: var(--red); }
+  .dropdown-menu button + button{ border-top:1px solid var(--line); }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay{
+    position:fixed; inset:0; background: rgba(23,36,46,0.45); display:flex;
+    align-items:flex-start; justify-content:center; padding: 60px 20px; z-index:50;
+  }
+  .modal-card{
+    position:relative; background: var(--paper); border-radius: var(--radius); box-shadow: var(--shadow);
+    max-width: 440px; width:100%; max-height: 80vh; overflow-y:auto; padding: 30px;
+  }
+  .modal-card-wide{ max-width: 640px; }
+  .modal-close{
+    position:absolute; top:14px; right:14px; background:none; border:none; font-size:1.5rem;
+    line-height:1; color: var(--muted); padding:4px;
+  }
+  .modal-close:hover{ color: var(--ink); }
+
+  /* ---------- Patient details / tabs / lists ---------- */
+  .panel-header-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:4px; }
+  .btn-sm{ padding:7px 14px; font-size:0.8rem; }
+  .subhead{
+    font-family:'IBM Plex Mono', monospace; font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase;
+    color: var(--muted); margin: 18px 0 10px;
+  }
+  .panel hr, .modal-card hr{ border:none; border-top:1px solid var(--line); margin:18px 0; }
+  .list-item{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:13px 4px; border-bottom:1px solid var(--line); cursor:pointer;
+  }
+  .list-item:last-child{ border-bottom:none; }
+  .list-item:hover{ background: var(--bg); }
+  .list-item .li-title{ font-weight:600; font-size:0.92rem; }
+  .list-item .li-sub{ font-size:0.8rem; color: var(--muted); margin-top:2px; }
+  .list-item .chevron{ color: var(--muted); flex-shrink:0; }
+
+  /* ---------- Health card ---------- */
+  .health-card-panel{ padding-bottom:24px; }
+  .health-card{
+    position:relative; overflow:hidden; border-radius:14px; padding:20px 22px 18px;
+    background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%); color:#fff;
+    aspect-ratio: 1.586 / 1; max-width:440px; display:flex; flex-direction:column; justify-content:space-between;
+  }
+  .health-card-watermark{ position:absolute; right:-10px; bottom:-6px; width:70%; height:auto; opacity:0.16; pointer-events:none; }
+  .health-card-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; position:relative; }
+  .health-card-brand{ font-family:'IBM Plex Mono', monospace; font-size:0.68rem; letter-spacing:0.12em; opacity:0.85; }
+  .health-card .badge{ background: rgba(255,255,255,0.2); color:#fff; }
+  .health-card-body{ display:flex; align-items:center; gap:14px; position:relative; }
+  .health-card-body-centered{
+    flex:1; align-items:center; justify-content:flex-start; gap:16px;
+  }
+  .avatar-btn{
+    width:76px; height:76px; border-radius:50%; flex-shrink:0; padding:0; overflow:hidden;
+    background: rgba(255,255,255,0.16); border:2px solid rgba(255,255,255,0.4);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .avatar-btn:hover{ border-color: rgba(255,255,255,0.75); }
+  .avatar-btn-lg{ width:104px; height:104px; }
+  .avatar-img{ width:100%; height:100%; object-fit:cover; }
+  .avatar-fallback{ font-family:'Spectral', serif; font-weight:600; font-size:1.5rem; color:#fff; }
+  .avatar-btn-lg .avatar-fallback{ font-size:2.1rem; }
+  .health-card-info{ min-width:0; }
+  .health-card-name{ font-family:'Spectral', serif; font-weight:600; font-size:1.2rem; line-height:1.25; overflow-wrap:anywhere; }
+  .health-card-phone{ font-size:0.85rem; opacity:0.88; margin-top:3px; }
+  .health-card-code-row{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:12px;
+    padding-top:16px; border-top:1px solid rgba(255,255,255,0.28); position:relative;
+  }
+  .health-card-code-label{ display:block; font-family:'IBM Plex Mono', monospace; font-size:0.66rem; letter-spacing:0.1em; text-transform:uppercase; opacity:0.78; margin-bottom:4px; }
+  .health-card-code{ font-size:1.35rem; font-weight:600; letter-spacing:0.05em; }
+  .health-card-code-row .btn-secondary{ background: rgba(255,255,255,0.16); color:#fff; border-color: rgba(255,255,255,0.4); flex-shrink:0; }
+  .health-card-code-row .btn-secondary:hover{ background: rgba(255,255,255,0.28); border-color: rgba(255,255,255,0.75); }
+  .health-card-panel .copy-note{ margin-top:10px; }
+  .health-card-panel .checklist{ margin-top:16px; }
+  .live-code-ring-wrap{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .live-code-ring{ display:block; flex-shrink:0; }
+  .live-code-ring .ring-track{ fill:none; stroke: rgba(255,255,255,0.28); stroke-width:3; }
+  .live-code-ring .ring-progress{
+    fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round;
+    transform: rotate(-90deg); transform-origin: 23px 23px; transition: stroke-dashoffset 1s linear;
+  }
+
+  /* ---------- Clinic chips ---------- */
+  .chip-list{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{
+    display:inline-flex; align-items:center; gap:8px; background: var(--teal-wash); color: var(--teal-dark);
+    border-radius:999px; padding:6px 8px 6px 12px; font-size:0.82rem; font-weight:600;
+  }
+  .chip button{ background:none; border:none; color: var(--teal-dark); opacity:0.7; font-size:1rem; line-height:1; padding:0 2px; }
+  .chip button:hover{ opacity:1; color: var(--red); }
+
+  /* ---------- Stats ---------- */
+  .stats-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-top:18px; }
+  @media (max-width: 420px){ .stats-grid{ grid-template-columns: 1fr; } }
+  .stat-tile{ background: var(--bg); border-radius:8px; padding:14px 16px; }
+  .stat-tile .stat-value{ font-family:'Spectral', serif; font-weight:600; font-size:1.5rem; color: var(--ink); }
+  .stat-tile .stat-label{ font-size:0.78rem; color: var(--muted); margin-top:4px; }
+
+  /* ---------- Chart legend ---------- */
+  .chart-legend{ display:flex; gap:16px; margin-top:8px; font-size:0.78rem; color: var(--muted); align-items:center; }
+  .chart-legend .legend-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+
+  /* ---------- Patient record list ---------- */
+  .record-list{ display:flex; flex-direction:column; gap:18px; }
+  .record-row{
+    position:relative; display:flex; flex-direction:column; align-items:stretch; text-align:left; padding:0; width:100%;
+    background: var(--paper); border:1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow:hidden; transition: border-color 0.2s ease;
+  }
+  .record-row:hover, .record-row:focus-visible{ border-color: var(--teal); }
+  .record-row-art{
+    position:relative; flex:0 0 190px; width:100%; display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+  @media (max-width: 480px){ .record-row-art{ flex-basis:140px; } }
+  .record-row-art::after{
+    content:""; position:absolute; inset:0;
+    background: linear-gradient(to bottom, rgba(255,255,255,0) 45%, var(--paper) 97%);
+  }
+  .record-row-art svg{ width:66%; height:66%; position:relative; z-index:1; }
+  .record-row-art img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .record-row-art-teal{ background: var(--teal-wash); }
+  .record-row-art-amber{ background: var(--amber-wash); }
+  .record-row-art-red{ background: var(--red-wash); }
+  .record-row-body{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding: 16px 20px; min-width:0;
+  }
+  .record-row-title{ font-family:'Spectral', serif; font-weight:600; font-size:1.4rem; color: var(--ink); }
+  .record-row-sub{ font-size:0.82rem; color: var(--muted); margin-top:3px; }

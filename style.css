@@ -311,6 +311,30 @@
   }
   .modal-close:hover{ color: var(--ink); }
 
+  /* ---------- "How it works" stepper modal ---------- */
+  /* Most modals in this app deliberately sit near the top (.modal-overlay's own
+     align-items:flex-start) so long-content ones like Account settings don't get
+     awkwardly cut off if centered — scope true centering to just this modal rather
+     than changing that globally. */
+  #pat-howitworks-modal, #doc-howitworks-modal{ align-items:center; }
+  .modal-card-stepper{ min-height:420px; display:flex; flex-direction:column; }
+  .modal-card-stepper .eyebrow{ display:block; text-align:center; }
+  .stepper-viewport{ flex:1; overflow:hidden; display:flex; align-items:center; margin:18px 0; }
+  .stepper-track{ display:flex; width:100%; transition: transform 0.35s ease; }
+  .stepper-slide{ flex:0 0 100%; min-width:0; text-align:center; padding:0 6px; }
+  .stepper-slide h3{ font-family:'Spectral', serif; font-weight:600; font-size:1.3rem; margin-bottom:12px; }
+  .stepper-slide p{ color: var(--ink-soft); font-size:0.95rem; line-height:1.6; }
+  .stepper-nav{ display:flex; align-items:center; justify-content:space-between; margin-top:auto; }
+  .stepper-arrow{
+    display:flex; align-items:center; justify-content:center; width:44px; height:44px;
+    border-radius:50%; border:1px solid var(--line); background: var(--paper); color: var(--ink-soft); cursor:pointer;
+  }
+  .stepper-arrow:hover{ border-color: var(--ink); color: var(--ink); }
+  .stepper-arrow:disabled{ opacity:0.35; cursor:not-allowed; }
+  .stepper-arrow:disabled:hover{ border-color: var(--line); color: var(--ink-soft); }
+  .stepper-arrow-primary{ background: var(--teal); border-color: var(--teal); color:#fff; }
+  .stepper-arrow-primary:hover{ background: var(--teal-dark); border-color: var(--teal-dark); color:#fff; }
+
   /* ---------- Patient details / tabs / lists ---------- */
   .panel-header-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:4px; }
   .btn-sm{ padding:7px 14px; font-size:0.8rem; }

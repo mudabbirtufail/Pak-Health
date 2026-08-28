@@ -36,7 +36,7 @@
         <svg class="choice-icon" width="46" height="46" viewBox="0 0 46 46"><circle cx="23" cy="15" r="8" fill="none" stroke="#1F6F63" stroke-width="2"/><path d="M8,40 C8,29 14,25 23,25 C32,25 38,29 38,40" fill="none" stroke="#1F6F63" stroke-width="2" stroke-linecap="round"/></svg>
         <span class="num">01</span>
         <h2>I am an individual</h2>
-        <p>Sign up in seconds, get an 8-digit code, and fill in your health history whenever you're ready.</p>
+        <p>Sign up in seconds, get your own private code, and fill in your health history whenever you're ready.</p>
         <span class="go">Continue as an individual
           <svg width="16" height="10" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
         </span>
@@ -187,6 +187,19 @@
     <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
     <div class="topbar-right">
       <span class="role-chip">Individual account</span>
+      <div class="dropdown-wrap" id="pat-account-dropdown-wrap">
+        <button class="btn btn-secondary btn-sm dropdown-trigger" id="pat-account-dropdown-trigger" type="button" aria-haspopup="true" aria-expanded="false">
+          Account
+          <svg width="10" height="6" viewBox="0 0 10 6"><path d="M1,1 L5,5 L9,1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="dropdown-menu hidden" id="pat-account-dropdown-menu">
+          <button type="button" id="pat-howitworks-btn">How it works</button>
+          <button type="button" id="pat-myprofile-btn">My profile</button>
+          <button type="button" id="pat-account-settings-btn">Account settings</button>
+          <button type="button" id="pat-access-manage-btn">Manage access</button>
+          <button type="button" id="pat-stats-btn">My statistics</button>
+        </div>
+      </div>
       <button class="link-btn" id="pat-signout">Sign out</button>
     </div>
   </header>
@@ -223,10 +236,7 @@
 
         <div class="panel">
           <div class="copy-note" id="pat-dash-copy-note"></div>
-          <button class="btn btn-secondary btn-block" id="pat-account-settings-btn" style="margin-top:16px;">Account settings</button>
-          <button class="btn btn-secondary btn-block" id="pat-access-manage-btn" style="margin-top:10px;">Manage access</button>
-          <button class="btn btn-secondary btn-block" id="pat-stats-btn" style="margin-top:10px;">My statistics</button>
-          <div class="privacy-note">Your live code refreshes on its own every 3 minutes and works once. Hand it over in person — never post or text it. A doctor you've trusted doesn't need it at all.</div>
+          <div class="privacy-note">Your live code refreshes on its own every 2 minutes and works once. Hand it over in person — never post or text it. A doctor you've trusted doesn't need it at all.</div>
         </div>
        </div>
       </div>
@@ -312,35 +322,39 @@
     </div>
   </div>
 
-  <div class="modal-overlay hidden" id="pat-profile-modal">
-    <div class="modal-card">
-      <button class="modal-close" id="pat-profile-close" aria-label="Close">&times;</button>
-      <span class="eyebrow">Access code</span>
-      <div class="code mono" id="pat-modal-code" style="font-size:1.3rem; margin:10px 0 16px;">0000 0000</div>
-
-      <h3>Account settings</h3>
-      <p class="panel-sub">Add your email and phone so doctors can reach you if needed.</p>
-      <div class="field"><label for="pat-name">Full name</label><input type="text" id="pat-name" placeholder="Ayesha Khan"></div>
-      <div class="field"><label for="pat-email">Email</label><input type="email" id="pat-email" placeholder="you@example.com"></div>
-      <div class="field"><label for="pat-phone">Phone</label><input type="tel" id="pat-phone" placeholder="+92 300 1234567"></div>
-
-      <div class="save-row">
-        <button class="btn btn-primary btn-block" id="pat-save-btn">Save changes</button>
+  <div class="modal-overlay hidden" id="pat-howitworks-modal">
+    <div class="modal-card modal-card-stepper">
+      <button class="modal-close" id="pat-howitworks-close" aria-label="Close">&times;</button>
+      <span class="eyebrow" id="pat-howitworks-counter">Step 1 of 4</span>
+      <div class="stepper-viewport">
+        <div class="stepper-track" id="pat-howitworks-track">
+          <div class="stepper-slide">
+            <h3>Sign up</h3>
+            <p>Get a permanent 8-digit account code — private, and yours alone.</p>
+          </div>
+          <div class="stepper-slide">
+            <h3>Show your live code</h3>
+            <p>Your dashboard always has a fresh 6-digit code, good for one hour and one doctor.</p>
+          </div>
+          <div class="stepper-slide">
+            <h3>Doctor writes the visit</h3>
+            <p>They redeem your code, add their notes, and access ends when the hour's up.</p>
+          </div>
+          <div class="stepper-slide">
+            <h3>Trust doctors you see often</h3>
+            <p>Grant standing access any time — and revoke it just as easily.</p>
+          </div>
+        </div>
       </div>
-      <span class="save-note" id="pat-save-note">Saved</span>
+      <div class="stepper-nav">
+        <button class="stepper-arrow" id="pat-howitworks-back" type="button" aria-label="Back">
+          <svg width="16" height="16" viewBox="0 0 16 16"><path d="M10,2 L4,8 L10,14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="stepper-arrow stepper-arrow-primary" id="pat-howitworks-next" type="button" aria-label="Next"></button>
+      </div>
     </div>
   </div>
 
-  <div class="modal-overlay hidden" id="pat-stats-modal">
-    <div class="modal-card">
-      <button class="modal-close" id="pat-stats-close" aria-label="Close">&times;</button>
-      <span class="eyebrow">Your activity</span>
-      <h3 style="margin-top:6px;">Statistics</h3>
-      <p class="panel-sub" style="margin-top:8px;">Based on the visits recorded in your record.</p>
-      <div class="stats-grid" id="pat-stats-grid"></div>
-      <div class="empty-state" id="pat-stats-empty">No visits recorded yet.</div>
-    </div>
-  </div>
 
   <div class="modal-overlay hidden" id="pat-access-modal">
     <div class="modal-card modal-card-wide">
@@ -515,12 +529,85 @@
     </div>
   </div>
 
+  <div id="view-pat-profile" class="view hidden">
+    <header class="topbar">
+      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="topbar-right">
+        <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
+      </div>
+    </header>
+    <main class="dash-main">
+      <div class="panel">
+        <span class="eyebrow">Profile</span>
+        <h3 style="margin-top:6px;">My profile</h3>
+        <p class="panel-sub" style="margin-top:8px;">Your name, as doctors will see it on your visits.</p>
+        <div class="field"><label for="pat-name">Full name</label><input type="text" id="pat-name" placeholder="Ayesha Khan"></div>
+        <div class="save-row">
+          <button class="btn btn-primary btn-block" id="pat-profile-save-btn">Save changes</button>
+        </div>
+        <span class="save-note" id="pat-profile-save-note">Saved</span>
+      </div>
+    </main>
+  </div>
+
+  <div id="view-pat-account-settings" class="view hidden">
+    <header class="topbar">
+      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="topbar-right">
+        <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
+      </div>
+    </header>
+    <main class="dash-main">
+      <div class="panel">
+        <span class="eyebrow">Settings</span>
+        <h3 style="margin-top:6px;">Account settings</h3>
+        <p class="panel-sub" style="margin-top:8px;">Add your email and phone so doctors can reach you if needed.</p>
+        <div class="field"><label for="pat-email">Email</label><input type="email" id="pat-email" placeholder="you@example.com"></div>
+        <div class="field"><label for="pat-phone">Phone</label><input type="tel" id="pat-phone" placeholder="+92 300 1234567"></div>
+        <div class="save-row">
+          <button class="btn btn-primary btn-block" id="pat-save-btn">Save changes</button>
+        </div>
+        <span class="save-note" id="pat-save-note">Saved</span>
+      </div>
+    </main>
+  </div>
+
+  <div id="view-pat-stats" class="view hidden">
+    <header class="topbar">
+      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="topbar-right">
+        <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
+      </div>
+    </header>
+    <main class="dash-main">
+      <div class="panel">
+        <span class="eyebrow">Your activity</span>
+        <h3 style="margin-top:6px;">Statistics</h3>
+        <p class="panel-sub" style="margin-top:8px;">Based on the visits recorded in your record.</p>
+        <div class="stats-grid" id="pat-stats-grid"></div>
+        <div class="empty-state" id="pat-stats-empty">No visits recorded yet.</div>
+      </div>
+    </main>
+  </div>
+
 <!-- ============ DOCTOR DASHBOARD ============ -->
 <div id="view-doctor-dash" class="view hidden">
   <header class="topbar">
     <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
     <div class="topbar-right">
       <span class="role-chip">Doctor account</span>
+      <div class="dropdown-wrap" id="doc-account-dropdown-wrap">
+        <button class="btn btn-secondary btn-sm dropdown-trigger" id="doc-account-dropdown-trigger" type="button" aria-haspopup="true" aria-expanded="false">
+          Account
+          <svg width="10" height="6" viewBox="0 0 10 6"><path d="M1,1 L5,5 L9,1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="dropdown-menu hidden" id="doc-account-dropdown-menu">
+          <button type="button" id="doc-howitworks-btn">How it works</button>
+          <button type="button" id="doc-myprofile-btn">My profile</button>
+          <button type="button" id="doc-account-settings-btn">Account settings</button>
+          <button type="button" id="doc-stats-btn">My statistics</button>
+        </div>
+      </div>
       <button class="link-btn" id="doc-signout">Sign out</button>
     </div>
   </header>
@@ -561,8 +648,6 @@
             <select id="doc-current-clinic"><option value="">No clinic selected</option></select>
             <div class="hint" id="doc-clinic-hint">Add clinics in account settings to select one here.</div>
           </div>
-          <button class="btn btn-secondary btn-block" id="doc-account-settings-btn" style="margin-top:12px;">Account settings</button>
-          <button class="btn btn-secondary btn-block" id="doc-stats-btn" style="margin-top:10px;">My statistics</button>
         </div>
       </div>
 
@@ -575,7 +660,7 @@
           </div>
 
           <div id="doc-find-code-pane">
-            <p class="panel-sub" id="lookup-subtitle">Enter the one-time code your patient just showed you — it's only valid for 3 minutes.</p>
+            <p class="panel-sub" id="lookup-subtitle">Enter the one-time code your patient just showed you — it's only valid for 2 minutes.</p>
             <div class="lookup-row" id="lookup-row">
               <input type="text" id="lookup-code" placeholder="6-digit live code">
               <button class="btn btn-primary" id="lookup-btn">View record</button>
@@ -596,23 +681,26 @@
             <div class="copy-note" style="margin:-8px 0 4px; color:var(--muted);" id="res-access-note">—</div>
             <button class="link-btn" id="lookup-change-btn" style="margin-bottom:16px;">Search a different patient</button>
 
-            <div class="tabs">
-              <button class="tab active" id="doc-tab-visits">Visits</button>
-              <button class="tab" id="doc-tab-tests">Tests</button>
-            </div>
+            <div class="record-list">
+              <button class="record-row" type="button" data-goto="view-doctor-record-visits">
+                <div class="record-row-art record-row-art-teal">
+                  <img src="images/visits.jpg" alt="Visits">
+                </div>
+                <div class="record-row-body">
+                  <div class="record-row-title">Visits</div>
+                  <svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+                </div>
+              </button>
 
-            <div id="doc-visits-pane">
-              <button class="btn btn-primary btn-block" id="add-visit-btn">Add visit note</button>
-              <span class="save-note" id="add-visit-note" style="display:block; text-align:center; margin:8px 0 6px;">Visit added</span>
-              <div id="doc-visits-list"></div>
-              <div class="empty-state" id="doc-visits-empty">No visits recorded yet.</div>
-            </div>
-
-            <div id="doc-tests-pane" class="hidden">
-              <button class="btn btn-primary btn-block" id="add-test-btn">Add test / report</button>
-              <span class="save-note" id="add-test-note" style="display:block; text-align:center; margin:8px 0 6px;">Test added</span>
-              <div id="doc-tests-list"></div>
-              <div class="empty-state" id="doc-tests-empty">No tests on file yet.</div>
+              <button class="record-row" type="button" data-goto="view-doctor-record-tests">
+                <div class="record-row-art record-row-art-amber">
+                  <img src="images/lab-results.jpg" alt="Tests">
+                </div>
+                <div class="record-row-body">
+                  <div class="record-row-title">Tests</div>
+                  <svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+                </div>
+              </button>
             </div>
           </div>
 
@@ -621,42 +709,6 @@
       </div>
     </div>
   </main>
-
-  <div class="modal-overlay hidden" id="doc-profile-modal">
-    <div class="modal-card">
-      <button class="modal-close" id="doc-profile-close" aria-label="Close">&times;</button>
-      <span class="eyebrow">Doctor ID</span>
-      <div class="code mono" id="doc-modal-id" style="font-size:1.3rem; margin:10px 0 16px;">DR-000000</div>
-
-      <h3>Account settings</h3>
-      <p class="panel-sub">Complete email, phone and license to get verified.</p>
-      <h4 class="subhead">Contact</h4>
-      <div class="field"><label for="doc-name">Full name</label><input type="text" id="doc-name" placeholder="Dr. Bilal Chaudhry"></div>
-      <div class="field"><label for="doc-email">Email</label><input type="email" id="doc-email" placeholder="you@clinic.com"></div>
-      <div class="field"><label for="doc-phone">Phone</label><input type="tel" id="doc-phone" placeholder="+92 300 1234567"></div>
-      <div class="field"><label for="doc-license">Medical license number</label><input type="text" id="doc-license" placeholder="License / registration no."></div>
-
-      <hr>
-      <h4 class="subhead">Professional profile</h4>
-      <div class="field"><label for="doc-specialty">Specialty</label><input type="text" id="doc-specialty" placeholder="e.g. Cardiology, Family Medicine"></div>
-      <div class="field"><label for="doc-education">Education & qualifications</label><textarea id="doc-education" placeholder="Degrees, residency, board certifications..."></textarea></div>
-      <div class="field"><label for="doc-about">About</label><textarea id="doc-about" placeholder="A short bio patients can see when you're verified."></textarea></div>
-
-      <hr>
-      <h4 class="subhead">Clinics</h4>
-      <p class="panel-sub" style="margin-bottom:12px;">Add the clinics or hospitals you work from. Pick which one you're currently at from the dashboard — it's added automatically to visit notes you write.</p>
-      <div class="chip-list" id="doc-clinics-list" style="margin-bottom:12px;"></div>
-      <div class="lookup-row">
-        <input type="text" id="doc-clinic-input" placeholder="e.g. Shifa International Hospital">
-        <button class="btn btn-secondary" id="doc-clinic-add-btn">Add</button>
-      </div>
-
-      <div class="save-row">
-        <button class="btn btn-primary btn-block" id="doc-save-btn">Save changes</button>
-      </div>
-      <span class="save-note" id="doc-save-note">Saved</span>
-    </div>
-  </div>
 
   <div class="modal-overlay hidden" id="doc-test-modal">
     <div class="modal-card">
@@ -724,9 +776,109 @@
     </div>
   </div>
 
-  <div class="modal-overlay hidden" id="doc-stats-modal">
-    <div class="modal-card modal-card-wide">
-      <button class="modal-close" id="doc-stats-close" aria-label="Close">&times;</button>
+  <div class="modal-overlay hidden" id="doc-howitworks-modal">
+    <div class="modal-card modal-card-stepper">
+      <button class="modal-close" id="doc-howitworks-close" aria-label="Close">&times;</button>
+      <span class="eyebrow" id="doc-howitworks-counter">Step 1 of 4</span>
+      <div class="stepper-viewport">
+        <div class="stepper-track" id="doc-howitworks-track">
+          <div class="stepper-slide">
+            <h3>Create your account</h3>
+            <p>Sign up with your medical license number so patients can find and trust you.</p>
+          </div>
+          <div class="stepper-slide">
+            <h3>Redeem a patient's live code</h3>
+            <p>Enter the 6-digit code they show you — good for one hour, and only for you.</p>
+          </div>
+          <div class="stepper-slide">
+            <h3>Add visit notes</h3>
+            <p>Write up the visit and it's saved straight to the patient's record.</p>
+          </div>
+          <div class="stepper-slide">
+            <h3>Or get trusted</h3>
+            <p>A patient can grant you standing access any time, so you don't need a fresh code for regular visits.</p>
+          </div>
+        </div>
+      </div>
+      <div class="stepper-nav">
+        <button class="stepper-arrow" id="doc-howitworks-back" type="button" aria-label="Back">
+          <svg width="16" height="16" viewBox="0 0 16 16"><path d="M10,2 L4,8 L10,14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="stepper-arrow stepper-arrow-primary" id="doc-howitworks-next" type="button" aria-label="Next"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="view-doc-profile" class="view hidden">
+  <header class="topbar">
+    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="topbar-right">
+      <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
+    </div>
+  </header>
+  <main class="dash-main">
+    <div class="panel">
+      <span class="eyebrow">Profile</span>
+      <h3 style="margin-top:6px;">My profile</h3>
+      <p class="panel-sub" style="margin-top:8px;">Your name and professional background — the "About" text is visible to patients once you're verified.</p>
+      <div class="field"><label for="doc-name">Full name</label><input type="text" id="doc-name" placeholder="Dr. Bilal Chaudhry"></div>
+      <div class="field"><label for="doc-specialty">Specialty</label><input type="text" id="doc-specialty" placeholder="e.g. Cardiology, Family Medicine"></div>
+      <div class="field"><label for="doc-education">Education & qualifications</label><textarea id="doc-education" placeholder="Degrees, residency, board certifications..."></textarea></div>
+      <div class="field"><label for="doc-about">About</label><textarea id="doc-about" placeholder="A short bio patients can see when you're verified."></textarea></div>
+      <div class="save-row">
+        <button class="btn btn-primary btn-block" id="doc-profile-save-btn">Save changes</button>
+      </div>
+      <span class="save-note" id="doc-profile-save-note">Saved</span>
+    </div>
+  </main>
+</div>
+
+<div id="view-doc-account-settings" class="view hidden">
+  <header class="topbar">
+    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="topbar-right">
+      <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
+    </div>
+  </header>
+  <main class="dash-main">
+    <div class="panel">
+      <span class="eyebrow">Doctor ID</span>
+      <div class="code mono" id="doc-modal-id" style="font-size:1.3rem; margin:10px 0 16px;">DR-000000</div>
+
+      <h3>Account settings</h3>
+      <p class="panel-sub">Complete email, phone and license to get verified.</p>
+      <h4 class="subhead">Contact</h4>
+      <div class="field"><label for="doc-email">Email</label><input type="email" id="doc-email" placeholder="you@clinic.com"></div>
+      <div class="field"><label for="doc-phone">Phone</label><input type="tel" id="doc-phone" placeholder="+92 300 1234567"></div>
+      <div class="field"><label for="doc-license">Medical license number</label><input type="text" id="doc-license" placeholder="License / registration no."></div>
+
+      <hr>
+      <h4 class="subhead">Clinics</h4>
+      <p class="panel-sub" style="margin-bottom:12px;">Add the clinics or hospitals you work from. Pick which one you're currently at from the dashboard — it's added automatically to visit notes you write.</p>
+      <div class="chip-list" id="doc-clinics-list" style="margin-bottom:12px;"></div>
+      <div class="lookup-row">
+        <input type="text" id="doc-clinic-input" placeholder="e.g. Shifa International Hospital">
+        <button class="btn btn-secondary" id="doc-clinic-add-btn">Add</button>
+      </div>
+
+      <div class="save-row">
+        <button class="btn btn-primary btn-block" id="doc-save-btn">Save changes</button>
+      </div>
+      <span class="save-note" id="doc-save-note">Saved</span>
+    </div>
+  </main>
+</div>
+
+<div id="view-doc-stats" class="view hidden">
+  <header class="topbar">
+    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="topbar-right">
+      <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
+    </div>
+  </header>
+  <main class="dash-main">
+    <div class="panel">
       <span class="eyebrow">Your activity</span>
       <h3 style="margin-top:6px;">Statistics</h3>
       <p class="panel-sub" style="margin-top:8px;">Based on visit notes you've added through Pak Health.</p>
@@ -737,7 +889,47 @@
         <div id="doc-stats-chart-wrap"></div>
       </div>
     </div>
-  </div>
+  </main>
+</div>
+
+<div id="view-doctor-record-visits" class="view hidden">
+  <header class="topbar">
+    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="topbar-right">
+      <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
+    </div>
+  </header>
+  <main class="dash-main">
+    <div class="panel">
+      <span class="eyebrow">Records</span>
+      <h3 style="margin-top:6px;" id="doc-record-visits-heading">Visits</h3>
+      <p class="panel-sub" style="margin-top:8px;">Every visit you've logged for this patient.</p>
+      <button class="btn btn-primary btn-block" id="add-visit-btn">Add visit note</button>
+      <span class="save-note" id="add-visit-note" style="display:block; text-align:center; margin:8px 0 6px;">Visit added</span>
+      <div id="doc-visits-list"></div>
+      <div class="empty-state" id="doc-visits-empty">No visits recorded yet.</div>
+    </div>
+  </main>
+</div>
+
+<div id="view-doctor-record-tests" class="view hidden">
+  <header class="topbar">
+    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="topbar-right">
+      <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
+    </div>
+  </header>
+  <main class="dash-main">
+    <div class="panel">
+      <span class="eyebrow">Records</span>
+      <h3 style="margin-top:6px;" id="doc-record-tests-heading">Tests</h3>
+      <p class="panel-sub" style="margin-top:8px;">Every test or report you've logged for this patient.</p>
+      <button class="btn btn-primary btn-block" id="add-test-btn">Add test / report</button>
+      <span class="save-note" id="add-test-note" style="display:block; text-align:center; margin:8px 0 6px;">Test added</span>
+      <div id="doc-tests-list"></div>
+      <div class="empty-state" id="doc-tests-empty">No tests on file yet.</div>
+    </div>
+  </main>
 </div>
 
 <script src="app.js"></script>

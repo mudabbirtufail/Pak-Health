@@ -3,6 +3,41 @@
 
   // ---------- helpers ----------
   function $(id){ return document.getElementById(id); }
+
+  // A "How it works" modal that slides between step slides one at a time via
+  // Back/Next arrows, reused for both the patient and doctor account menus (same
+  // mechanism, different step markup and DOM ids since each role's modal lives
+  // inside its own view). The slides themselves are static HTML side-by-side inside
+  // `ids.track`; stepping just translates the track — content isn't injected by JS.
+  var STEPPER_NEXT_ICON = '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M6,2 L12,8 L6,14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var STEPPER_DONE_ICON = '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M3,8 L7,12 L13,4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function makeStepperModal(ids){
+    var idx = 0;
+    var total = 0;
+    function render(){
+      $(ids.track).style.transform = 'translateX(-' + (idx * 100) + '%)';
+      $(ids.counter).textContent = 'Step ' + (idx + 1) + ' of ' + total;
+      $(ids.back).disabled = idx === 0;
+      var last = idx === total - 1;
+      $(ids.next).innerHTML = last ? STEPPER_DONE_ICON : STEPPER_NEXT_ICON;
+      $(ids.next).setAttribute('aria-label', last ? 'Done' : 'Next');
+    }
+    function open(){
+      total = $(ids.track).children.length;
+      idx = 0;
+      render();
+      $(ids.modal).classList.remove('hidden');
+    }
+    function close(){ $(ids.modal).classList.add('hidden'); }
+    $(ids.next).addEventListener('click', function(){
+      if (idx === total - 1){ close(); return; }
+      idx++; render();
+    });
+    $(ids.back).addEventListener('click', function(){ if (idx > 0){ idx--; render(); } });
+    $(ids.close).addEventListener('click', close);
+    $(ids.modal).addEventListener('click', function(e){ if (e.target === $(ids.modal)) close(); });
+    return { open: open, close: close };
+  }
   // Every "screen" here is just a div toggled hidden/visible — there's no real
   // browser navigation, so without this the back/forward buttons would leave the
   // app entirely instead of moving between views. showView() mirrors each switch
@@ -22,8 +57,8 @@
       history.pushState({ view: id }, '', '#' + id);
     }
   }
-  var PATIENT_ONLY_VIEWS = ['view-patient-dash','view-record-visits','view-record-tests','view-record-prescriptions','view-patient-eyes'];
-  var DOCTOR_ONLY_VIEWS = ['view-doctor-dash'];
+  var PATIENT_ONLY_VIEWS = ['view-patient-dash','view-record-visits','view-record-tests','view-record-prescriptions','view-patient-eyes','view-pat-profile','view-pat-account-settings','view-pat-stats'];
+  var DOCTOR_ONLY_VIEWS = ['view-doctor-dash', 'view-doctor-record-visits', 'view-doctor-record-tests', 'view-doc-profile', 'view-doc-account-settings', 'view-doc-stats'];
   window.addEventListener('popstate', function(e){
     var requested = (e.state && e.state.view) || 'view-landing';
     var id = requested;
@@ -40,8 +75,6 @@
     for (var i=0;i<n;i++) s += Math.floor(Math.random()*10);
     return s;
   }
-  function formatCode(code){ return code.slice(0,4) + ' ' + code.slice(4); }
-
   // Real persistence for a live deploy: a Supabase project with a single `kv_store`
   // table (key text primary key, value text) mirrors this file's get/set-by-key
   // interface almost exactly, so the rest of the app didn't need to change.
@@ -127,7 +160,7 @@
 
   // ---------- Access grants (see ACCESS-MODEL.md) ----------
   // A doctor never gets standing access just by knowing a patient's permanent account
-  // code. Access is either a single-use, 3-minute code redeemed in person (good for one
+  // code. Access is either a single-use, 2-minute code redeemed in person (good for one
   // hour from redemption) or a standing "Trusted" grant the patient creates and can
   // revoke any time. Both produce the same kind of row here, checked the same way:
   // valid = exists a grant for (patient, doctor) with revoked_at null and
@@ -147,7 +180,7 @@
     var row = {
       id: uid(), patient_id: patientId, code: randomDigits(6),
       created_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 3*60*1000).toISOString(),
+      expires_at: new Date(Date.now() + 2*60*1000).toISOString(),
       redeemed_at: null, redeemed_by_doctor_id: null
     };
     if (supabaseClient){
@@ -652,12 +685,12 @@
     renderAppointmentsList(data.appointments);
     closeVisitModal();
     closeTestModal();
-    closePatProfileModal();
-    closePatStatsModal();
     closeAddEyeModal();
     closeEyeModal();
     closePatAccessModal();
     closeBookApptModal();
+    closePatAcctDropdown();
+    patHowItWorks.close();
     await regenerateLiveCode();
     showView('view-patient-dash');
     syncStickyColumnHeights();
@@ -665,10 +698,10 @@
 
   // ---- Live access code (patient side) ----
   // Generated automatically the moment the patient reaches their dashboard — no
-  // button. The ring around it drains over the code's 3-minute life; when it runs
+  // button. The ring around it drains over the code's 2-minute life; when it runs
   // out this tab quietly mints a fresh one, so there's always a live code on screen
   // to hand to a doctor without the patient having to do anything.
-  var LIVE_CODE_SECONDS = 180;
+  var LIVE_CODE_SECONDS = 120;
   var RING_R = 21;
   var RING_C = 2 * Math.PI * RING_R;
   var liveCodeTimer = null;
@@ -718,6 +751,7 @@
     renderAdhocList();
     $('pat-trust-input').value = '';
     clearError($('pat-trust-error'));
+    closePatAcctDropdown();
     $('pat-access-modal').classList.remove('hidden');
   }
   function closePatAccessModal(){ $('pat-access-modal').classList.add('hidden'); }
@@ -799,33 +833,44 @@
     }
   });
 
-  function openPatProfileModal(){
-    $('pat-modal-code').textContent = formatCode(session.id);
-    $('pat-name').value = (currentPatientData && currentPatientData.name) || '';
+  function openPatAccountSettingsPage(){
     $('pat-email').value = (currentPatientData && currentPatientData.email) || '';
     $('pat-phone').value = (currentPatientData && currentPatientData.phone) || '';
-    $('pat-profile-modal').classList.remove('hidden');
+    closePatAcctDropdown();
+    showView('view-pat-account-settings');
   }
-  function closePatProfileModal(){
-    $('pat-profile-modal').classList.add('hidden');
+  $('pat-account-settings-btn').addEventListener('click', openPatAccountSettingsPage);
+
+  function openPatProfilePage(){
+    $('pat-name').value = (currentPatientData && currentPatientData.name) || '';
+    closePatAcctDropdown();
+    showView('view-pat-profile');
   }
-  $('pat-account-settings-btn').addEventListener('click', openPatProfileModal);
-  $('pat-profile-close').addEventListener('click', closePatProfileModal);
-  $('pat-profile-modal').addEventListener('click', function(e){
-    if (e.target === $('pat-profile-modal')) closePatProfileModal();
+  $('pat-myprofile-btn').addEventListener('click', openPatProfilePage);
+
+  $('pat-profile-save-btn').addEventListener('click', async function(){
+    var data = Object.assign({}, currentPatientData, {
+      code: session.id,
+      name: $('pat-name').value.trim()
+    });
+    await savePatient(session.id, data);
+    currentPatientData = data;
+    renderHealthCard(data);
+    var note = $('pat-profile-save-note');
+    note.classList.add('show');
+    setTimeout(function(){ note.classList.remove('show'); }, 1800);
   });
+
   $('pat-save-btn').addEventListener('click', async function(){
     var email = $('pat-email').value.trim();
     var data = Object.assign({}, currentPatientData, {
       code: session.id,
-      name: $('pat-name').value.trim(),
       email: email,
       phone: $('pat-phone').value.trim()
     });
     await savePatient(session.id, data);
     await linkPatientEmail(email, session.id);
     currentPatientData = data;
-    renderHealthCard(data);
     var note = $('pat-save-note');
     note.classList.add('show');
     setTimeout(function(){ note.classList.remove('show'); }, 1800);
@@ -844,7 +889,7 @@
       doctorsSeen: Object.keys(doctors).length
     };
   }
-  function openPatStatsModal(){
+  function openPatStatsPage(){
     var stats = computePatientStats(currentPatientData);
     if (!stats.hasData){
       $('pat-stats-grid').innerHTML = '';
@@ -859,12 +904,35 @@
         return '<div class="stat-tile"><div class="stat-value">'+t.value+'</div><div class="stat-label">'+t.label+'</div></div>';
       }).join('');
     }
-    $('pat-stats-modal').classList.remove('hidden');
+    closePatAcctDropdown();
+    showView('view-pat-stats');
   }
-  function closePatStatsModal(){ $('pat-stats-modal').classList.add('hidden'); }
-  $('pat-stats-btn').addEventListener('click', openPatStatsModal);
-  $('pat-stats-close').addEventListener('click', closePatStatsModal);
-  $('pat-stats-modal').addEventListener('click', function(e){ if (e.target === $('pat-stats-modal')) closePatStatsModal(); });
+  $('pat-stats-btn').addEventListener('click', openPatStatsPage);
+
+  // ---- Account dropdown (topbar) — How it works / Account settings / My statistics ----
+  function closePatAcctDropdown(){
+    $('pat-account-dropdown-menu').classList.add('hidden');
+    $('pat-account-dropdown-trigger').setAttribute('aria-expanded', 'false');
+  }
+  $('pat-account-dropdown-trigger').addEventListener('click', function(e){
+    e.stopPropagation();
+    var menu = $('pat-account-dropdown-menu');
+    var opening = menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', !opening);
+    this.setAttribute('aria-expanded', String(opening));
+  });
+  document.addEventListener('click', function(e){
+    if (!$('pat-account-dropdown-menu').classList.contains('hidden') && !e.target.closest('#pat-account-dropdown-wrap')){
+      closePatAcctDropdown();
+    }
+  });
+  $('pat-howitworks-btn').addEventListener('click', closePatAcctDropdown);
+
+  var patHowItWorks = makeStepperModal({
+    modal:'pat-howitworks-modal', track:'pat-howitworks-track',
+    counter:'pat-howitworks-counter', back:'pat-howitworks-back', next:'pat-howitworks-next', close:'pat-howitworks-close'
+  });
+  $('pat-howitworks-btn').addEventListener('click', patHowItWorks.open);
 
   $('pat-avatar-btn').addEventListener('click', function(){
     $('pat-avatar-input').click();
@@ -1315,12 +1383,12 @@
     currentLookupGrant = null;
     switchFindTab('code');
     renderRoster();
-    closeDocProfileModal();
     closeAddVisitModal();
     closeDocVisitModal();
     closeAddTestModal();
     closeDocTestModal();
-    closeDocStatsModal();
+    closeDocAcctDropdown();
+    docHowItWorks.close();
     showView('view-doctor-dash');
   }
 
@@ -1434,20 +1502,30 @@
   $('doc-save-btn').addEventListener('click', async function(){
     var data = Object.assign({}, currentDoctorData, {
       doctorId: session.id,
-      name: $('doc-name').value.trim(),
       email: $('doc-email').value.trim(),
       phone: $('doc-phone').value.trim(),
-      license: $('doc-license').value.trim(),
-      specialty: $('doc-specialty').value.trim(),
-      education: $('doc-education').value.trim(),
-      about: $('doc-about').value.trim()
+      license: $('doc-license').value.trim()
     });
     data.verified = isDoctorVerified(data);
     await saveDoctor(session.id, data);
     currentDoctorData = data;
-    renderDoctorCard(data);
     renderDoctorVerification(data);
     var note = $('doc-save-note');
+    note.classList.add('show');
+    setTimeout(function(){ note.classList.remove('show'); }, 1800);
+  });
+  $('doc-profile-save-btn').addEventListener('click', async function(){
+    var data = Object.assign({}, currentDoctorData, {
+      doctorId: session.id,
+      name: $('doc-name').value.trim(),
+      specialty: $('doc-specialty').value.trim(),
+      education: $('doc-education').value.trim(),
+      about: $('doc-about').value.trim()
+    });
+    await saveDoctor(session.id, data);
+    currentDoctorData = data;
+    renderDoctorCard(data);
+    var note = $('doc-profile-save-note');
     note.classList.add('show');
     setTimeout(function(){ note.classList.remove('show'); }, 1800);
   });
@@ -1484,21 +1562,46 @@
     showView('view-landing');
   });
 
-  function openDocProfileModal(){
+  function openDocAccountSettingsPage(){
     renderClinicsList(currentDoctorData);
     $('doc-clinic-input').value = '';
-    $('doc-profile-modal').classList.remove('hidden');
+    closeDocAcctDropdown();
+    showView('view-doc-account-settings');
   }
-  function closeDocProfileModal(){
-    $('doc-profile-modal').classList.add('hidden');
-  }
-  $('doc-account-settings-btn').addEventListener('click', openDocProfileModal);
-  $('doc-profile-close').addEventListener('click', closeDocProfileModal);
-  $('doc-profile-modal').addEventListener('click', function(e){
-    if (e.target === $('doc-profile-modal')) closeDocProfileModal();
+  $('doc-account-settings-btn').addEventListener('click', openDocAccountSettingsPage);
+
+  $('doc-myprofile-btn').addEventListener('click', function(){
+    closeDocAcctDropdown();
+    showView('view-doc-profile');
   });
+
+  // ---- Account dropdown (topbar) — How it works / Account settings / My statistics ----
+  function closeDocAcctDropdown(){
+    $('doc-account-dropdown-menu').classList.add('hidden');
+    $('doc-account-dropdown-trigger').setAttribute('aria-expanded', 'false');
+  }
+  $('doc-account-dropdown-trigger').addEventListener('click', function(e){
+    e.stopPropagation();
+    var menu = $('doc-account-dropdown-menu');
+    var opening = menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', !opening);
+    this.setAttribute('aria-expanded', String(opening));
+  });
+  document.addEventListener('click', function(e){
+    if (!$('doc-account-dropdown-menu').classList.contains('hidden') && !e.target.closest('#doc-account-dropdown-wrap')){
+      closeDocAcctDropdown();
+    }
+  });
+  $('doc-howitworks-btn').addEventListener('click', closeDocAcctDropdown);
+
+  var docHowItWorks = makeStepperModal({
+    modal:'doc-howitworks-modal', track:'doc-howitworks-track',
+    counter:'doc-howitworks-counter', back:'doc-howitworks-back', next:'doc-howitworks-next', close:'doc-howitworks-close'
+  });
+  $('doc-howitworks-btn').addEventListener('click', docHowItWorks.open);
+
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape'){ closeDocProfileModal(); closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeDocStatsModal(); closePatProfileModal(); closePatStatsModal(); closeAddEyeModal(); closeEyeModal(); closePatAccessModal(); closeBookApptModal(); }
+    if (e.key === 'Escape'){ closeVisitModal(); closeTestModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeAddEyeModal(); closeEyeModal(); closePatAccessModal(); closeBookApptModal(); closePatAcctDropdown(); patHowItWorks.close(); closeDocAcctDropdown(); docHowItWorks.close(); }
   });
 
   function escapeHtml(s){
@@ -1580,16 +1683,6 @@
   $('doc-test-modal-close').addEventListener('click', closeDocTestModal);
   $('doc-test-modal').addEventListener('click', function(e){ if (e.target === $('doc-test-modal')) closeDocTestModal(); });
 
-  function switchDoctorResultTab(tab){
-    var visits = tab === 'visits';
-    $('doc-tab-visits').classList.toggle('active', visits);
-    $('doc-tab-tests').classList.toggle('active', !visits);
-    $('doc-visits-pane').classList.toggle('hidden', !visits);
-    $('doc-tests-pane').classList.toggle('hidden', visits);
-  }
-  $('doc-tab-visits').addEventListener('click', function(){ switchDoctorResultTab('visits'); });
-  $('doc-tab-tests').addEventListener('click', function(){ switchDoctorResultTab('tests'); });
-
   function showLookupResult(code, data, grant){
     currentLookupCode = code;
     currentLookupData = data;
@@ -1609,9 +1702,10 @@
       accessNote = 'Access: one-time code · ends in ~' + mins + 'm';
     }
     $('res-access-note').textContent = accessNote;
+    $('doc-record-visits-heading').textContent = 'Visits — ' + (data.name || 'Unnamed patient');
+    $('doc-record-tests-heading').textContent = 'Tests — ' + (data.name || 'Unnamed patient');
     renderDoctorVisitsList(data.visits || []);
     renderDoctorTestsList(data.tests || []);
-    switchDoctorResultTab('visits');
   }
   function resetLookup(){
     currentLookupCode = null;
@@ -1927,7 +2021,7 @@
       yearPatients: Object.keys(yearPatients).length
     };
   }
-  function openDocStatsModal(){
+  function openDocStatsPage(){
     var stats = computeDoctorStats(currentDoctorData);
     if (!stats.hasData){
       $('doc-stats-grid').innerHTML = '';
@@ -1948,12 +2042,10 @@
       $('doc-stats-chart-section').classList.remove('hidden');
       renderDoctorTrendChart(computeDailyCounts(currentDoctorData && currentDoctorData.visitLog));
     }
-    $('doc-stats-modal').classList.remove('hidden');
+    closeDocAcctDropdown();
+    showView('view-doc-stats');
   }
-  function closeDocStatsModal(){ $('doc-stats-modal').classList.add('hidden'); }
-  $('doc-stats-btn').addEventListener('click', openDocStatsModal);
-  $('doc-stats-close').addEventListener('click', closeDocStatsModal);
-  $('doc-stats-modal').addEventListener('click', function(e){ if (e.target === $('doc-stats-modal')) closeDocStatsModal(); });
+  $('doc-stats-btn').addEventListener('click', openDocStatsPage);
 
   // Every session starts fresh on landing regardless of what hash a reload carried
   // in — there's no persisted session to restore a deep link into, so replace

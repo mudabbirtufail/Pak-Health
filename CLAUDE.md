@@ -3,7 +3,7 @@
 A patient records platform prototype. Two user roles — **individuals** (patients) and
 **doctors** — with a grant-based access model: a patient's permanent 8-digit account ID
 identifies their record but no longer grants access on its own. A doctor gets in either
-by redeeming a single-use, 3-minute live code the patient generates and shows them in
+by redeeming a single-use, 2-minute live code the patient generates and shows them in
 person (good for one hour from redemption), or through a standing "Trusted" grant the
 patient creates and can revoke at any time. See "Access model" below.
 
@@ -120,7 +120,7 @@ verified, which would defeat the point of having the tag at all.
 - **Access model** (see [`ACCESS-MODEL.md`](ACCESS-MODEL.md) for the full design — this
   is Phase 1 of it, the core grant mechanism, built directly into this file): the
   moment a patient reaches their dashboard, a 6-digit live code is generated
-  automatically — no button — good for 3 minutes and one redemption, shown right on
+  automatically — no button — good for 2 minutes and one redemption, shown right on
   the health card next to a small circular countdown ring (sized to match the live-code
   text) and a "Reset" button that manually mints a fresh code and restarts the ring
   early. When the ring runs out on its own (or a fresh dashboard load happens), a new
@@ -138,12 +138,22 @@ verified, which would defeat the point of having the tag at all.
 - Doctor dashboard: redeem a patient's live code (or pick them from the roster) → the
   find-a-patient box is replaced by the patient's name, an access note (standing
   trust vs. one-time code with its remaining time), a "Search a different patient"
-  link, and **Visits / Tests tabs** — same list-and-detail-modal pattern as the
-  patient's own dashboard. "Add visit note" and "Add test / report" buttons sit above
-  each list and open a form modal; saving re-validates the grant, stamps
-  `writtenViaGrantId` and an `unverified` snapshot, then writes directly into that
-  patient's record, so the patient sees it immediately next time they sign in. This is
-  the core loop of the app. The doctor card's own checklist only lists "Medical
+  link, and two **Visits / Tests tiles** (`.record-row`, the same photo-banner style
+  and even the same two photos as the patient's own record list) that navigate to
+  dedicated full-screen pages (`view-doctor-record-visits` / `view-doctor-record-tests`,
+  each with a "← Back to dashboard" link) rather than switching an in-page tab — this
+  mirrors the patient side's own tabs-to-pages promotion (see below) so a doctor's
+  patient-record view works the same way. "Add visit note" and "Add test / report"
+  buttons sit above each list, inside its page, and open a form modal; saving
+  re-validates the grant, stamps `writtenViaGrantId` and an `unverified` snapshot,
+  then writes directly into that patient's record, so the patient sees it immediately
+  next time they sign in. Clicking a row still opens the same detail modal as before
+  — only the category-level navigation (Visits vs. Tests) changed, not the individual
+  entry view. Going back to the dashboard doesn't lose the looked-up patient — nothing
+  resets `currentLookupCode`/`currentLookupData`, so `#patient-result` just shows the
+  same patient again, exactly like the patient side's own record pages don't reset
+  `currentPatientData`. This is the core loop of the app. The doctor card's own
+  checklist only lists "Medical
   license number" now — email and phone were dropped from it (the "Verified" badge
   itself still requires all three via `isDoctorVerified()`, which is unaffected; only
   the checklist's display was trimmed, matching the patient side no longer echoing
@@ -172,16 +182,62 @@ verified, which would defeat the point of having the tag at all.
   navigates to a real full-screen page (its own `<div class="view">`, shown via the
   same `showView()` top-level view-switching the rest of the app already uses, with a
   "← Back to dashboard" link in its topbar) rather than opening a modal — these were
-  promoted to pages specifically because they're primary destinations now, unlike
-  incidental detail popups (Account settings, Stats, Manage access) which stay
-  modals. Within each page, clicking a row still opens the existing detail modal
-  (visit/test/eye entry) on top of the page. **My Prescriptions is derived, not
-  stored separately** — it scans every visit for a non-empty, non-"None"
+  promoted to pages specifically because they're primary destinations now. Within
+  each page, clicking a row still opens the existing detail modal (visit/test/eye
+  entry) on top of the page — that stays a modal since it's an incidental detail
+  popup, not a destination of its own. "Manage access" is the same kind of incidental
+  popup and also stays a modal. "Account settings" and "My statistics" *were*
+  modals too but are now pages as well (see the Account dropdown menu, below) — the
+  distinction that decides page vs. modal ended up being less about primary-vs-
+  incidental and more about whether the content wants real screen width/room to
+  scroll, which settings forms and stat grids both do. **My Prescriptions is derived,
+  not stored separately** — it scans every visit for a non-empty, non-"None"
   `prescription` field and lists those, clicking through to the same visit-detail
-  modal. An "Account settings" modal
-  (name, email, phone) mirrors the doctor's — this is what lets a patient add or fix
-  their email/phone *after* signup; before this existed there was no way to edit those
-  fields post-signup at all. There's no "verified" concept for patients (only for
+  modal. "How it works," "My profile," "Account settings," "Manage access," and "My
+  statistics" all live in an "Account" dropdown menu in the topbar (next to "Sign
+  out") — nothing settings-related sits as a standalone sidebar button anymore. The
+  dropdown reuses `.dropdown-wrap`/`.dropdown-trigger`/`.dropdown-menu`, CSS that
+  already existed in the stylesheet but had no markup using it until this was built.
+  The doctor dashboard has the equivalent dropdown minus "Manage access" (no doctor
+  equivalent exists), so the doctor's sidebar panel below the card ends up holding
+  just the clinic picker; the patient's sidebar panel below the card ends up holding
+  no buttons at all, just the copy-note and privacy-note text.
+
+  "My profile," "Account settings," and "My statistics" are full pages
+  (`view-pat-profile`/`view-pat-account-settings`/`view-pat-stats`, and the `doc-`
+  equivalents), not modals — same "← Back to dashboard" pattern as the record pages,
+  chosen because settings forms and stat grids want real screen width rather than a
+  ~440px modal card. **Every field lives on exactly one of the two pages, never
+  both** — earlier drafts had "My profile" as a read-only mirror of everything
+  "Account settings" already edited, which was confusing (two pages, identical
+  content, unclear why either existed) rather than useful, so the fields were split
+  by what they represent instead: "My profile" holds identity/bio fields (patient:
+  just name; doctor: name, specialty, education, about — the fields a patient might
+  eventually see), "Account settings" holds contact/access fields (patient: email,
+  phone; doctor: email, phone, license, plus the doctor ID display and clinics
+  management). Both pages are independently editable with their own save button
+  (`pat-profile-save-btn` / `pat-save-btn`, `doc-profile-save-btn` / `doc-save-btn`)
+  that only writes the fields it owns — e.g. saving Account settings never touches
+  `name`, so it can't accidentally stomp on an unsaved edit sitting in the profile
+  page's field. The patient's permanent 8-digit account code used to be shown at the
+  top of Account settings ("Access code") but was deliberately removed and not
+  relocated anywhere else in the UI — it's purely an internal identifier now (the
+  sign-in field still accepts it, since existing patients only ever knew this code
+  before email sign-in existed, but nothing surfaces it back to a signed-in patient
+  post-signup). "How it works" opens a centered, taller-than-usual modal
+  (`#pat-howitworks-modal`/`#doc-howitworks-modal` override `.modal-overlay`'s default
+  top-aligned position just for themselves — most modals stay top-aligned so long
+  content like Account settings doesn't get cut off) explaining the live-code/
+  trust-grant flow from that role's side, one step at a time. The four steps are
+  static slides sitting side-by-side in a flex track (`.stepper-track` /
+  `.stepper-slide`); stepping just translates the track (`makeStepperModal()` in
+  app.js, shared by both roles with different step markup and DOM ids) rather than
+  swapping injected text, which is what makes the slide animation possible. Back/Next
+  are icon-only circular arrow buttons, not labeled buttons; Back is disabled (not
+  hidden) on the first step, and Next becomes a checkmark that closes the modal on
+  the last step. The step content is the same copy originally drafted for a
+  landing-page "how it works" section and then not used there. There's no
+  "verified" concept for patients (only for
   doctors, via license verification), and no on-dashboard display of the email/phone
   values themselves — Account settings is the only place they're shown, on the
   assumption a patient already knows their own contact info and doesn't need it
@@ -356,13 +412,13 @@ relying on cross-device grant persistence there.
    deploy a repo (or a drag-and-dropped file) in a couple of minutes.
 5. Before wider rollout (not required just to let a few testers try it): add rate
    limiting on code redemption, since the 6-digit live code isn't currently
-   brute-force protected (the 3-minute expiry and single-use narrow the window, but
+   brute-force protected (the 2-minute expiry and single-use narrow the window, but
    don't replace real rate limiting).
 
 ## Next version: a real access model
 
 [`ACCESS-MODEL.md`](ACCESS-MODEL.md) is the full design doc for a real access-control
-redesign: real per-user auth, a single-use 3-minute access code for ad-hoc visits, a
+redesign: real per-user auth, a single-use 2-minute access code for ad-hoc visits, a
 "Trusted" doctor tier for standing relationships, patient-controlled revocation, and an
 access-history log. **Its core mechanism (§1, §5, §6 — single-use codes, trust grants,
 revocation) is now built**, described above in "Access model" and "Data model." What's

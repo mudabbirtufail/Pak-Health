@@ -111,6 +111,9 @@
   .auth-title{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
   .auth-title h2{ font-size:1.5rem; }
   .auth-sub{ color: var(--ink-soft); font-size:0.9rem; margin-bottom:22px; }
+  .auth-links{ text-align:right; margin-top:10px; }
+  .auth-card hr{ border:none; border-top:1px solid var(--line); margin:20px 0; }
+  .demo-note{ font-size:0.85rem; color: var(--teal-dark); background: var(--teal-wash); border-radius:8px; padding:12px 14px; line-height:1.5; }
 
   .tabs{ display:flex; border-bottom:1px solid var(--line); margin-bottom:22px; }
   .tab{
@@ -262,18 +265,14 @@
     font-size:0.8rem; color: var(--muted); background: var(--bg); border-radius:8px; padding:12px 14px; line-height:1.5; margin-top:16px;
   }
 
-  /* ---------- Google sign-up ---------- */
-  .divider{ display:flex; align-items:center; gap:12px; margin:18px 0; color: var(--muted); font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em; }
-  .divider::before, .divider::after{ content:""; flex:1; height:1px; background: var(--line); }
-  .btn-google{
-    background: var(--paper); color: var(--ink); border:1px solid var(--line);
-    display:flex; align-items:center; justify-content:center; gap:10px; width:100%;
+  /* ---------- Email verification banner ---------- */
+  .verify-banner{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    background: var(--amber-wash); color: var(--amber); border:1px solid var(--amber);
+    border-radius: var(--radius); padding:12px 18px; margin-bottom:20px; font-size:0.88rem;
   }
-  .btn-google:hover{ border-color: var(--ink-soft); background: var(--bg); }
-  .google-panel{
-    border:1px solid var(--line); border-radius:8px; padding:18px; margin-top:16px; background: var(--bg);
-  }
-  .google-panel .demo-note{ font-size:0.76rem; color: var(--muted); margin-bottom:14px; line-height:1.5; }
+  .verify-banner span{ line-height:1.4; }
+  .verify-banner .btn{ flex-shrink:0; }
 
   /* ---------- Account dropdown ---------- */
   .dropdown-wrap{ position:relative; }

@@ -75,188 +75,115 @@
     for (var i=0;i<n;i++) s += Math.floor(Math.random()*10);
     return s;
   }
-  // Real persistence for a live deploy: a Supabase project with a single `kv_store`
-  // table (key text primary key, value text) mirrors this file's get/set-by-key
-  // interface almost exactly, so the rest of the app didn't need to change.
-  // Fill these in once you have a Supabase project (Settings > API) — until then
-  // they're left as placeholders and the app quietly skips straight to the
-  // in-memory fallback below, exactly like before.
-  var SUPABASE_URL = 'https://topuupugxzulubrbkuzo.supabase.co';
-  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvcHV1cHVneHp1bHVicmJrdXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3ODA4NzQsImV4cCI6MjEwMjM1Njg3NH0.0DLPi6wP2NgibwJjf7ZSkazUQos81RAL6aM8JO7MLb4';
+
+  // ---------- Supabase (real backend — required, not a fallback) ----------
+  // This app now holds real pilot patient/doctor data (see CLAUDE.md), so there is
+  // no in-memory or window.storage fallback the way the earlier demo had — if this
+  // client can't be created or reach the project, the app shows a clear error
+  // instead of silently pretending to work. See supabase/schema.sql for the tables,
+  // RLS policies, and RPC functions this client talks to.
+  var SUPABASE_URL = 'https://siywcdmewzayoqzmuekb.supabase.co';
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpeXdjZG1ld3pheW9xem11ZWtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNDgyMDgsImV4cCI6MjEwMzgyNDIwOH0.rBEfjbVYF14bFRQJ8Lxw_WN-HSWjxbByBf_0zzXBNDA';
   var supabaseClient = null;
-  if (window.supabase && SUPABASE_URL.indexOf('YOUR_') !== 0 && SUPABASE_ANON_KEY.indexOf('YOUR_') !== 0){
-    try{ supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); }catch(e){}
+  try{
+    if (window.supabase) supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }catch(e){}
+  if (!supabaseClient){
+    document.addEventListener('DOMContentLoaded', function(){
+      document.body.innerHTML = '<div style="max-width:520px;margin:80px auto;padding:24px;font-family:sans-serif;text-align:center;">'
+        + '<h2>Can’t connect</h2><p>Pak Health couldn’t reach its backend. Please reload the page, or contact support if this keeps happening.</p></div>';
+    });
+    return;
   }
 
-  // In-memory fallback store, used if window.storage and Supabase are both
-  // unavailable or error out, so the app still works (for this browser tab) even
-  // without persistence.
-  var memoryStore = {};
-  async function storeGet(key){
-    if (window.storage && typeof window.storage.get === 'function'){
-      try{
-        var r = await window.storage.get(key, true);
-        return r ? r.value : null;
-      }catch(e){
-        // treat as "not found" and fall through below
-      }
-    }
-    if (supabaseClient){
-      try{
-        var res = await supabaseClient.from('kv_store').select('value').eq('key', key).maybeSingle();
-        if (!res.error) return res.data ? res.data.value : null;
-      }catch(e){
-        // fall through to memory below
-      }
-    }
-    return Object.prototype.hasOwnProperty.call(memoryStore, key) ? memoryStore[key] : null;
+  function isDoctorVerified(d){ return !!(d && d.verified); }
+  function maskPhone(phone){
+    if (!phone) return 'No phone on file';
+    var digits = phone.replace(/\D/g, '');
+    if (digits.length < 4) return phone;
+    return '••• ' + digits.slice(-4);
   }
-  async function storeSet(key, value){
-    memoryStore[key] = value;
-    if (window.storage && typeof window.storage.set === 'function'){
-      try{
-        await window.storage.set(key, value, true);
-      }catch(e){
-        // keep the memory copy so the app still works this session
-      }
-    }
-    if (supabaseClient){
-      try{
-        await supabaseClient.from('kv_store').upsert({ key: key, value: value, updated_at: new Date().toISOString() });
-      }catch(e){
-        // keep the memory copy so the app still works this session
-      }
-    }
+  async function getAuthUser(){
+    var res = await supabaseClient.auth.getUser();
+    return res.data && res.data.user;
   }
-  async function keyExists(key){
-    var v = await storeGet(key);
-    return v !== null && v !== undefined;
+  function authErrorMessage(error, fallback){
+    var msg = (error && error.message) || '';
+    if (/email not confirmed/i.test(msg)) return 'Please confirm your email before signing in — check your inbox for the confirmation link.';
+    if (/invalid login credentials/i.test(msg)) return 'Incorrect email or password.';
+    return msg || fallback || 'Something went wrong. Please try again.';
   }
-  async function generatePatientCode(){
-    var code, exists = true;
-    while(exists){ code = randomDigits(8); exists = await keyExists('patient:'+code); }
-    return code;
+
+  // ---------- Data mapping (DB snake_case rows -> the camelCase shape the rest of
+  // this file's rendering code already expects) ----------
+  function mapPatientRow(row){
+    return {
+      id: row.id, code: row.code, name: row.name || '', dob: row.dob || '', gender: row.gender || '',
+      phone: row.phone || '', photoUrl: row.photo_url || '', bloodType: row.blood_type || '',
+      emergencyContact: row.emergency_contact || '', allergies: row.allergies || '',
+      conditions: row.conditions || '', medications: row.medications || ''
+    };
   }
-  async function generateDoctorId(){
-    var id, exists = true;
-    while(exists){ id = 'DR-' + randomDigits(6); exists = await keyExists('doctor:'+id); }
-    return id;
+  function mapDoctorRow(row){
+    return {
+      id: row.id, doctorId: row.doctor_code, name: row.name || '', dob: row.dob || '', gender: row.gender || '',
+      phone: row.phone || '', photoUrl: row.photo_url || '', license: row.license || '', specialty: row.specialty || '',
+      education: row.education || '', about: row.about || '', verified: !!row.verified,
+      clinics: row.clinics || [], currentClinic: row.current_clinic || ''
+    };
   }
-  async function savePatient(code, data){
-    await storeSet('patient:'+code, JSON.stringify(data));
+  function mapVisitRow(row){
+    return {
+      id: row.id, doctorName: row.doctor_name || '', clinicName: row.clinic_name || '', date: row.date,
+      time: row.time || '', symptoms: row.symptoms || '', diagnosis: row.diagnosis || '', prescription: row.prescription || '',
+      notes: row.notes || '', writtenViaGrantId: row.written_via_grant_id, unverified: !!row.unverified
+    };
   }
-  async function loadPatient(code){
-    var v = await storeGet('patient:'+code);
-    try{ return v ? JSON.parse(v) : null; }catch(e){ return null; }
+  function mapTestRow(row){
+    return {
+      id: row.id, name: row.name || '', date: row.date, doctorName: row.doctor_name || '',
+      resultSummary: row.result_summary || '', writtenViaGrantId: row.written_via_grant_id, unverified: !!row.unverified
+    };
   }
-  async function saveDoctor(id, data){
-    await storeSet('doctor:'+id, JSON.stringify(data));
+  function mapEyeRow(row){
+    return { id: row.id, date: row.date, sphL: row.sph_l || '', cylL: row.cyl_l || '', axisL: row.axis_l || '', sphR: row.sph_r || '', cylR: row.cyl_r || '', axisR: row.axis_r || '' };
   }
-  async function loadDoctor(id){
-    var v = await storeGet('doctor:'+id);
-    try{ return v ? JSON.parse(v) : null; }catch(e){ return null; }
+  function mapAppointmentRow(row){
+    return { id: row.id, doctorName: row.doctor_name || '', clinicName: row.clinic_name || '', date: row.date, time: row.time || '', reason: row.reason || '' };
   }
-  function isDoctorVerified(d){ return !!(d.email && d.phone && d.license); }
+
+  async function loadPatientProfile(id){
+    var res = await supabaseClient.from('patients').select('*').eq('id', id).maybeSingle();
+    return res.data ? mapPatientRow(res.data) : null;
+  }
+  async function loadDoctorProfile(id){
+    var res = await supabaseClient.from('doctors').select('*').eq('id', id).maybeSingle();
+    return res.data ? mapDoctorRow(res.data) : null;
+  }
+  async function loadPatientRecordForDoctor(patientId){
+    var profile = await loadPatientProfile(patientId);
+    if (!profile) return null;
+    var visitsRes = await supabaseClient.from('visits').select('*').eq('patient_id', patientId).order('date', { ascending:false });
+    var testsRes = await supabaseClient.from('tests').select('*').eq('patient_id', patientId).order('date', { ascending:false });
+    profile.visits = (visitsRes.data || []).map(mapVisitRow);
+    profile.tests = (testsRes.data || []).map(mapTestRow);
+    return profile;
+  }
 
   // ---------- Access grants (see ACCESS-MODEL.md) ----------
-  // A doctor never gets standing access just by knowing a patient's permanent account
-  // code. Access is either a single-use, 2-minute code redeemed in person (good for one
-  // hour from redemption) or a standing "Trusted" grant the patient creates and can
-  // revoke any time. Both produce the same kind of row here, checked the same way:
-  // valid = exists a grant for (patient, doctor) with revoked_at null and
-  // (expires_at null or expires_at > now). Real persistence needs the access_codes /
-  // access_grants tables (see the SQL in the access-model plan); if they're not there
-  // yet, these fall back to in-memory arrays for this tab's session only, same spirit
-  // as the kv_store fallback above.
-  var memoryAccessCodes = [];
-  var memoryAccessGrants = [];
-  function uid(){
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
-      var r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
-      return v.toString(16);
-    });
-  }
+  // A doctor never gets standing access just by knowing a patient's permanent
+  // account code. Access is either a single-use, 2-minute live code redeemed in
+  // person (good for one hour from redemption) or a standing "Trusted" grant the
+  // patient creates and can revoke any time. Both produce the same kind of row,
+  // checked the same way — see the has_active_grant() predicate in
+  // supabase/schema.sql, which is the real enforcement now (RLS), not this client
+  // code. What's left here is just the client's own read/write access to the parts
+  // RLS lets it touch, plus redeem_access_code() which is a server-side RPC because
+  // a doctor's browser has no direct read access to access_codes at all.
   async function createAccessCode(patientId){
-    var row = {
-      id: uid(), patient_id: patientId, code: randomDigits(6),
-      created_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 2*60*1000).toISOString(),
-      redeemed_at: null, redeemed_by_doctor_id: null
-    };
-    if (supabaseClient){
-      try{
-        var res = await supabaseClient.from('access_codes').insert(row).select().maybeSingle();
-        if (!res.error && res.data) return res.data;
-      }catch(e){}
-    }
-    memoryAccessCodes.push(row);
-    return row;
-  }
-  async function getLatestAccessCode(patientId){
-    if (supabaseClient){
-      try{
-        var res = await supabaseClient.from('access_codes').select('*').eq('patient_id', patientId).order('created_at', { ascending:false }).limit(1).maybeSingle();
-        if (!res.error) return res.data || null;
-      }catch(e){}
-    }
-    var mine = memoryAccessCodes.filter(function(r){ return r.patient_id === patientId; });
-    if (!mine.length) return null;
-    mine.sort(function(a,b){ return a.created_at < b.created_at ? 1 : -1; });
-    return mine[0];
-  }
-  async function markCodeRedeemed(row, doctorId){
-    row.redeemed_at = new Date().toISOString();
-    row.redeemed_by_doctor_id = doctorId;
-    if (supabaseClient){
-      try{ await supabaseClient.from('access_codes').update({ redeemed_at: row.redeemed_at, redeemed_by_doctor_id: doctorId }).eq('id', row.id); return; }catch(e){}
-    }
-    // memory row was mutated in place above
-  }
-  async function insertGrant(row){
-    if (supabaseClient){
-      try{
-        var res = await supabaseClient.from('access_grants').insert(row).select().maybeSingle();
-        if (!res.error && res.data) return res.data;
-      }catch(e){}
-    }
-    memoryAccessGrants.push(row);
-    return row;
-  }
-  async function createTrustGrant(patientId, doctorId){
-    var existing = await getActiveGrant(patientId, doctorId);
-    if (existing && !existing.expires_at) return existing;
-    return await insertGrant({
-      id: uid(), patient_id: patientId, doctor_id: doctorId, granted_via:'trust',
-      source_code_id: null, granted_at: new Date().toISOString(), expires_at: null, revoked_at: null
-    });
-  }
-  async function revokeGrant(grantId){
-    if (supabaseClient){
-      try{ await supabaseClient.from('access_grants').update({ revoked_at: new Date().toISOString() }).eq('id', grantId); }catch(e){}
-    }
-    memoryAccessGrants.forEach(function(g){ if (g.id === grantId) g.revoked_at = new Date().toISOString(); });
-  }
-  async function listGrantsForPatient(patientId){
-    var rows = [];
-    if (supabaseClient){
-      try{
-        var res = await supabaseClient.from('access_grants').select('*').eq('patient_id', patientId);
-        if (!res.error && res.data) rows = res.data;
-      }catch(e){}
-    }
-    memoryAccessGrants.forEach(function(g){ if (g.patient_id === patientId && rows.indexOf(g) === -1 && !rows.some(function(r){ return r.id === g.id; })) rows.push(g); });
-    return rows;
-  }
-  async function listGrantsForDoctor(doctorId){
-    var rows = [];
-    if (supabaseClient){
-      try{
-        var res = await supabaseClient.from('access_grants').select('*').eq('doctor_id', doctorId);
-        if (!res.error && res.data) rows = res.data;
-      }catch(e){}
-    }
-    memoryAccessGrants.forEach(function(g){ if (g.doctor_id === doctorId && !rows.some(function(r){ return r.id === g.id; })) rows.push(g); });
-    return rows;
+    var row = { patient_id: patientId, code: randomDigits(6), expires_at: new Date(Date.now() + 2*60*1000).toISOString() };
+    var res = await supabaseClient.from('access_codes').insert(row).select().maybeSingle();
+    return res.data || null;
   }
   function isGrantActive(g){
     if (!g || g.revoked_at) return false;
@@ -264,98 +191,61 @@
     return new Date(g.expires_at).getTime() > Date.now();
   }
   async function getActiveGrant(patientId, doctorId){
-    var rows = (await listGrantsForPatient(patientId)).filter(function(g){ return g.doctor_id === doctorId; });
-    var active = rows.filter(isGrantActive);
+    var res = await supabaseClient.from('access_grants').select('*')
+      .eq('patient_id', patientId).eq('doctor_id', doctorId).is('revoked_at', null);
+    var active = (res.data || []).filter(isGrantActive);
     if (!active.length) return null;
-    // Prefer the trust grant if both exist somehow.
     active.sort(function(a,b){ return a.granted_via === 'trust' ? -1 : 1; });
     return active[0];
   }
-  async function redeemAccessCode(code, doctorId){
-    var latest = null;
-    // We need the code across all patients, not just one — search isn't scoped to a
-    // patient the doctor already knows, so query directly.
-    if (supabaseClient){
-      try{
-        var res = await supabaseClient.from('access_codes').select('*').eq('code', code).order('created_at', { ascending:false }).limit(1).maybeSingle();
-        if (!res.error) latest = res.data || null;
-      }catch(e){}
-    }
-    if (!latest){
-      var candidates = memoryAccessCodes.filter(function(r){ return r.code === code; });
-      candidates.sort(function(a,b){ return a.created_at < b.created_at ? 1 : -1; });
-      latest = candidates[0] || null;
-    }
-    if (!latest) return { ok:false, reason:'not-found' };
-    // Only the most recent code issued for that patient is ever valid (v3 design —
-    // generating a fresh code silently retires the previous one).
-    var current = await getLatestAccessCode(latest.patient_id);
-    if (!current || current.id !== latest.id || current.code !== code) return { ok:false, reason:'not-found' };
-    if (latest.redeemed_at) return { ok:false, reason:'redeemed' };
-    if (new Date(latest.expires_at).getTime() <= Date.now()) return { ok:false, reason:'expired' };
-
-    var trustGrant = await getActiveGrant(latest.patient_id, doctorId);
-    if (trustGrant && trustGrant.granted_via === 'trust'){
-      // Trusted doctor redeeming a code is pure navigation — mark the code used, but
-      // don't create a separate one-hour grant that would just shadow the standing one.
-      await markCodeRedeemed(latest, doctorId);
-      return { ok:true, patientId: latest.patient_id, grant: trustGrant };
-    }
-    await markCodeRedeemed(latest, doctorId);
-    var grant = await insertGrant({
-      id: uid(), patient_id: latest.patient_id, doctor_id: doctorId, granted_via:'code',
-      source_code_id: latest.id, granted_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 60*60*1000).toISOString(), revoked_at: null
-    });
-    return { ok:true, patientId: latest.patient_id, grant: grant };
+  async function redeemAccessCode(code){
+    var res = await supabaseClient.rpc('redeem_access_code', { p_code: code });
+    if (res.error) return { ok:false, error: res.error };
+    var row = res.data && res.data[0];
+    if (!row) return { ok:false, error: null };
+    return { ok:true, patientId: row.patient_id, patientName: row.patient_name, grantedVia: row.granted_via };
   }
-  function maskPhone(phone){
-    if (!phone) return 'No phone on file';
-    var digits = phone.replace(/\D/g, '');
-    if (digits.length < 4) return phone;
-    return '••• ' + digits.slice(-4);
+  function mapRedeemErrorText(error){
+    var msg = (error && error.message) || '';
+    if (/code_expired/.test(msg)) return 'That code has expired — ask your patient to generate a new one.';
+    if (/code_redeemed/.test(msg)) return 'That code has already been used — ask your patient for a new one.';
+    return 'No active code found. Double-check it with your patient.';
+  }
+  async function revokeGrant(grantId){
+    await supabaseClient.from('access_grants').update({ revoked_at: new Date().toISOString() }).eq('id', grantId);
+  }
+  async function createTrustGrant(patientId, doctorId){
+    var existing = await getActiveGrant(patientId, doctorId);
+    if (existing && !existing.expires_at) return existing;
+    var res = await supabaseClient.from('access_grants').insert({ patient_id: patientId, doctor_id: doctorId, granted_via: 'trust' }).select().maybeSingle();
+    if (res.error) throw res.error;
+    return res.data;
   }
   async function listTrustedDoctorsForPatient(patientId){
-    var grants = (await listGrantsForPatient(patientId)).filter(function(g){ return g.granted_via === 'trust' && isGrantActive(g); });
-    var out = [];
-    for (var i=0;i<grants.length;i++){
-      var d = await loadDoctor(grants[i].doctor_id);
-      out.push({ grant: grants[i], doctor: d || { doctorId: grants[i].doctor_id, name:'' } });
-    }
-    return out;
+    var res = await supabaseClient.from('access_grants').select('*, doctors(*)')
+      .eq('patient_id', patientId).eq('granted_via', 'trust').is('revoked_at', null);
+    return (res.data || []).map(function(g){
+      var d = g.doctors || {};
+      return { grant: g, doctor: { doctorId: d.doctor_code, name: d.name, phone: d.phone, verified: !!d.verified } };
+    });
   }
   async function listActiveAdhocGrantsForPatient(patientId){
-    var grants = (await listGrantsForPatient(patientId)).filter(function(g){ return g.granted_via === 'code' && isGrantActive(g); });
-    var out = [];
-    for (var i=0;i<grants.length;i++){
-      var d = await loadDoctor(grants[i].doctor_id);
-      out.push({ grant: grants[i], doctor: d || { doctorId: grants[i].doctor_id, name:'' } });
-    }
-    return out;
+    var res = await supabaseClient.from('access_grants').select('*, doctors(*)')
+      .eq('patient_id', patientId).eq('granted_via', 'code').is('revoked_at', null)
+      .gt('expires_at', new Date().toISOString());
+    return (res.data || []).map(function(g){
+      var d = g.doctors || {};
+      return { grant: g, doctor: { doctorId: d.doctor_code, name: d.name, phone: d.phone, verified: !!d.verified } };
+    });
   }
   async function listTrustedPatientsForDoctor(doctorId){
-    var grants = (await listGrantsForDoctor(doctorId)).filter(function(g){ return g.granted_via === 'trust' && isGrantActive(g); });
-    var out = [];
-    for (var i=0;i<grants.length;i++){
-      var p = await loadPatient(grants[i].patient_id);
-      if (p) out.push({ grant: grants[i], patient: p });
-    }
-    return out;
+    var res = await supabaseClient.from('access_grants').select('*, patients(*)')
+      .eq('doctor_id', doctorId).eq('granted_via', 'trust').is('revoked_at', null);
+    return (res.data || []).filter(function(g){ return g.patients; }).map(function(g){
+      return { grant: g, patient: mapPatientRow(g.patients) };
+    });
   }
 
-  async function hashPassword(password){
-    if (!password) return '';
-    try{
-      var enc = new TextEncoder().encode(password);
-      var digest = await crypto.subtle.digest('SHA-256', enc);
-      return Array.from(new Uint8Array(digest)).map(function(b){ return b.toString(16).padStart(2, '0'); }).join('');
-    }catch(e){
-      // Fallback for environments without SubtleCrypto (e.g. non-HTTPS). Not cryptographically secure.
-      var h = 0;
-      for (var i = 0; i < password.length; i++){ h = ((h << 5) - h + password.charCodeAt(i)) | 0; }
-      return 'fb_' + h;
-    }
-  }
   function showError(el, message){
     el.textContent = message;
     el.classList.add('show');
@@ -363,6 +253,9 @@
   function clearError(el){
     el.textContent = '';
     el.classList.remove('show');
+  }
+  function renderVerifyBanner(prefix, email, confirmed){
+    $(prefix + '-verify-banner').classList.toggle('hidden', !email || confirmed === true);
   }
   function copyToClipboard(text, noteEl){
     var done = function(){
@@ -393,259 +286,202 @@
     el.addEventListener('click', function(){ showView(el.getAttribute('data-goto')); });
   });
 
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   // ================= DOCTOR AUTH =================
+  function showDoctorAuthPane(pane){
+    var signin = pane === 'signin';
+    $('doc-signin-pane').classList.toggle('hidden', !signin);
+    $('doc-signup-pane').classList.toggle('hidden', signin);
+  }
   function resetDoctorAuthView(){
-    $('doc-tab-signup').classList.add('active');
-    $('doc-tab-signin').classList.remove('active');
-    $('doc-signup-pane').classList.remove('hidden');
-    $('doc-signin-pane').classList.add('hidden');
-    $('doc-google-panel').classList.add('hidden');
-    $('doc-signup-name').value = '';
-    $('doc-signup-phone').value = '';
-    $('doc-signup-email').value = '';
-    $('doc-signup-password').value = '';
-    $('doc-signup-password2').value = '';
-    $('doc-google-name').value = '';
-    $('doc-google-phone').value = '';
-    $('doc-google-email').value = '';
-    clearError($('doc-create-error'));
-    clearError($('doc-google-error'));
-    $('doc-signin-id').value = '';
+    showDoctorAuthPane('signin');
+    $('doc-signin-email').value = '';
     $('doc-signin-password').value = '';
     clearError($('doc-signin-error'));
+    $('doc-signup-first').value = '';
+    $('doc-signup-middle').value = '';
+    $('doc-signup-last').value = '';
+    $('doc-signup-dob').value = '';
+    $('doc-signup-gender').value = '';
+    $('doc-signup-email').value = '';
+    $('doc-signup-password').value = '';
+    $('doc-signup-license').value = '';
+    clearError($('doc-create-error'));
+    $('doc-signup-checkemail').classList.add('hidden');
   }
-  $('doc-tab-signup').addEventListener('click', function(){
-    $('doc-tab-signup').classList.add('active'); $('doc-tab-signin').classList.remove('active');
-    $('doc-signup-pane').classList.remove('hidden'); $('doc-signin-pane').classList.add('hidden');
-  });
-  $('doc-tab-signin').addEventListener('click', function(){
-    $('doc-tab-signin').classList.add('active'); $('doc-tab-signup').classList.remove('active');
-    $('doc-signin-pane').classList.remove('hidden'); $('doc-signup-pane').classList.add('hidden');
-  });
-  async function createDoctorAccount(name, phone, email, password){
-    var id = await generateDoctorId();
-    var passwordHash = password ? await hashPassword(password) : '';
-    var data = { doctorId:id, name:name||'', email:email||'', phone:phone||'', license:'', specialty:'', education:'', about:'', photoUrl:'', passwordHash:passwordHash, clinics:[], currentClinic:'', visitLog:[], createdAt: Date.now() };
-    data.verified = isDoctorVerified(data);
-    await saveDoctor(id, data);
-    session = { type:'doctor', id:id };
-    await enterDoctorDash(id);
-  }
+  $('doc-goto-signup-btn').addEventListener('click', function(){ showDoctorAuthPane('signup'); });
+  $('doc-back-to-signin-btn').addEventListener('click', function(){ showDoctorAuthPane('signin'); });
   $('doc-create-btn').addEventListener('click', async function(){
-    var name = $('doc-signup-name').value.trim();
-    var phone = $('doc-signup-phone').value.trim();
+    var first = $('doc-signup-first').value.trim();
+    var middle = $('doc-signup-middle').value.trim();
+    var last = $('doc-signup-last').value.trim();
+    var dob = $('doc-signup-dob').value;
+    var gender = $('doc-signup-gender').value;
     var email = $('doc-signup-email').value.trim();
     var password = $('doc-signup-password').value;
-    var password2 = $('doc-signup-password2').value;
+    var license = $('doc-signup-license').value.trim();
     clearError($('doc-create-error'));
-    if (password && password.length < 6){
-      showError($('doc-create-error'), 'Password must be at least 6 characters, or leave both password fields blank to skip it for now.');
-      return;
-    }
-    if (password !== password2){
-      showError($('doc-create-error'), 'Passwords don\u2019t match.');
-      return;
-    }
+    $('doc-signup-checkemail').classList.add('hidden');
+    if (!first || !last){ showError($('doc-create-error'), 'First and last name are required.'); return; }
+    if (!dob){ showError($('doc-create-error'), 'Date of birth is required.'); return; }
+    if (!gender){ showError($('doc-create-error'), 'Please select a gender.'); return; }
+    if (!EMAIL_RE.test(email)){ showError($('doc-create-error'), 'Enter a valid email address.'); return; }
+    if (!password || password.length < 6){ showError($('doc-create-error'), 'Password must be at least 6 characters.'); return; }
+    var name = [first, middle, last].filter(Boolean).join(' ');
     $('doc-create-btn').disabled = true;
     $('doc-create-btn').textContent = 'Creating...';
     try{
-      await createDoctorAccount(name, phone, email, password);
+      var res = await supabaseClient.auth.signUp({
+        email: email, password: password,
+        options: { data: { role: 'doctor', name: name, dob: dob, gender: gender, license: license } }
+      });
+      if (res.error){
+        showError($('doc-create-error'), authErrorMessage(res.error, 'Something went wrong creating your account. Please try again.'));
+        return;
+      }
+      if (res.data.user && res.data.user.identities && res.data.user.identities.length === 0){
+        showError($('doc-create-error'), 'An account with that email already exists.');
+        return;
+      }
+      if (res.data.session){
+        session = { type:'doctor', id:res.data.user.id };
+        await enterDoctorDash(res.data.user.id);
+      } else {
+        $('doc-signup-checkemail-addr').textContent = email;
+        $('doc-signup-checkemail').classList.remove('hidden');
+      }
     }catch(e){
       showError($('doc-create-error'), 'Something went wrong creating your account. Please try again.');
     }finally{
       $('doc-create-btn').disabled = false;
-      $('doc-create-btn').textContent = 'Create my account';
-    }
-  });
-  $('doc-google-btn').addEventListener('click', function(){
-    $('doc-google-panel').classList.toggle('hidden');
-  });
-  $('doc-google-continue').addEventListener('click', async function(){
-    var name = $('doc-google-name').value.trim();
-    var phone = $('doc-google-phone').value.trim();
-    var email = $('doc-google-email').value.trim();
-    $('doc-google-continue').disabled = true;
-    $('doc-google-continue').textContent = 'Creating...';
-    clearError($('doc-google-error'));
-    try{
-      await createDoctorAccount(name, phone, email, '');
-    }catch(e){
-      showError($('doc-google-error'), 'Something went wrong creating your account. Please try again.');
-    }finally{
-      $('doc-google-continue').disabled = false;
-      $('doc-google-continue').textContent = 'Continue';
+      $('doc-create-btn').textContent = 'Submit';
     }
   });
   $('doc-signin-btn').addEventListener('click', async function(){
-    var raw = $('doc-signin-id').value.trim().toUpperCase();
-    var id = raw.indexOf('DR-') === 0 ? raw : 'DR-' + raw.replace(/[^0-9]/g,'');
+    var email = $('doc-signin-email').value.trim();
     var password = $('doc-signin-password').value;
-    var data = await loadDoctor(id);
-    if (!data){
-      showError($('doc-signin-error'), 'We couldn\u2019t find a doctor account with that ID.');
-      return;
-    }
-    if (data.passwordHash){
-      var enteredHash = await hashPassword(password);
-      if (!password || enteredHash !== data.passwordHash){
-        showError($('doc-signin-error'), 'Incorrect password.');
+    clearError($('doc-signin-error'));
+    $('doc-signin-btn').disabled = true;
+    try{
+      var res = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
+      if (res.error){
+        showError($('doc-signin-error'), authErrorMessage(res.error));
         return;
       }
+      session = { type:'doctor', id:res.data.user.id };
+      await enterDoctorDash(res.data.user.id);
+    }finally{
+      $('doc-signin-btn').disabled = false;
     }
-    clearError($('doc-signin-error'));
-    session = { type:'doctor', id:id };
-    await enterDoctorDash(id);
   });
   $('doc-signin-password').addEventListener('keydown', function(e){
     if (e.key === 'Enter') $('doc-signin-btn').click();
   });
+  $('doc-forgot-btn').addEventListener('click', function(){ $('doc-forgot-modal').classList.remove('hidden'); });
+  function closeDocForgotModal(){ $('doc-forgot-modal').classList.add('hidden'); }
+  $('doc-forgot-close').addEventListener('click', closeDocForgotModal);
+  $('doc-forgot-ok').addEventListener('click', closeDocForgotModal);
+  $('doc-forgot-modal').addEventListener('click', function(e){ if (e.target === $('doc-forgot-modal')) closeDocForgotModal(); });
 
   // ================= PATIENT AUTH =================
+  function showPatientAuthPane(pane){
+    var signin = pane === 'signin';
+    $('pat-signin-pane').classList.toggle('hidden', !signin);
+    $('pat-signup-pane').classList.toggle('hidden', signin);
+  }
   function resetPatientAuthView(){
-    $('pat-tab-signup').classList.add('active');
-    $('pat-tab-signin').classList.remove('active');
-    $('pat-signup-pane').classList.remove('hidden');
-    $('pat-signin-pane').classList.add('hidden');
-    $('pat-google-panel').classList.add('hidden');
-    $('pat-signup-name').value = '';
-    $('pat-signup-phone').value = '';
-    $('pat-signup-email').value = '';
-    $('pat-signup-password').value = '';
-    $('pat-signup-password2').value = '';
-    $('pat-google-name').value = '';
-    $('pat-google-phone').value = '';
-    $('pat-google-email').value = '';
-    clearError($('pat-create-error'));
-    clearError($('pat-google-error'));
-    $('pat-signin-code').value = '';
+    showPatientAuthPane('signin');
+    $('pat-signin-email').value = '';
     $('pat-signin-password').value = '';
     clearError($('pat-signin-error'));
+    $('pat-signup-first').value = '';
+    $('pat-signup-middle').value = '';
+    $('pat-signup-last').value = '';
+    $('pat-signup-dob').value = '';
+    $('pat-signup-gender').value = '';
+    $('pat-signup-email').value = '';
+    $('pat-signup-password').value = '';
+    clearError($('pat-create-error'));
+    $('pat-signup-checkemail').classList.add('hidden');
   }
-  $('pat-tab-signup').addEventListener('click', function(){
-    $('pat-tab-signup').classList.add('active'); $('pat-tab-signin').classList.remove('active');
-    $('pat-signup-pane').classList.remove('hidden'); $('pat-signin-pane').classList.add('hidden');
-  });
-  $('pat-tab-signin').addEventListener('click', function(){
-    $('pat-tab-signin').classList.add('active'); $('pat-tab-signup').classList.remove('active');
-    $('pat-signin-pane').classList.remove('hidden'); $('pat-signup-pane').classList.add('hidden');
-  });
-  function emailIndexKey(email){ return 'patient-email:' + email.trim().toLowerCase(); }
-  async function linkPatientEmail(email, code){
-    if (!email) return;
-    await storeSet(emailIndexKey(email), code);
-  }
-  async function createPatientAccount(name, phone, email, password){
-    var code = await generatePatientCode();
-    var passwordHash = password ? await hashPassword(password) : '';
-    var data = { code:code, name:name||'', email:email||'', phone:phone||'', dob:'', idNumber:'', bloodType:'', emergencyContact:'', allergies:'', conditions:'', medications:'', photoUrl:'', passwordHash:passwordHash, visits: sampleVisits(), tests: sampleTests(), appointments: sampleAppointments(), createdAt: Date.now() };
-    await savePatient(code, data);
-    await linkPatientEmail(email, code);
-    session = { type:'patient', id:code };
-    await enterPatientDash(code);
-  }
+  $('pat-goto-signup-btn').addEventListener('click', function(){ showPatientAuthPane('signup'); });
+  $('pat-back-to-signin-btn').addEventListener('click', function(){ showPatientAuthPane('signin'); });
   $('pat-create-btn').addEventListener('click', async function(){
-    var name = $('pat-signup-name').value.trim();
-    var phone = $('pat-signup-phone').value.trim();
+    var first = $('pat-signup-first').value.trim();
+    var middle = $('pat-signup-middle').value.trim();
+    var last = $('pat-signup-last').value.trim();
+    var dob = $('pat-signup-dob').value;
+    var gender = $('pat-signup-gender').value;
     var email = $('pat-signup-email').value.trim();
     var password = $('pat-signup-password').value;
-    var password2 = $('pat-signup-password2').value;
     clearError($('pat-create-error'));
-    if (password && password.length < 6){
-      showError($('pat-create-error'), 'Password must be at least 6 characters, or leave both password fields blank to skip it for now.');
-      return;
-    }
-    if (password !== password2){
-      showError($('pat-create-error'), 'Passwords don\u2019t match.');
-      return;
-    }
+    $('pat-signup-checkemail').classList.add('hidden');
+    if (!first || !last){ showError($('pat-create-error'), 'First and last name are required.'); return; }
+    if (!dob){ showError($('pat-create-error'), 'Date of birth is required.'); return; }
+    if (!gender){ showError($('pat-create-error'), 'Please select a gender.'); return; }
+    if (!EMAIL_RE.test(email)){ showError($('pat-create-error'), 'Enter a valid email address.'); return; }
+    if (!password || password.length < 6){ showError($('pat-create-error'), 'Password must be at least 6 characters.'); return; }
+    var name = [first, middle, last].filter(Boolean).join(' ');
     $('pat-create-btn').disabled = true;
     $('pat-create-btn').textContent = 'Creating...';
     try{
-      await createPatientAccount(name, phone, email, password);
+      var res = await supabaseClient.auth.signUp({
+        email: email, password: password,
+        options: { data: { role: 'patient', name: name, dob: dob, gender: gender } }
+      });
+      if (res.error){
+        showError($('pat-create-error'), authErrorMessage(res.error, 'Something went wrong creating your account. Please try again.'));
+        return;
+      }
+      if (res.data.user && res.data.user.identities && res.data.user.identities.length === 0){
+        showError($('pat-create-error'), 'An account with that email already exists.');
+        return;
+      }
+      if (res.data.session){
+        session = { type:'patient', id:res.data.user.id };
+        await enterPatientDash(res.data.user.id);
+      } else {
+        $('pat-signup-checkemail-addr').textContent = email;
+        $('pat-signup-checkemail').classList.remove('hidden');
+      }
     }catch(e){
       showError($('pat-create-error'), 'Something went wrong creating your account. Please try again.');
     }finally{
       $('pat-create-btn').disabled = false;
-      $('pat-create-btn').textContent = 'Create my account';
-    }
-  });
-  $('pat-google-btn').addEventListener('click', function(){
-    $('pat-google-panel').classList.toggle('hidden');
-  });
-  $('pat-google-continue').addEventListener('click', async function(){
-    var name = $('pat-google-name').value.trim();
-    var phone = $('pat-google-phone').value.trim();
-    var email = $('pat-google-email').value.trim();
-    $('pat-google-continue').disabled = true;
-    $('pat-google-continue').textContent = 'Creating...';
-    clearError($('pat-google-error'));
-    try{
-      await createPatientAccount(name, phone, email, '');
-    }catch(e){
-      showError($('pat-google-error'), 'Something went wrong creating your account. Please try again.');
-    }finally{
-      $('pat-google-continue').disabled = false;
-      $('pat-google-continue').textContent = 'Continue';
+      $('pat-create-btn').textContent = 'Submit';
     }
   });
   $('pat-signin-btn').addEventListener('click', async function(){
-    var raw = $('pat-signin-code').value.trim();
+    var email = $('pat-signin-email').value.trim();
     var password = $('pat-signin-password').value;
-    var code = null;
-    if (raw.indexOf('@') !== -1){
-      code = await storeGet(emailIndexKey(raw));
-    } else {
-      var digits = raw.replace(/[^0-9]/g,'');
-      if (digits.length === 8) code = digits;
-    }
-    if (!code){
-      showError($('pat-signin-error'), 'We couldn\u2019t find an account with that code or email.');
-      return;
-    }
-    var data = await loadPatient(code);
-    if (!data){
-      showError($('pat-signin-error'), 'We couldn\u2019t find an account with that code or email.');
-      return;
-    }
-    if (data.passwordHash){
-      var enteredHash = await hashPassword(password);
-      if (!password || enteredHash !== data.passwordHash){
-        showError($('pat-signin-error'), 'Incorrect password.');
+    clearError($('pat-signin-error'));
+    $('pat-signin-btn').disabled = true;
+    try{
+      var res = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
+      if (res.error){
+        showError($('pat-signin-error'), authErrorMessage(res.error));
         return;
       }
+      session = { type:'patient', id:res.data.user.id };
+      await enterPatientDash(res.data.user.id);
+    }finally{
+      $('pat-signin-btn').disabled = false;
     }
-    clearError($('pat-signin-error'));
-    session = { type:'patient', id:code };
-    await enterPatientDash(code);
   });
   $('pat-signin-password').addEventListener('keydown', function(e){
     if (e.key === 'Enter') $('pat-signin-btn').click();
   });
+  $('pat-forgot-btn').addEventListener('click', function(){ $('pat-forgot-modal').classList.remove('hidden'); });
+  function closePatForgotModal(){ $('pat-forgot-modal').classList.add('hidden'); }
+  $('pat-forgot-close').addEventListener('click', closePatForgotModal);
+  $('pat-forgot-ok').addEventListener('click', closePatForgotModal);
+  $('pat-forgot-modal').addEventListener('click', function(e){ if (e.target === $('pat-forgot-modal')) closePatForgotModal(); });
 
   // ================= PATIENT DASHBOARD =================
   var currentPatientData = null;
   var calViewDate = new Date();
 
-  function sampleVisits(){
-    return [
-      { doctorName:'Dr. Ali Raza', date:'2026-05-14', time:'10:30 AM', symptoms:'Persistent cough and mild fever for four days.', diagnosis:'Acute bronchitis', prescription:'Amoxicillin 500mg, 3x daily for 7 days.', notes:'Follow up if symptoms persist beyond 10 days.' },
-      { doctorName:'Dr. Fatima Noor', date:'2026-02-02', time:'3:00 PM', symptoms:'Routine annual check-up, no complaints.', diagnosis:'No concerns found.', prescription:'None', notes:'Recommended an annual blood panel and flu shot.' }
-    ];
-  }
-  function sampleTests(){
-    return [
-      { name:'Complete Blood Count (CBC)', date:'2026-02-02' },
-      { name:'Chest X-Ray', date:'2026-05-15' }
-    ];
-  }
-  function sampleAppointments(){
-    var d = new Date();
-    function inDays(n){ var t = new Date(d); t.setDate(t.getDate() + n); return t.toISOString().slice(0, 10); }
-    return [
-      { doctorName:'Dr. Ali Raza', clinicName:'City General Hospital', date: inDays(4), time:'11:00 AM', reason:'Follow-up for bronchitis' },
-      { doctorName:'Dr. Fatima Noor', clinicName:'Shifa Clinic', date: inDays(11), time:'4:30 PM', reason:'Annual check-up' }
-    ];
-  }
   function getInitials(name){
     if (!name || !name.trim()) return '?';
     var parts = name.trim().split(/\s+/);
@@ -665,17 +501,28 @@
     }
   }
 
-  async function enterPatientDash(code){
-    var data = await loadPatient(code);
-    if (!data) data = { code:code };
-    var seeded = false;
-    if (!data.visits || !data.visits.length){ data.visits = sampleVisits(); seeded = true; }
-    if (!data.tests || !data.tests.length){ data.tests = sampleTests(); seeded = true; }
-    if (!data.appointments || !data.appointments.length){ data.appointments = sampleAppointments(); seeded = true; }
-    if (!data.eyeEntries) data.eyeEntries = [];
+  async function enterPatientDash(id){
+    var data = await loadPatientProfile(id);
+    if (!data){
+      // profile row missing is unexpected (the signup trigger should have created
+      // it) — bail out to landing rather than show a broken dashboard.
+      session = { type:null, id:null };
+      showView('view-landing');
+      return;
+    }
+    var authUser = await getAuthUser();
+    data.email = authUser.email;
+    var visitsRes = await supabaseClient.from('visits').select('*').eq('patient_id', id).order('date', { ascending:false });
+    var testsRes = await supabaseClient.from('tests').select('*').eq('patient_id', id).order('date', { ascending:false });
+    var eyesRes = await supabaseClient.from('eye_entries').select('*').eq('patient_id', id).order('date', { ascending:false });
+    var apptsRes = await supabaseClient.from('appointments').select('*').eq('patient_id', id).order('date', { ascending:true });
+    data.visits = (visitsRes.data || []).map(mapVisitRow);
+    data.tests = (testsRes.data || []).map(mapTestRow);
+    data.eyeEntries = (eyesRes.data || []).map(mapEyeRow);
+    data.appointments = (apptsRes.data || []).map(mapAppointmentRow);
     currentPatientData = data;
-    if (seeded){ try{ await savePatient(code, data); }catch(e){} }
     renderHealthCard(data);
+    renderVerifyBanner('pat', authUser.email, !!authUser.email_confirmed_at);
     renderVisitsList(data.visits);
     renderTestsList(data.tests);
     renderPrescriptionsList(data.visits);
@@ -762,7 +609,7 @@
   function renderGrantRow(entry, showRevoke, subtext){
     var d = entry.doctor;
     var name = d.name ? ('Dr. ' + d.name.replace(/^Dr\.?\s*/i,'')) : (d.doctorId || 'Unknown doctor');
-    var verified = d.email && d.phone && d.license;
+    var verified = !!d.verified;
     return '<div class="list-item" data-grant="'+entry.grant.id+'" style="cursor:default;">'
       + '<div><div class="li-title">'+escapeHtml(name)+' <span class="badge '+(verified?'verified':'unverified')+'" style="margin-left:6px;">'+(verified?'Verified':'Unverified')+'</span></div>'
       + '<div class="li-sub">'+escapeHtml(maskPhone(d.phone))+(subtext ? ' · '+subtext : '')+'</div></div>'
@@ -812,20 +659,20 @@
   }
   $('pat-trust-add-btn').addEventListener('click', async function(){
     var raw = $('pat-trust-input').value.trim().toUpperCase();
-    var id = raw.indexOf('DR-') === 0 ? raw : 'DR-' + raw.replace(/[^0-9]/g,'');
+    var code = raw.indexOf('DR-') === 0 ? raw : 'DR-' + raw.replace(/[^0-9]/g,'');
     clearError($('pat-trust-error'));
-    if (!/^DR-\d{6}$/.test(id)){
+    if (!/^DR-\d{6}$/.test(code)){
       showError($('pat-trust-error'), 'Enter a valid doctor ID, like DR-482913.');
       return;
     }
-    var doc = await loadDoctor(id);
-    if (!doc){
+    var docRes = await supabaseClient.from('doctors').select('id').eq('doctor_code', code).maybeSingle();
+    if (!docRes.data){
       showError($('pat-trust-error'), 'No doctor found with that ID.');
       return;
     }
     $('pat-trust-add-btn').disabled = true;
     try{
-      await createTrustGrant(session.id, id);
+      await createTrustGrant(session.id, docRes.data.id);
       $('pat-trust-input').value = '';
       renderTrustedList();
     }finally{
@@ -849,13 +696,10 @@
   $('pat-myprofile-btn').addEventListener('click', openPatProfilePage);
 
   $('pat-profile-save-btn').addEventListener('click', async function(){
-    var data = Object.assign({}, currentPatientData, {
-      code: session.id,
-      name: $('pat-name').value.trim()
-    });
-    await savePatient(session.id, data);
-    currentPatientData = data;
-    renderHealthCard(data);
+    var name = $('pat-name').value.trim();
+    await supabaseClient.from('patients').update({ name: name }).eq('id', session.id);
+    currentPatientData.name = name;
+    renderHealthCard(currentPatientData);
     var note = $('pat-profile-save-note');
     note.classList.add('show');
     setTimeout(function(){ note.classList.remove('show'); }, 1800);
@@ -863,17 +707,42 @@
 
   $('pat-save-btn').addEventListener('click', async function(){
     var email = $('pat-email').value.trim();
-    var data = Object.assign({}, currentPatientData, {
-      code: session.id,
-      email: email,
-      phone: $('pat-phone').value.trim()
-    });
-    await savePatient(session.id, data);
-    await linkPatientEmail(email, session.id);
-    currentPatientData = data;
-    var note = $('pat-save-note');
-    note.classList.add('show');
-    setTimeout(function(){ note.classList.remove('show'); }, 1800);
+    var phone = $('pat-phone').value.trim();
+    $('pat-save-btn').disabled = true;
+    try{
+      var authUser = await getAuthUser();
+      if (email && email !== authUser.email){
+        await supabaseClient.auth.updateUser({ email: email });
+        // Supabase confirms the new address before auth.users.email actually
+        // changes — the verify banner naturally reappears until that happens,
+        // no separate "reset the flag" step needed.
+      }
+      await supabaseClient.from('patients').update({ phone: phone }).eq('id', session.id);
+      currentPatientData.phone = phone;
+      authUser = await getAuthUser();
+      currentPatientData.email = authUser.email;
+      renderVerifyBanner('pat', authUser.email, !!authUser.email_confirmed_at);
+      var note = $('pat-save-note');
+      note.classList.add('show');
+      setTimeout(function(){ note.classList.remove('show'); }, 1800);
+    }finally{
+      $('pat-save-btn').disabled = false;
+    }
+  });
+  $('pat-verify-btn').addEventListener('click', async function(){
+    var btn = $('pat-verify-btn');
+    var authUser = await getAuthUser();
+    if (!authUser || !authUser.email) return;
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    try{
+      await supabaseClient.auth.resend({ type:'signup', email: authUser.email });
+      btn.textContent = 'Sent!';
+    }catch(e){
+      btn.textContent = 'Resend email';
+    }finally{
+      setTimeout(function(){ btn.textContent = 'Resend email'; btn.disabled = false; }, 2500);
+    }
   });
 
   function computePatientStats(data){
@@ -953,14 +822,14 @@
       $('pat-avatar-img').src = dataUrl;
       $('pat-avatar-img').classList.remove('hidden');
       $('pat-avatar-fallback').classList.add('hidden');
-      var data = Object.assign({}, currentPatientData, { photoUrl: dataUrl });
-      currentPatientData = data;
-      try{ await savePatient(session.id, data); }catch(err){}
+      currentPatientData.photoUrl = dataUrl;
+      try{ await supabaseClient.from('patients').update({ photo_url: dataUrl }).eq('id', session.id); }catch(err){}
     };
     reader.readAsDataURL(file);
   });
-  $('pat-signout').addEventListener('click', function(){
+  $('pat-signout').addEventListener('click', async function(){
     stopLiveCodeTimer();
+    await supabaseClient.auth.signOut();
     session = { type:null, id:null };
     showView('view-landing');
   });
@@ -1298,28 +1167,26 @@
       return;
     }
     clearError($('add-eye-error'));
-    var entry = {
+    var row = {
+      patient_id: session.id,
       date: date,
-      sphL: $('eye-sph-l').value.trim(),
-      cylL: $('eye-cyl-l').value.trim(),
-      axisL: $('eye-axis-l').value.trim(),
-      sphR: $('eye-sph-r').value.trim(),
-      cylR: $('eye-cyl-r').value.trim(),
-      axisR: $('eye-axis-r').value.trim()
+      sph_l: $('eye-sph-l').value.trim(),
+      cyl_l: $('eye-cyl-l').value.trim(),
+      axis_l: $('eye-axis-l').value.trim(),
+      sph_r: $('eye-sph-r').value.trim(),
+      cyl_r: $('eye-cyl-r').value.trim(),
+      axis_r: $('eye-axis-r').value.trim()
     };
     $('add-eye-save').disabled = true;
     $('add-eye-save').textContent = 'Saving...';
     try{
-      var data = await loadPatient(session.id);
-      if (!data){
-        showError($('add-eye-error'), 'Your record could not be found anymore.');
+      var res = await supabaseClient.from('eye_entries').insert(row).select().maybeSingle();
+      if (res.error || !res.data){
+        showError($('add-eye-error'), 'Something went wrong saving this entry. Please try again.');
         return;
       }
-      if (!data.eyeEntries) data.eyeEntries = [];
-      data.eyeEntries.unshift(entry);
-      await savePatient(session.id, data);
-      currentPatientData = data;
-      renderEyesList(data.eyeEntries);
+      currentPatientData.eyeEntries.unshift(mapEyeRow(res.data));
+      renderEyesList(currentPatientData.eyeEntries);
       closeAddEyeModal();
       var note = $('add-eye-note');
       note.classList.add('show');
@@ -1353,23 +1220,40 @@
       $('doc-avatar-fallback').textContent = getDoctorInitials(data.name);
     }
   }
+  async function loadDoctorVisitLog(doctorId){
+    var res = await supabaseClient.from('visits').select('patient_id, date').eq('authored_by_doctor_id', doctorId);
+    return (res.data || []).map(function(r){ return { patientCode: r.patient_id, date: r.date }; });
+  }
   async function enterDoctorDash(id){
-    var data = await loadDoctor(id);
-    if (!data) data = { doctorId:id };
-    if (!data.clinics) data.clinics = [];
-    if (!data.currentClinic) data.currentClinic = '';
-    if (!data.visitLog) data.visitLog = [];
+    var data = await loadDoctorProfile(id);
+    if (!data){
+      session = { type:null, id:null };
+      showView('view-landing');
+      return;
+    }
+    var authUser = await getAuthUser();
+    data.email = authUser.email;
+    // Self-heal: "Verified" now requires a confirmed email too, not just its
+    // presence — recompute and persist it here so a doctor who just clicked their
+    // confirmation link sees the badge update the next time they land here.
+    var shouldBeVerified = !!(data.phone && data.license && authUser.email_confirmed_at);
+    if (shouldBeVerified !== data.verified){
+      data.verified = shouldBeVerified;
+      try{ await supabaseClient.from('doctors').update({ verified: shouldBeVerified }).eq('id', id); }catch(e){}
+    }
+    data.visitLog = await loadDoctorVisitLog(id);
     currentDoctorData = data;
-    $('doc-dash-id').textContent = id;
-    $('doc-modal-id').textContent = id;
+    $('doc-dash-id').textContent = data.doctorId;
+    $('doc-modal-id').textContent = data.doctorId;
     $('doc-name').value = data.name || '';
-    $('doc-email').value = data.email || '';
+    $('doc-email').value = authUser.email || '';
     $('doc-phone').value = data.phone || '';
     $('doc-license').value = data.license || '';
     $('doc-specialty').value = data.specialty || '';
     $('doc-education').value = data.education || '';
     $('doc-about').value = data.about || '';
     renderDoctorCard(data);
+    renderVerifyBanner('doc', authUser.email, !!authUser.email_confirmed_at);
     renderDoctorVerification(data);
     renderClinicSelect(data);
     $('lookup-code').value = '';
@@ -1423,14 +1307,15 @@
         + chevronSvg + '</div>';
     }).join('');
     listEl.querySelectorAll('.list-item').forEach(function(el){
-      el.addEventListener('click', function(){
+      el.addEventListener('click', async function(){
         var e = entries[parseInt(el.getAttribute('data-idx'), 10)];
-        showLookupResult(e.patient.code, e.patient, e.grant);
+        var full = await loadPatientRecordForDoctor(e.patient.id);
+        if (full) showLookupResult(e.patient.id, full, e.grant);
       });
     });
   }
   function renderDoctorVerification(data){
-    var verified = isDoctorVerified(data);
+    var verified = !!data.verified;
     var badge = $('doc-badge');
     badge.textContent = verified ? 'Verified' : 'Unverified';
     badge.className = 'badge ' + (verified ? 'verified' : 'unverified');
@@ -1469,7 +1354,7 @@
         var idx = parseInt(btn.getAttribute('data-idx'), 10);
         var removed = currentDoctorData.clinics.splice(idx, 1)[0];
         if (currentDoctorData.currentClinic === removed) currentDoctorData.currentClinic = '';
-        await saveDoctor(session.id, currentDoctorData);
+        await supabaseClient.from('doctors').update({ clinics: currentDoctorData.clinics, current_clinic: currentDoctorData.currentClinic }).eq('id', session.id);
         renderClinicsList(currentDoctorData);
         renderClinicSelect(currentDoctorData);
       });
@@ -1484,7 +1369,7 @@
     if (!exists){
       currentDoctorData.clinics.push(name);
       if (!currentDoctorData.currentClinic) currentDoctorData.currentClinic = name;
-      await saveDoctor(session.id, currentDoctorData);
+      await supabaseClient.from('doctors').update({ clinics: currentDoctorData.clinics, current_clinic: currentDoctorData.currentClinic }).eq('id', session.id);
       renderClinicsList(currentDoctorData);
       renderClinicSelect(currentDoctorData);
     }
@@ -1496,41 +1381,67 @@
   });
   $('doc-current-clinic').addEventListener('change', async function(){
     currentDoctorData.currentClinic = $('doc-current-clinic').value;
-    await saveDoctor(session.id, currentDoctorData);
+    await supabaseClient.from('doctors').update({ current_clinic: currentDoctorData.currentClinic }).eq('id', session.id);
   });
 
   $('doc-save-btn').addEventListener('click', async function(){
-    var data = Object.assign({}, currentDoctorData, {
-      doctorId: session.id,
-      email: $('doc-email').value.trim(),
-      phone: $('doc-phone').value.trim(),
-      license: $('doc-license').value.trim()
-    });
-    data.verified = isDoctorVerified(data);
-    await saveDoctor(session.id, data);
-    currentDoctorData = data;
-    renderDoctorVerification(data);
-    var note = $('doc-save-note');
-    note.classList.add('show');
-    setTimeout(function(){ note.classList.remove('show'); }, 1800);
+    var email = $('doc-email').value.trim();
+    var phone = $('doc-phone').value.trim();
+    var license = $('doc-license').value.trim();
+    $('doc-save-btn').disabled = true;
+    try{
+      var authUser = await getAuthUser();
+      if (email && email !== authUser.email){
+        await supabaseClient.auth.updateUser({ email: email });
+        authUser = await getAuthUser();
+      }
+      var verified = !!(phone && license && authUser.email_confirmed_at);
+      await supabaseClient.from('doctors').update({ phone: phone, license: license, verified: verified }).eq('id', session.id);
+      currentDoctorData.phone = phone;
+      currentDoctorData.license = license;
+      currentDoctorData.verified = verified;
+      currentDoctorData.email = authUser.email;
+      renderDoctorVerification(currentDoctorData);
+      renderVerifyBanner('doc', authUser.email, !!authUser.email_confirmed_at);
+      var note = $('doc-save-note');
+      note.classList.add('show');
+      setTimeout(function(){ note.classList.remove('show'); }, 1800);
+    }finally{
+      $('doc-save-btn').disabled = false;
+    }
+  });
+  $('doc-verify-btn').addEventListener('click', async function(){
+    var btn = $('doc-verify-btn');
+    var authUser = await getAuthUser();
+    if (!authUser || !authUser.email) return;
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    try{
+      await supabaseClient.auth.resend({ type:'signup', email: authUser.email });
+      btn.textContent = 'Sent!';
+    }catch(e){
+      btn.textContent = 'Resend email';
+    }finally{
+      setTimeout(function(){ btn.textContent = 'Resend email'; btn.disabled = false; }, 2500);
+    }
   });
   $('doc-profile-save-btn').addEventListener('click', async function(){
-    var data = Object.assign({}, currentDoctorData, {
-      doctorId: session.id,
-      name: $('doc-name').value.trim(),
-      specialty: $('doc-specialty').value.trim(),
-      education: $('doc-education').value.trim(),
-      about: $('doc-about').value.trim()
-    });
-    await saveDoctor(session.id, data);
-    currentDoctorData = data;
-    renderDoctorCard(data);
+    var name = $('doc-name').value.trim();
+    var specialty = $('doc-specialty').value.trim();
+    var education = $('doc-education').value.trim();
+    var about = $('doc-about').value.trim();
+    await supabaseClient.from('doctors').update({ name: name, specialty: specialty, education: education, about: about }).eq('id', session.id);
+    currentDoctorData.name = name;
+    currentDoctorData.specialty = specialty;
+    currentDoctorData.education = education;
+    currentDoctorData.about = about;
+    renderDoctorCard(currentDoctorData);
     var note = $('doc-profile-save-note');
     note.classList.add('show');
     setTimeout(function(){ note.classList.remove('show'); }, 1800);
   });
   $('doc-dash-copy').addEventListener('click', function(){
-    copyToClipboard(session.id, $('doc-dash-copy-note'));
+    copyToClipboard(currentDoctorData.doctorId, $('doc-dash-copy-note'));
   });
   $('doc-avatar-btn').addEventListener('click', function(){
     $('doc-avatar-input').click();
@@ -1551,13 +1462,13 @@
       $('doc-avatar-img').src = dataUrl;
       $('doc-avatar-img').classList.remove('hidden');
       $('doc-avatar-fallback').classList.add('hidden');
-      var data = Object.assign({}, currentDoctorData, { photoUrl: dataUrl });
-      currentDoctorData = data;
-      try{ await saveDoctor(session.id, data); }catch(err){}
+      currentDoctorData.photoUrl = dataUrl;
+      try{ await supabaseClient.from('doctors').update({ photo_url: dataUrl }).eq('id', session.id); }catch(err){}
     };
     reader.readAsDataURL(file);
   });
-  $('doc-signout').addEventListener('click', function(){
+  $('doc-signout').addEventListener('click', async function(){
+    await supabaseClient.auth.signOut();
     session = { type:null, id:null };
     showView('view-landing');
   });
@@ -1683,8 +1594,8 @@
   $('doc-test-modal-close').addEventListener('click', closeDocTestModal);
   $('doc-test-modal').addEventListener('click', function(e){ if (e.target === $('doc-test-modal')) closeDocTestModal(); });
 
-  function showLookupResult(code, data, grant){
-    currentLookupCode = code;
+  function showLookupResult(patientId, data, grant){
+    currentLookupCode = patientId;
     currentLookupData = data;
     currentLookupGrant = grant || null;
     $('lookup-row').classList.add('hidden');
@@ -1733,24 +1644,22 @@
     }
     $('lookup-btn').disabled = true;
     try{
-      var result = await redeemAccessCode(code, session.id);
+      var result = await redeemAccessCode(code);
       if (!result.ok){
         $('patient-result').classList.add('hidden');
         $('lookup-not-found').classList.remove('hidden');
-        $('lookup-not-found').textContent =
-          result.reason === 'expired' ? 'That code has expired — ask your patient to generate a new one.' :
-          result.reason === 'redeemed' ? 'That code has already been used — ask your patient for a new one.' :
-          'No active code found. Double-check it with your patient.';
+        $('lookup-not-found').textContent = mapRedeemErrorText(result.error);
         return;
       }
-      var data = await loadPatient(result.patientId);
-      if (!data){
+      var full = await loadPatientRecordForDoctor(result.patientId);
+      if (!full){
         $('patient-result').classList.add('hidden');
         $('lookup-not-found').classList.remove('hidden');
         $('lookup-not-found').textContent = 'That patient’s record could not be found.';
         return;
       }
-      showLookupResult(result.patientId, data, result.grant);
+      var grant = await getActiveGrant(result.patientId, session.id);
+      showLookupResult(result.patientId, full, grant);
     }finally{
       $('lookup-btn').disabled = false;
     }
@@ -1763,7 +1672,7 @@
   function currentDoctorDisplayName(){
     var name = currentDoctorData && currentDoctorData.name ? currentDoctorData.name.trim() : '';
     if (name) return 'Dr. ' + name.replace(/^Dr\.?\s*/i, '');
-    return session.id || 'Doctor';
+    return (currentDoctorData && currentDoctorData.doctorId) || 'Doctor';
   }
   function openAddVisitModal(){
     if (!currentLookupCode) return;
@@ -1804,33 +1713,31 @@
         showError($('add-visit-error'), 'Your access to this patient has expired or been revoked. Ask them for a new code or to re-trust you.');
         return;
       }
-      var visit = {
-        doctorName: currentDoctorDisplayName(),
-        clinicName: (currentDoctorData && currentDoctorData.currentClinic) || '',
+      var row = {
+        patient_id: currentLookupCode,
+        authored_by_doctor_id: session.id,
+        written_via_grant_id: activeGrant.id,
+        doctor_name: currentDoctorDisplayName(),
+        clinic_name: (currentDoctorData && currentDoctorData.currentClinic) || '',
         date: date,
         time: $('visit-time').value.trim(),
         symptoms: $('visit-symptoms').value.trim(),
         diagnosis: $('visit-diagnosis').value.trim(),
         prescription: $('visit-prescription').value.trim(),
         notes: $('visit-notes').value.trim(),
-        writtenViaGrantId: activeGrant.id,
         unverified: !isDoctorVerified(currentDoctorData || {})
       };
-      var data = await loadPatient(currentLookupCode);
-      if (!data){
-        showError($('add-visit-error'), 'This patient record could not be found anymore.');
+      // RLS re-checks the grant independently at insert time (has_active_grant on
+      // the visits_insert policy) — the client-side check above is UX, not the
+      // security boundary, so a rejected insert here means access was revoked in
+      // the moment between the check and the save.
+      var res = await supabaseClient.from('visits').insert(row).select().maybeSingle();
+      if (res.error || !res.data){
+        showError($('add-visit-error'), 'Your access to this patient has expired or been revoked. Ask them for a new code or to re-trust you.');
         return;
       }
-      if (!data.visits) data.visits = [];
-      data.visits.unshift(visit);
-      await savePatient(currentLookupCode, data);
-      currentLookupData = data;
-      renderDoctorVisitsList(data.visits);
-      if (currentDoctorData){
-        if (!currentDoctorData.visitLog) currentDoctorData.visitLog = [];
-        currentDoctorData.visitLog.push({ patientCode: currentLookupCode, patientName: data.name || '', date: date });
-        try{ await saveDoctor(session.id, currentDoctorData); }catch(err){}
-      }
+      currentLookupData.visits = [mapVisitRow(res.data)].concat(currentLookupData.visits || []);
+      renderDoctorVisitsList(currentLookupData.visits);
       closeAddVisitModal();
       var note = $('add-visit-note');
       note.classList.add('show');
@@ -1885,24 +1792,23 @@
         showError($('add-test-error'), 'Your access to this patient has expired or been revoked. Ask them for a new code or to re-trust you.');
         return;
       }
-      var test = {
+      var row = {
+        patient_id: currentLookupCode,
+        authored_by_doctor_id: session.id,
+        written_via_grant_id: activeGrant.id,
         name: name,
         date: date,
-        doctorName: currentDoctorDisplayName(),
-        resultSummary: $('test-result').value.trim(),
-        writtenViaGrantId: activeGrant.id,
+        doctor_name: currentDoctorDisplayName(),
+        result_summary: $('test-result').value.trim(),
         unverified: !isDoctorVerified(currentDoctorData || {})
       };
-      var data = await loadPatient(currentLookupCode);
-      if (!data){
-        showError($('add-test-error'), 'This patient record could not be found anymore.');
+      var res = await supabaseClient.from('tests').insert(row).select().maybeSingle();
+      if (res.error || !res.data){
+        showError($('add-test-error'), 'Your access to this patient has expired or been revoked. Ask them for a new code or to re-trust you.');
         return;
       }
-      if (!data.tests) data.tests = [];
-      data.tests.unshift(test);
-      await savePatient(currentLookupCode, data);
-      currentLookupData = data;
-      renderDoctorTestsList(data.tests);
+      currentLookupData.tests = [mapTestRow(res.data)].concat(currentLookupData.tests || []);
+      renderDoctorTestsList(currentLookupData.tests);
       closeAddTestModal();
       var note = $('add-test-note');
       note.classList.add('show');
@@ -2047,11 +1953,34 @@
   }
   $('doc-stats-btn').addEventListener('click', openDocStatsPage);
 
-  // Every session starts fresh on landing regardless of what hash a reload carried
-  // in — there's no persisted session to restore a deep link into, so replace
-  // (never push) to avoid leaving a stray extra entry in front of it.
-  history.replaceState({ view: 'view-landing' }, '', '#view-landing');
-  suppressHistoryPush = true;
-  showView('view-landing');
-  suppressHistoryPush = false;
+  // ---------- Bootstrap ----------
+  // Unlike the old kv_store version, the Supabase client persists its own session
+  // in localStorage — so a reload no longer has to restart at landing. If a
+  // session already exists (including one just established by a confirmation or
+  // password-reset link's #access_token=... fragment, which the client consumes
+  // automatically during getSession()), route straight into the right dashboard
+  // instead of showing landing at all.
+  (async function bootstrap(){
+    var res = await supabaseClient.auth.getSession();
+    var authSession = res.data && res.data.session;
+    if (authSession && authSession.user){
+      var role = authSession.user.user_metadata && authSession.user.user_metadata.role;
+      var targetView = role === 'doctor' ? 'view-doctor-dash' : 'view-patient-dash';
+      history.replaceState({ view: targetView }, '', location.pathname + location.search);
+      suppressHistoryPush = true;
+      if (role === 'doctor'){
+        session = { type:'doctor', id: authSession.user.id };
+        await enterDoctorDash(authSession.user.id);
+      } else {
+        session = { type:'patient', id: authSession.user.id };
+        await enterPatientDash(authSession.user.id);
+      }
+      suppressHistoryPush = false;
+    } else {
+      history.replaceState({ view: 'view-landing' }, '', '#view-landing');
+      suppressHistoryPush = true;
+      showView('view-landing');
+      suppressHistoryPush = false;
+    }
+  })();
 })();

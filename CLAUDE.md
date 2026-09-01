@@ -9,13 +9,22 @@ patient creates and can revoke at any time. See "Access model" below.
 
 ## Current state
 
-This is a **single-file HTML/CSS/JS prototype**: `pakHealth.html`. No build step —
-open it directly in a browser. All styling and logic live in that one file (inline
-`<style>` and `<script>` tags), plus one CDN script tag for the Supabase JS client
-(see Storage below).
+The frontend is still a **single-file HTML/CSS/JS app**: `pakHealth.html` (plus
+`style.css`/`app.js`, split out from it). No build step — open it directly in a
+browser. The backend, however, is now a **real Supabase project** — real Supabase
+Auth accounts (not a hand-rolled password scheme) and a relational schema with RLS
+policies that enforce the access-grant model in the database itself, not just in
+client-side JS. See [`supabase/schema.sql`](supabase/schema.sql) for the source of
+truth, and "Storage" / "Auth" below for how the client talks to it.
 
-**This is a demo, not a real product.** It should never hold real patient data. See
-"Known limitations" below for why.
+**This is now aimed at a small, real, supervised pilot** — a handful of consenting
+clinics/patients, not a national rollout (see [`ACCESS-MODEL.md`](ACCESS-MODEL.md)'s
+own scope note: "a doctor–patient product, not a national system"). The security
+foundation for that (real auth, database-enforced access control, no fake seeded
+data) is in place; what's *not* yet done before real patients should touch it is
+tracked in "Known limitations" and "Natural next steps" below — most importantly a
+real SMTP sender for verification email, a real consent flow, and a Supabase Pro
+upgrade with backups.
 
 ## Architecture
 
@@ -32,81 +41,105 @@ open it directly in a browser. All styling and logic live in that one file (inli
   real navigation. A `popstate` listener re-applies the view without re-pushing, and
   redirects to `view-landing` if the target needs a session (`PATIENT_ONLY_VIEWS` /
   `DOCTOR_ONLY_VIEWS`) that no longer exists — e.g. pressing back after signing out.
-  There's still no session persistence across a real page reload, so a reload always
-  restarts at landing regardless of the hash in the URL (deep-linking into an
-  authenticated view isn't supported, and isn't attempted).
-- **Storage**: three tiers, tried in order, all behind the same `storeGet`/`storeSet`
-  interface so the rest of the app never branches on which one is active. (1)
-  `window.storage` (Claude.ai artifact persistent storage API) when running inside
-  the Claude.ai artifact viewer. (2) **Supabase**, if `SUPABASE_URL` /
-  `SUPABASE_ANON_KEY` near the top of the `<script>` are filled in with a real
-  project's values — a single `kv_store` table (`key text primary key, value text`)
-  mirrors the get/set-by-key shape exactly, so this is real persistence for a live
-  deploy. (3) An **in-memory JS object fallback** if neither is available/configured
-  — resets on every page reload, doesn't sync across devices. Until Supabase
-  credentials are filled in, the app silently runs on tier (3) exactly as before.
-- **Data keys**: `patient:<8-digit-code>` and `doctor:<DR-XXXXXX>`, stored as JSON
-  strings, `shared: true` so a doctor's browser can look up a patient's record by code.
-  A third key shape, `patient-email:<lowercased-email>`, stores just the plain-text
-  code as its value — a secondary index so a patient can sign in with their email
-  instead of their code. Written at signup and re-written whenever a patient saves a
-  new email in Account settings; the old key isn't cleaned up if the email changes
-  (harmless — it would just also resolve to the same patient), so this can drift into
-  a few orphaned rows over time.
-- **Access grants** (see "Access model" below) live in two real Postgres tables,
-  `access_codes` and `access_grants`, separate from `kv_store` — this is structured,
-  queryable data (expiry, redemption, revocation), not a fit for the JSON-blob shape
-  everything else uses. Same fallback pattern as the rest of storage: if these tables
-  aren't there yet, grant helpers fall back to in-memory arrays for that browser tab's
-  session only.
-- **Auth**: password is optional at signup (deliberately, to keep trying the app
-  frictionless). If set, it's SHA-256 hashed client-side via `crypto.subtle` (no salt —
-  not real security, just better than plaintext) with a non-cryptographic fallback hash
-  if `SubtleCrypto` is unavailable. Accounts with no password sign in with code/ID alone
-  — mirrors how the "Continue with Google" demo accounts work (no password stored at
-  all, matching real OAuth behavior).
+  A real page reload no longer restarts at landing — see "Auth" below for how the
+  Supabase session bootstrap handles that now — but deep-linking into a specific
+  *sub*-view (e.g. reloading straight into `#view-record-visits`) still isn't
+  attempted; reload always lands on the role's main dashboard.
+- **Storage**: real Supabase Postgres, no fallback tiers. `SUPABASE_URL` /
+  `SUPABASE_ANON_KEY` near the top of `app.js` point at the pilot's Supabase project.
+  There is deliberately no `window.storage`/in-memory fallback the way the original
+  demo had — this app now holds real pilot data (once real users are onboarded), so a
+  failed connection shows a real "can't connect" error on load instead of silently
+  pretending to work on a fallback that would just lose the user's data on reload. See
+  [`supabase/schema.sql`](supabase/schema.sql) for every table, RLS policy, and RPC
+  function — that file is the source of truth, not this doc.
+- **Schema, in brief**: `patients` and `doctors` are real tables keyed by the
+  Supabase Auth user id (`auth.users.id`), each carrying a human-facing display code
+  (`code` / `doctor_code`) generated server-side. `visits`, `tests`, `eye_entries`,
+  and `appointments` are one row per entry (not a JSON array on the patient row) —
+  besides being the correct shape for RLS, this also fixed a real bug the old
+  JSON-blob design had: concurrent read-modify-write saves could silently drop
+  entries (see the old "race condition" known limitation, now resolved). `visits`/
+  `tests` carry `authored_by_doctor_id`, `written_via_grant_id`, and `unverified` —
+  exactly the three columns ACCESS-MODEL.md §13 specifies.
+- **Access grants** (see "Access model" below) live in `access_codes` and
+  `access_grants`, same shape as before but with `patient_id`/`doctor_id` now typed
+  as `uuid references auth.users(id)` instead of free-text codes, so RLS policies can
+  compare directly against `auth.uid()`. A doctor's browser has **no direct read
+  access to `access_codes` at all** — redeeming a live code goes through
+  `redeem_access_code()`, a `security definer` Postgres function, so the server (not
+  the client) is what confirms a code is current/unexpired/unredeemed and mints the
+  grant.
+- **Auth**: real Supabase Auth (`supabase.auth.signUp`/`signInWithPassword`/
+  `signOut`), not a hand-rolled password scheme — no more client-side SHA-256
+  hashing, no more `passwordHash` column. A Postgres trigger (`handle_new_user()`,
+  the standard Supabase pattern) creates the matching `patients`/`doctors` row the
+  instant an `auth.users` row is inserted, reading `role`/`name`/`dob`/`gender`/
+  `license` out of the signup call's `options.data` — this guarantees a profile row
+  always exists alongside the auth user, with no separate client-side write that
+  could fail or race. Sign-in is **email-only for both roles now** — the old
+  `patient-email:`/`doctor-email:` lookup-index tables and the doctor-ID/8-digit-code
+  sign-in fallbacks were dropped, since Supabase Auth's own user table already is the
+  email index (see git history for the earlier session's kv_store-based version if
+  that fallback is ever wanted back). The Supabase JS client persists its session in
+  `localStorage` on its own, so a page reload now bootstraps straight into the right
+  dashboard instead of always restarting at landing (see the `bootstrap()` IIFE at
+  the bottom of `app.js`) — this also handles a clicked email-confirmation link
+  correctly, since the client consumes the link's `#access_token=...` fragment
+  before the app's own hash-based view router runs.
 
-## Data model (informal)
+## Data model
 
-```
-patient: {
-  code, name, email, phone, photoUrl, passwordHash,  // no "verified" — that's a doctor-only concept, see below
-  bloodType, emergencyContact, allergies, conditions, medications,  // no longer editable in UI, kept for compat
-  visits: [{ doctorName, clinicName, date, time, symptoms, diagnosis, prescription, notes,
-             writtenViaGrantId, unverified }],  // last two added with the access model, see below
-  tests:  [{ name, date, doctorName, resultSummary, writtenViaGrantId, unverified }],
-  eyeEntries: [{ date, sphL, cylL, axisL, sphR, cylR, axisR }],  // self-entered, patient-only, see "My Eyes" below
-  appointments: [{ doctorName, clinicName, date, time, reason }]  // display-only for now, see "Appointments" below
-}
+The real schema is [`supabase/schema.sql`](supabase/schema.sql) — that's the source
+of truth (tables, RLS policies, the signup trigger, the redemption RPC), not this
+doc. In short: `patients` / `doctors` (one row per account, keyed by
+`auth.users.id`), `visits` / `tests` / `eye_entries` / `appointments` (one row per
+entry, `patient_id`-scoped), `access_codes` / `access_grants` (the grant ledger — see
+"Access model" below).
 
-doctor: {
-  doctorId, name, email, phone, photoUrl, passwordHash, verified,
-  license, specialty, education, about,
-  clinics: [string],       // clinics/hospitals this doctor has added, managed in account settings
-  currentClinic: string,   // which one of `clinics` they're currently at; stamped onto new visits as clinicName
-  visitLog: [{ patientCode, patientName, date }]  // one entry per visit note this doctor has added, used for stats
-}
+`app.js` maps each table's snake_case columns to the camelCase shape the UI-rendering
+code already expects (`mapPatientRow`, `mapVisitRow`, etc., near the top of the
+file) — that mapping layer is what let most of the rendering code (list/modal
+renderers, chart builders, stats) stay unchanged across the move from JSON blobs to
+real tables; only the load/save functions themselves changed.
 
-// Postgres tables, not part of the patient/doctor JSON blobs — see "Access model" below.
-access_codes:  { id, patient_id, code, created_at, expires_at, redeemed_at, redeemed_by_doctor_id }
-access_grants: { id, patient_id, doctor_id, granted_via: 'code'|'trust', source_code_id,
-                  granted_at, expires_at, revoked_at }
-```
-
-`writtenViaGrantId` on a visit/test entry is the `access_grants.id` that authorized the
-write — no audit-log UI reads it yet, but it's captured at write time so nothing has to
-be reconstructed later. `unverified` is a **snapshot** of the writing doctor's
+`written_via_grant_id` on a visit/test row is the `access_grants.id` that authorized
+the write — no audit-log UI reads it yet, but it's captured at write time so nothing
+has to be reconstructed later. `unverified` is a **snapshot** of the writing doctor's
 verification status at that moment (not a live lookup) — if it were live, an entry
 written while unverified would silently lose its tag the moment that doctor later got
 verified, which would defeat the point of having the tag at all.
 
 ## Key flows already built
 
-- Landing page → doctor / individual choice → sign up (name, phone, email, optional
-  password) or sign in → dashboard. Doctors sign in with their doctor ID; patients can
-  sign in with either their 8-digit code **or** their email (detected by whether the
-  input contains `@`), both plus a password if one was set. "Continue with Google" is
-  a **demo only** (asks for name/email inline, no real OAuth).
+- Landing page → doctor / individual choice → a Facebook-style auth card: a sign-in
+  pane (email + password, "Forgot password?", a "Create new account" button) is the
+  default view, with a separate sign-up pane behind that button (first/middle/last
+  name, date of birth, gender, email, password — doctors get an extra optional
+  medical license field). First/middle/last are joined into the single `name` field
+  the rest of the app already displays everywhere, not stored separately, since
+  nothing reads them individually. Signup calls `supabase.auth.signUp()` directly —
+  Supabase itself rejects an already-registered email (detected via
+  `user.identities.length === 0` in the response) rather than this app maintaining
+  its own uniqueness index. If the project requires email confirmation (Authentication
+  → Providers → Email → "Confirm email" in the Supabase dashboard — currently **on**
+  for the pilot project), signup shows a "check your email" notice instead of
+  dropping straight into the dashboard, and sign-in with an unconfirmed account shows
+  a clear "please confirm your email" error rather than a generic failure.
+  "Forgot password?" still opens a modal that's honest about not being wired up yet
+  — real Supabase Auth makes `resetPasswordForEmail()` straightforward to add, but
+  it wasn't part of this pass; noted in "Natural next steps."
+- **Email verification**: real now, via Supabase Auth's own confirmation email —
+  `email_confirmed_at` on the auth user is the actual flag, not a hand-rolled
+  boolean. The amber dashboard banner shows whenever a signed-in user's email isn't
+  confirmed yet, with a "Resend email" button calling `supabase.auth.resend()`. A
+  doctor's "Verified" badge now additionally requires a confirmed email (on top of
+  phone + license) — `enterDoctorDash()` self-heals this on every load, recomputing
+  and re-saving `verified` in case it just changed (e.g. the doctor clicked their
+  confirmation link since the last visit). **Still needed before real pilot users**:
+  the project currently uses Supabase's own limited default email sender, fine for
+  testing but not for real volume — a real SMTP provider (Resend, Postmark, etc.)
+  needs to be connected in Authentication → SMTP Settings first.
 - Both roles get an ID-card-style visual (health card / doctor card) with a real card
   aspect ratio and a photo upload (stored as base64 `photoUrl`). Only the doctor card
   carries a verified badge (email + phone + license) — patients aren't a verification
@@ -132,9 +165,13 @@ verified, which would defeat the point of having the tag at all.
   revocable access (patient-initiated only — a doctor can never request it), shown in
   that doctor's "Find a patient → My patients" roster with no code needed. Revoking
   takes effect on the next load, not mid-session, because every lookup and every
-  visit/test save re-checks grant validity rather than caching it. Auth itself is
-  unchanged (see Known limitations) — grants are enforced in app code against the
-  existing doctorId/patientCode session, not via Postgres RLS.
+  visit/test save re-checks grant validity rather than caching it. **This is now
+  enforced by Postgres RLS**, not just app code — the `has_active_grant()` predicate
+  in `supabase/schema.sql` gates the actual `select`/`insert` policies on `patients`/
+  `visits`/`tests`, so a revoked doctor is blocked at the database level the moment
+  their grant row's `revoked_at` is set, verified by direct testing (revoke, then
+  confirm the doctor's own roster query — RLS-scoped to `auth.uid()` — no longer
+  returns that patient at all).
 - Doctor dashboard: redeem a patient's live code (or pick them from the roster) → the
   find-a-patient box is replaced by the patient's name, an access note (standing
   trust vs. one-time code with its remaining time), a "Search a different patient"
@@ -144,7 +181,16 @@ verified, which would defeat the point of having the tag at all.
   each with a "← Back to dashboard" link) rather than switching an in-page tab — this
   mirrors the patient side's own tabs-to-pages promotion (see below) so a doctor's
   patient-record view works the same way. "Add visit note" and "Add test / report"
-  buttons sit above each list, inside its page, and open a form modal; saving
+  buttons sit above each list, inside its page, and open a form modal — that modal's
+  HTML lives as a top-level sibling of every `.view` div (not nested inside
+  `view-doctor-dash`), which matters: a modal nested inside a *different, currently
+  hidden* view is unreachable, since `display:none` on the ancestor collapses it
+  regardless of the modal's own hidden state. This was a real bug found and fixed
+  during the RLS migration's browser verification (the four doctor record-detail/
+  add modals had been left inside `view-doctor-dash` since whenever the Visits/Tests
+  tiles were promoted to their own pages) — the patient-side equivalents were already
+  correctly placed as top-level siblings, so only the doctor side needed the fix.
+  Saving
   re-validates the grant, stamps `writtenViaGrantId` and an `unverified` snapshot,
   then writes directly into that patient's record, so the patient sees it immediately
   next time they sign in. Clicking a row still opens the same detail modal as before
@@ -270,12 +316,15 @@ verified, which would defeat the point of having the tag at all.
   since there's no detail to open yet), with an empty state when there are none. A
   "Book new appointment" button opens a modal that's honest about scope: it explains
   online booking isn't wired up yet rather than pretending to submit a request. Backed
-  by `patient.appointments` (see "Data model" above) — seeded with a couple of
-  relative-date demo entries the same way `visits`/`tests` are (via `sampleAppointments()`,
-  both at signup and as a self-heal backfill for existing accounts with none), since
-  there's no booking flow yet to create real ones. **The booking mechanism itself
-  (who it notifies, whether a doctor confirms it, how it writes into `appointments`) is
-  deliberately not built** — this is UI-only, waiting on that design decision.
+  by the `appointments` table (see "Data model" above) — new accounts start with
+  **no** entries and the empty-state copy handles that; the earlier demo's
+  fake-sample-data seeding at signup (`sampleVisits()`/`sampleTests()`/
+  `sampleAppointments()`) was deliberately removed when this moved to real Supabase
+  Auth accounts, since fabricating visit/test/appointment history into what's now a
+  potentially real patient's chart would be actively misleading, not just a demo
+  nicety. **The booking mechanism itself (who it notifies, whether a doctor confirms
+  it, how it writes into `appointments`) is deliberately not built** — this is
+  UI-only, waiting on that design decision.
 - Patient "My Eyes" page: self-entered eyeglass prescription tracking — SPH, CYL, and
   axis for each eye, one entry per date, newest first, click a row for the full
   detail. Two hand-drawn inline SVG line charts (same no-dependency approach as the
@@ -298,122 +347,85 @@ verified, which would defeat the point of having the tag at all.
   every calendar day from the doctor's first-ever visit note to today (gaps filled
   with 0), so a doctor can see at a glance whether they're trending up or down over
   time; hover a point (native SVG `<title>`) for the exact date and count. Backed by
-  `doctor.visitLog`, appended every time that doctor saves a visit note (not tests) —
-  there's no cross-patient index otherwise, since storage is plain key/value keyed by
-  patient code.
+  a `select patient_id, date from visits where authored_by_doctor_id = X` query
+  (`loadDoctorVisitLog()`) run fresh on every dashboard load — there's no stored
+  `visitLog` field anymore now that visits are real rows; this replaced the old
+  demo's `doctor.visitLog` JSON array that got appended to on every visit save.
 
 ## Known limitations (the honest list)
 
-1. **Backend is now connected.** `SUPABASE_URL` / `SUPABASE_ANON_KEY` in the `<script>`
-   point at a live Supabase project (`kv_store`, `access_codes`, and `access_grants`
-   tables + RLS policies created per "Going live" below), and a real cross-reload
-   signup/sign-in round trip has been verified against it. `window.storage` (Claude.ai
-   viewer) and the in-memory object are still there as fallbacks, tried in that order,
-   only if Supabase is unreachable. Remaining caveat: the anon-key RLS policies
-   intentionally allow anyone to read/write any row (matching the app's existing trust
-   model) — there's no rate limiting on code lookups, so this should stay a testing
-   deploy, not a public production one, until that's addressed.
-2. **No real authentication, so access grants aren't database-enforced either.**
-   Password hashing is client-side SHA-256, no salt, no rate limiting, no session
-   tokens. The access model (live codes, trust, revocation — see "Access model" above)
-   is real in the sense that the app won't show or write a record without a valid
-   grant, but that check happens in app code against the existing doctorId/patientCode
-   session, not in Postgres RLS keyed to a real identity — because there isn't one yet.
-   Fine for a demo of the *mechanism*; someone bypassing the app entirely and hitting
-   Supabase directly with the anon key still isn't stopped by anything but the same
-   trust model `kv_store` already has. Real Supabase Auth (see Next version) is what
-   would let RLS enforce this instead of the client.
-3. **No delete/edit** on visits or tests once added.
-4. **Test "reports"** are just a name/date/short text summary — no file upload, no
+1. **RESOLVED — real auth, database-enforced access.** Accounts are real Supabase
+   Auth identities; the access-grant model (live codes, trust, revocation) is
+   enforced by Postgres RLS, not just app code — verified directly (a revoked
+   doctor's own roster query, RLS-scoped to `auth.uid()`, stops returning that
+   patient). Someone bypassing the app entirely and hitting Supabase with the anon
+   key is now actually stopped by RLS, not just by the app choosing not to show them
+   anything.
+2. **RESOLVED — race condition on rapid-fire saves.** The old demo's read-modify-
+   write-a-JSON-blob save pattern could silently drop entries under concurrent
+   writes. Visits/tests/etc. are now real per-row inserts, which are atomic — this
+   class of bug can't happen anymore.
+3. **Rate limiting on live-code redemption is still only partial.** The code's
+   2-minute expiry + single-use narrows the window, and `redeem_access_code()` being
+   server-side (RPC, not a raw table the client can hammer) helps, but there's no
+   dedicated brute-force throttle on redemption attempts yet. Low risk for a small
+   supervised pilot; worth real rate limiting before wider rollout.
+4. **Email delivery is still on Supabase's limited default sender.** Fine for testing
+   (confirmation/resend emails work), not appropriate for real pilot volume — needs a
+   real SMTP provider connected before onboarding real users (see "Email
+   verification" above).
+5. **No delete/edit** on visits or tests once added.
+6. **Test "reports"** are just a name/date/short text summary — no file upload, no
    structured lab-value data. Deliberately deferred.
-5. **Clinics are per-doctor free text**, not a shared directory — two doctors typing
-   "City General Hospital" slightly differently produce two unrelated entries. Fine for
-   a demo; would need a shared `clinic:<id>` record (like patients/doctors) to dedupe
+7. **Clinics are per-doctor free text**, not a shared directory — two doctors typing
+   "City General Hospital" slightly differently produce two unrelated entries. Fine
+   for a pilot; would need a shared `clinics` table (like patients/doctors) to dedupe
    for real.
-6. **No access-history log yet.** `writtenViaGrantId` is captured on every visit/test so
-   nothing has to be reconstructed later, but there's no UI that reads it — matches
-   ACCESS-MODEL.md's own deferred list (§7/§10).
-7. **Race condition on rapid-fire saves.** Adding a visit or test does load record →
-   modify → save, not an atomic append. Confirmed by reproduction: scripting six visit
-   adds back-to-back lost five of them, because overlapping saves can complete
-   out of order and the last write wins, silently discarding whichever save's data
-   didn't make it into that snapshot — no error is shown either time. Unlikely to bite
-   during normal one-at-a-time human use, but a real gap if two doctors ever save to
-   the same patient close together, or a slow connection causes a double-submit. Real
-   fix needs either a per-record write queue client-side or moving visits/tests to
-   proper relational rows with atomic inserts instead of one big JSON blob per patient.
-   Noted, not yet fixed — deliberately deferred.
+8. **No access-history log yet.** `written_via_grant_id` is captured on every
+   visit/test so nothing has to be reconstructed later, but there's no UI that reads
+   it — matches ACCESS-MODEL.md's own deferred list (§7/§10).
+9. **No consent flow, no legal/compliance review.** A real pilot with real patients
+   needs an actual informed-consent step at signup and a real privacy/data-handling
+   review (health data is heavily regulated) — neither exists yet; flagged, not
+   built, since consent copy needs the project owner's (or counsel's) review, not
+   invented text.
+10. **Free-tier Supabase project.** No automated backups, subject to auto-pausing on
+    inactivity. Upgrade to Pro before any real patient data goes in.
 
 ## Going live (Supabase + static hosting)
 
-Steps 1–4 are **done**. The app is live at
-https://mudabbirtufail.github.io/Pak-Health/pakHealth.html, connected to a real
-Supabase project, served from the `mudabbirtufail/Pak-Health` GitHub repo (branch
-`main`) via GitHub Pages. A real cross-device signup/sign-in round trip has been
-verified against the deployed URL itself, not just locally. Step 3b (the access-model
-migration) is a newer addition — confirm it's been run against the live project before
-relying on cross-device grant persistence there.
+**The deployed GitHub Pages site (`mudabbirtufail.github.io/Pak-Health/pakHealth.html`,
+`mudabbirtufail/Pak-Health` repo) has not been updated to this pilot-auth version yet**
+— it's still serving whatever was last committed/pushed, which predates the Supabase
+Auth + RLS migration described in this doc. The working directory here (uncommitted
+as of this migration) points `app.js` at a **separate, fresh Supabase project**
+created specifically for this migration — deliberately not the same project the old
+demo used, so the public demo keeps working untouched while this was built and
+verified. Commit + push + a matching Supabase project decision (reuse this fresh one,
+or provision another) are still needed before the *pilot* version is actually live
+anywhere.
 
-1. **Create a free Supabase project** at supabase.com (no credit card needed for the
-   free tier). Once it's provisioned, go to Settings → API and copy the **Project
-   URL** and the **`anon` `public` key**.
-2. **Run this in the Supabase SQL editor** to create the storage table and open it up
-   to the anon key (matches the app's existing "anyone with the code" trust model —
-   see the caveat in Known limitations above):
-   ```sql
-   create table if not exists public.kv_store (
-     key text primary key,
-     value text not null,
-     updated_at timestamptz not null default now()
-   );
-   alter table public.kv_store enable row level security;
-   create policy "anon read" on public.kv_store for select using (true);
-   create policy "anon insert" on public.kv_store for insert with check (true);
-   create policy "anon update" on public.kv_store for update using (true) with check (true);
-   ```
+1. **Create a Supabase project** at supabase.com. Go to Settings → API and copy the
+   **Project URL** and the **`anon` `public` key**.
+2. **Run [`supabase/schema.sql`](supabase/schema.sql)** in that project's SQL editor
+   — paste the whole file, run it once. It creates every table, RLS policy, the
+   signup trigger, and the `redeem_access_code()` function in one pass. This
+   replaces the old inline `kv_store`/`access_codes`/`access_grants` SQL that used to
+   live in this doc — `supabase/schema.sql` is the only source of truth for schema
+   now.
 3. **Paste the Project URL and anon key** into `SUPABASE_URL` / `SUPABASE_ANON_KEY`
-   near the top of the `<script>` in `pakHealth.html` (replacing the `YOUR_...`
-   placeholders). The app picks this up automatically — no other code changes needed.
-3b. **Access-model migration** — run this in the same SQL editor to add the two tables
-    the access model (above) needs. If this hasn't been run yet in the live project,
-    the app still works, it just falls back to in-memory grants for that browser tab
-    (no persistence, no cross-device redemption) until it is:
-    ```sql
-    create table if not exists public.access_codes (
-      id uuid primary key default gen_random_uuid(),
-      patient_id text not null,
-      code text not null,
-      created_at timestamptz not null default now(),
-      expires_at timestamptz not null,
-      redeemed_at timestamptz,
-      redeemed_by_doctor_id text
-    );
-    create index if not exists access_codes_patient_idx on public.access_codes(patient_id, created_at desc);
-    alter table public.access_codes enable row level security;
-    create policy "anon all access_codes" on public.access_codes for all using (true) with check (true);
-
-    create table if not exists public.access_grants (
-      id uuid primary key default gen_random_uuid(),
-      patient_id text not null,
-      doctor_id text not null,
-      granted_via text not null check (granted_via in ('code','trust')),
-      source_code_id uuid references public.access_codes(id),
-      granted_at timestamptz not null default now(),
-      expires_at timestamptz,
-      revoked_at timestamptz
-    );
-    create index if not exists access_grants_lookup_idx on public.access_grants(patient_id, doctor_id);
-    create index if not exists access_grants_doctor_idx on public.access_grants(doctor_id) where revoked_at is null;
-    alter table public.access_grants enable row level security;
-    create policy "anon all access_grants" on public.access_grants for all using (true) with check (true);
-    ```
-4. **Host the static file** — since it's still just one HTML file, any static host
-   works: GitHub Pages, Netlify, Vercel, or Cloudflare Pages all have free tiers that
-   deploy a repo (or a drag-and-dropped file) in a couple of minutes.
-5. Before wider rollout (not required just to let a few testers try it): add rate
-   limiting on code redemption, since the 6-digit live code isn't currently
-   brute-force protected (the 2-minute expiry and single-use narrow the window, but
-   don't replace real rate limiting).
+   near the top of `app.js`.
+4. **Configure Supabase Auth** (Authentication → Providers → Email in the dashboard):
+   decide whether "Confirm email" should be on (currently **on** for the pilot
+   project — blocks sign-in until the confirmation link is clicked) or off (lets a
+   new account use the app immediately, with just the dashboard banner nudging them
+   to verify). Either way, connect a real SMTP provider (Authentication → SMTP
+   Settings) before real pilot users sign up — Supabase's own default sender is
+   rate-limited and meant for testing only.
+5. **Host the static file** — GitHub Pages, Netlify, Vercel, or Cloudflare Pages all
+   work.
+6. Before wider rollout: upgrade the Supabase project to Pro (automated backups, no
+   auto-pausing) and add a real consent step at signup — see "Known limitations."
 
 ## Next version: a real access model
 
@@ -421,36 +433,37 @@ relying on cross-device grant persistence there.
 redesign: real per-user auth, a single-use 2-minute access code for ad-hoc visits, a
 "Trusted" doctor tier for standing relationships, patient-controlled revocation, and an
 access-history log. **Its core mechanism (§1, §5, §6 — single-use codes, trust grants,
-revocation) is now built**, described above in "Access model" and "Data model." What's
-still not built, matching the doc's own scope and deferred list:
+revocation) and its auth provider choice (§4 — Supabase Auth, specifically so RLS can
+enforce grants) are both now built**, described above in "Access model," "Storage,"
+and "Auth." What's still not built, matching the doc's own scope and deferred list:
 
-- **Real Supabase Auth / Google OAuth.** Grants are checked in app code against the
-  existing custom session, not enforced by Postgres RLS keyed to a real identity — see
-  Known limitations.
 - **The mobile-only PIN lock.** There's no separate mobile app in this repo, so the
   live-code and manage-access screens live in the web patient dashboard instead — a
   deliberate scope call for this phase, not what the doc originally describes.
   Revisit if a real mobile app ever gets built.
-- **Access-history log** — deferred in the doc itself (§7/§10); `writtenViaGrantId` is
-  captured so it can be added later without a data migration.
+- **Access-history log** — deferred in the doc itself (§7/§10); `written_via_grant_id`
+  is captured so it can be added later without a data migration.
 - **CNIC-linked emergency access, verification review queue, doctor MFA, appointment
   booking** — all explicitly deferred in the doc (§10/§11).
 
 ## Natural next steps (in rough priority order)
 
-1. Real auth via Supabase (email/password *and* real Google OAuth, so the current
-   fake Google button becomes real) instead of the current custom SHA-256 password
-   flow — the Supabase storage tier above only replaces persistence, not auth. This is
-   also what would let access grants move from app-code-enforced to RLS-enforced.
-2. Edit/delete for visits and tests.
-3. Access-history log UI, now that `writtenViaGrantId` is already being captured.
-4. Mobile pass — responsive breakpoints exist but haven't been stress-tested on an
+1. Real SMTP provider + a real consent flow — the two concrete blockers before real
+   pilot users sign up, per "Known limitations" above.
+2. Real password reset (`supabase.auth.resetPasswordForEmail()`) — the "Forgot
+   password?" modal still just explains it isn't built yet; straightforward to add
+   now that real Auth exists, just not part of this migration.
+3. Edit/delete for visits and tests.
+4. Access-history log UI, now that `written_via_grant_id` is already being captured.
+5. Real rate limiting on live-code redemption attempts.
+6. Mobile pass — responsive breakpoints exist but haven't been stress-tested on an
    actual phone.
-5. Real file upload for test reports (once there's a real backend with file storage).
-6. Appointment booking mechanism — the "Book new appointment" button on the patient
+7. Real file upload for test reports (once there's file storage wired up — Supabase
+   Storage is a natural fit given everything else is already on Supabase).
+8. Appointment booking mechanism — the "Book new appointment" button on the patient
    dashboard currently just explains it's not wired up yet (see "Appointments" above).
    Needs a design decision: does a doctor confirm/reject a request, does it write
-   straight into `patient.appointments`, does it notify the doctor at all given there's
+   straight into `appointments`, does it notify the doctor at all given there's
    no notification system yet.
 
 ## Design system (for consistency if extending the UI)

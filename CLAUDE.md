@@ -21,10 +21,11 @@ truth, and "Storage" / "Auth" below for how the client talks to it.
 clinics/patients, not a national rollout (see [`ACCESS-MODEL.md`](ACCESS-MODEL.md)'s
 own scope note: "a doctor–patient product, not a national system"). The security
 foundation for that (real auth, database-enforced access control, no fake seeded
-data) is in place; what's *not* yet done before real patients should touch it is
-tracked in "Known limitations" and "Natural next steps" below — most importantly a
-real SMTP sender for verification email, a real consent flow, and a Supabase Pro
-upgrade with backups.
+data, real SMTP for verification email) is in place; what's *not* yet done before
+real patients should touch it is tracked in "Known limitations" and "Natural next
+steps" below — most importantly a verified sending domain (SMTP works but is
+currently sandbox-restricted to the account owner's own email), a real consent
+flow, and a Supabase Pro upgrade with backups.
 
 ## Architecture
 
@@ -136,10 +137,14 @@ verified, which would defeat the point of having the tag at all.
   doctor's "Verified" badge now additionally requires a confirmed email (on top of
   phone + license) — `enterDoctorDash()` self-heals this on every load, recomputing
   and re-saving `verified` in case it just changed (e.g. the doctor clicked their
-  confirmation link since the last visit). **Still needed before real pilot users**:
-  the project currently uses Supabase's own limited default email sender, fine for
-  testing but not for real volume — a real SMTP provider (Resend, Postmark, etc.)
-  needs to be connected in Authentication → SMTP Settings first.
+  confirmation link since the last visit). **Custom SMTP (Resend) is now connected**
+  (Authentication → SMTP page, `smtp.resend.com`, verified working 2026-09-01 by
+  triggering a real password-recovery email and confirming delivery) — the pilot
+  project no longer relies on Supabase's rate-limited default sender. One remaining
+  restriction: Resend's sandbox only delivers to the account owner's own email
+  until a sending domain is verified (Resend → Domains) — real pilot users need that
+  domain verification done first, which naturally lines up with once
+  `pakhealth.com.pk` exists (see "Going live").
 - Both roles get an ID-card-style visual (health card / doctor card) with a real card
   aspect ratio and a photo upload (stored as base64 `photoUrl`). Only the doctor card
   carries a verified badge (email + phone + license) — patients aren't a verification
@@ -370,10 +375,10 @@ verified, which would defeat the point of having the tag at all.
    server-side (RPC, not a raw table the client can hammer) helps, but there's no
    dedicated brute-force throttle on redemption attempts yet. Low risk for a small
    supervised pilot; worth real rate limiting before wider rollout.
-4. **Email delivery is still on Supabase's limited default sender.** Fine for testing
-   (confirmation/resend emails work), not appropriate for real pilot volume — needs a
-   real SMTP provider connected before onboarding real users (see "Email
-   verification" above).
+4. **RESOLVED — real SMTP connected and verified working** (Resend, 2026-09-01).
+   Remaining caveat, not a bug: Resend's sandbox restricts delivery to the account
+   owner's own email until a sending domain is verified — needs that verification
+   done before onboarding real pilot users (see "Email verification" above).
 5. **No delete/edit** on visits or tests once added.
 6. **Test "reports"** are just a name/date/short text summary — no file upload, no
    structured lab-value data. Deliberately deferred.
@@ -416,12 +421,18 @@ anywhere.
 3. **Paste the Project URL and anon key** into `SUPABASE_URL` / `SUPABASE_ANON_KEY`
    near the top of `app.js`.
 4. **Configure Supabase Auth** (Authentication → Providers → Email in the dashboard):
-   decide whether "Confirm email" should be on (currently **on** for the pilot
-   project — blocks sign-in until the confirmation link is clicked) or off (lets a
-   new account use the app immediately, with just the dashboard banner nudging them
-   to verify). Either way, connect a real SMTP provider (Authentication → SMTP
-   Settings) before real pilot users sign up — Supabase's own default sender is
-   rate-limited and meant for testing only.
+   decide whether "Confirm email" should be on (blocks sign-in until the
+   confirmation link is clicked) or off (lets a new account use the app
+   immediately, with just the dashboard banner nudging them to verify) — currently
+   **off** on the pilot project (toggled off mid-session for easier testing; revisit
+   before real users). Either way, connect a real SMTP provider (Authentication →
+   SMTP page — a dedicated top-level page, `/auth/smtp`, not a tab buried under
+   something else) before real pilot users sign up — Supabase's own default sender
+   is rate-limited and meant for testing only. **Already done for the pilot
+   project**: Resend is connected and verified working (host `smtp.resend.com`,
+   username literally `resend`, password = Resend API key) — the one remaining step
+   is verifying a sending domain in Resend, since its sandbox mode only delivers to
+   the account owner's own email otherwise.
 5. **Host the static file** — GitHub Pages, Netlify, Vercel, or Cloudflare Pages all
    work.
 6. Before wider rollout: upgrade the Supabase project to Pro (automated backups, no
@@ -448,11 +459,15 @@ and "Auth." What's still not built, matching the doc's own scope and deferred li
 
 ## Natural next steps (in rough priority order)
 
-1. Real SMTP provider + a real consent flow — the two concrete blockers before real
-   pilot users sign up, per "Known limitations" above.
-2. Real password reset (`supabase.auth.resetPasswordForEmail()`) — the "Forgot
-   password?" modal still just explains it isn't built yet; straightforward to add
-   now that real Auth exists, just not part of this migration.
+1. Verify a sending domain in Resend (Domains → Add Domain) so real pilot users can
+   actually receive email — right now delivery is sandbox-restricted to the account
+   owner's own address (see "Known limitations"). A real consent flow at signup is
+   the other concrete blocker before onboarding real pilot users.
+2. Wire `supabase.auth.resetPasswordForEmail()` into the "Forgot password?" modal —
+   the *email-sending mechanism* is already verified working (tested directly via
+   the `/auth/v1/recover` endpoint during SMTP setup), but the app's UI still just
+   explains self-service reset isn't built; needs the modal's form wired to call it,
+   plus handling the `type=recovery` link landing (a "set new password" screen).
 3. Edit/delete for visits and tests.
 4. Access-history log UI, now that `written_via_grant_id` is already being captured.
 5. Real rate limiting on live-code redemption attempts.

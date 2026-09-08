@@ -54,6 +54,10 @@ create table public.doctors (
   education text not null default '',
   about text not null default '',
   verified boolean not null default false,
+  -- Each element is {"name": "...", "address": "..."} — app.js normalizes a
+  -- bare string element (the original shape, before addresses were added) to
+  -- {name: that string, address: ''} on read, so old rows never needed a
+  -- migration when this changed.
   clinics jsonb not null default '[]'::jsonb,
   current_clinic text not null default '',
   created_at timestamptz not null default now()
@@ -110,18 +114,59 @@ create table public.eye_entries (
   created_at timestamptz not null default now()
 );
 
--- Display-only for now (see CLAUDE.md "Appointments" — booking mechanism isn't
--- built yet), so patient-owned only, same as eye_entries.
+-- Booked by a patient against a real doctor account (see CLAUDE.md
+-- "Appointments") — doctor_id is nullable so it stays populated for real
+-- bookings while never breaking on a null. doctor_name/clinic_name stay as
+-- text snapshots, same reasoning as visits/tests: what the patient booked
+-- against at the time, unaffected by the doctor later editing their profile.
+-- Booking auto-creates a trust grant (see createTrustGrant() in app.js), so no
+-- separate doctor-facing insert/update policy is needed here — read-only.
 create table public.appointments (
   id uuid primary key default gen_random_uuid(),
   patient_id uuid not null references public.patients(id) on delete cascade,
+  doctor_id uuid references public.doctors(id) on delete set null,
   doctor_name text not null default '',
   clinic_name text not null default '',
+  clinic_address text not null default '',
   date date,
   time text not null default '',
   reason text not null default '',
+  created_at timestamptz not null default now(),
+  -- Belt-and-suspenders against two patients grabbing the same slot — the client
+  -- already filters out taken slots before showing them (see generateSlots() /
+  -- bookApptTakenTimes in app.js), but this is the real backstop since that check
+  -- and the insert aren't atomic. NULL doctor_id (old manual entries, if any) never
+  -- collides with itself since Postgres treats NULLs as distinct in a unique index.
+  constraint appointments_doctor_slot_unique unique (doctor_id, date, time)
+);
+
+-- A doctor's standing weekly bookable hours at one clinic (see CLAUDE.md
+-- "Appointments"/"Doctor clinics") — day_of_week follows JS Date.getDay() (0=Sun),
+-- so app.js never has to translate between two conventions. slot_minutes is the
+-- average time per patient the doctor sets for that block; app.js slices
+-- start_time..end_time into slots of that length for patients to book, and the
+-- same rows drive the doctor dashboard's "Currently seeing patients at"
+-- auto-select (see CLAUDE.md). Recurring, not per-date, by deliberate scope
+-- choice — simpler for a small pilot than a full calendar-with-exceptions model.
+create table public.doctor_availability (
+  id uuid primary key default gen_random_uuid(),
+  doctor_id uuid not null references public.doctors(id) on delete cascade,
+  clinic_name text not null,
+  day_of_week smallint not null check (day_of_week between 0 and 6),
+  start_time time not null,
+  end_time time not null,
+  slot_minutes smallint not null default 15 check (slot_minutes > 0),
+  -- How far out this block is bookable — the doctor picks a repeat length (in
+  -- weeks) in the "Manage bookings" grid, app.js clamps it to a 4-week/28-day
+  -- hard cap for every doctor (not just enforced in the UI — generateBookableDates()
+  -- in app.js never looks past today+28 regardless of what's stored here) and
+  -- writes today + that many weeks as this column. A whole clinic's schedule is
+  -- replaced (delete + re-insert) on every save rather than edited row-by-row, so
+  -- every row from one save always shares the same valid_until.
+  valid_until date,
   created_at timestamptz not null default now()
 );
+create index doctor_availability_doctor_idx on public.doctor_availability(doctor_id);
 
 -- The ephemeral, single-use, short-lived live code (see ACCESS-MODEL.md §5).
 -- Only ever read/written directly by its owning patient; a doctor redeems one
@@ -184,6 +229,7 @@ alter table public.visits enable row level security;
 alter table public.tests enable row level security;
 alter table public.eye_entries enable row level security;
 alter table public.appointments enable row level security;
+alter table public.doctor_availability enable row level security;
 alter table public.access_codes enable row level security;
 alter table public.access_grants enable row level security;
 
@@ -216,12 +262,30 @@ create policy "tests_select" on public.tests
 create policy "tests_insert" on public.tests
   for insert with check (authored_by_doctor_id = auth.uid() and public.has_active_grant(patient_id, auth.uid()));
 
--- eye_entries / appointments: patient-owned only, no doctor access at all —
--- matches today's behavior exactly (see CLAUDE.md).
+-- eye_entries: patient-owned only, no doctor access at all (see CLAUDE.md).
 create policy "eye_entries_own" on public.eye_entries
   for all using (auth.uid() = patient_id) with check (auth.uid() = patient_id);
+
+-- appointments: full CRUD for the owning patient (booking flow both inserts
+-- and updates the calendar/list, same as before); the named doctor gets
+-- read-only access to appointments booked against them, so their dashboard
+-- can list upcoming bookings without needing a separate access grant check —
+-- the booking itself already created one via createTrustGrant().
 create policy "appointments_own" on public.appointments
   for all using (auth.uid() = patient_id) with check (auth.uid() = patient_id);
+create policy "appointments_select_doctor" on public.appointments
+  for select using (auth.uid() = doctor_id);
+
+-- doctor_availability: readable by any signed-in user (a patient has to see a
+-- doctor's bookable hours before they've booked anything, same reasoning as
+-- doctors_select_authenticated below); only the owning doctor can add or remove
+-- their own blocks. No update policy — same add/remove-only pattern as clinics.
+create policy "doctor_availability_select_authenticated" on public.doctor_availability
+  for select using (auth.role() = 'authenticated');
+create policy "doctor_availability_insert_own" on public.doctor_availability
+  for insert with check (auth.uid() = doctor_id);
+create policy "doctor_availability_delete_own" on public.doctor_availability
+  for delete using (auth.uid() = doctor_id);
 
 -- access_codes: only the owning patient can see or create their own live codes.
 -- Deliberately no doctor-facing select policy at all — see redeem_access_code()

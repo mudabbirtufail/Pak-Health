@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=23">
 </head>
 <body>
 
@@ -243,10 +243,8 @@
         </div>
         <input type="file" accept="image/*" id="pat-avatar-input" class="hidden">
 
-        <div class="panel">
-          <div class="copy-note" id="pat-dash-copy-note"></div>
-          <div class="privacy-note">Your live code refreshes on its own every 2 minutes and works once. Hand it over in person — never post or text it. A doctor you've trusted doesn't need it at all.</div>
-        </div>
+        <div class="copy-note" id="pat-dash-copy-note"></div>
+        <div class="privacy-note">Your live code refreshes on its own every 2 minutes and works once. Hand it over in person — never post or text it. A doctor you've trusted doesn't need it at all.</div>
        </div>
       </div>
 
@@ -299,8 +297,7 @@
         <div class="panel">
           <span class="eyebrow">Appointments</span>
           <h3 style="margin-top:6px;">Upcoming appointments</h3>
-          <p class="panel-sub" style="margin-top:8px;">Scheduled visits with your doctors.</p>
-          <div id="pat-appts-list"></div>
+          <div id="pat-appts-list" style="margin-top:8px;"></div>
           <div class="empty-state hidden" id="pat-appts-empty">No upcoming appointments.</div>
           <button class="btn btn-primary btn-block" id="pat-book-appt-btn" type="button" style="margin-top:16px;">Book new appointment</button>
         </div>
@@ -321,13 +318,87 @@
     </div>
   </main>
 
-  <div class="modal-overlay hidden" id="pat-book-appt-modal">
+  <div class="modal-overlay hidden" id="pat-appt-detail-modal">
     <div class="modal-card">
-      <button class="modal-close" id="pat-book-appt-close" aria-label="Close">&times;</button>
-      <span class="eyebrow">Appointments</span>
-      <h3 style="margin-top:6px;">Book an appointment</h3>
-      <p class="panel-sub" style="margin-top:8px;">Online booking isn't set up yet — for now, contact your doctor's clinic directly to schedule a visit. This will let you book straight from Pak Health in a future update.</p>
-      <button class="btn btn-secondary btn-block" id="pat-book-appt-ok" style="margin-top:8px;">Got it</button>
+      <button class="modal-close" id="pat-appt-detail-close" aria-label="Close">&times;</button>
+      <span class="eyebrow">Appointment</span>
+      <div class="book-appt-doctor-name" id="pat-appt-detail-doctor" style="margin-top:6px;">—</div>
+      <div class="book-appt-clinic-name" id="pat-appt-detail-clinic">—</div>
+      <div class="book-appt-clinic-address" id="pat-appt-detail-address">—</div>
+      <div class="appt-datetime" id="pat-appt-detail-date">—</div>
+      <div class="appt-datetime" id="pat-appt-detail-time">—</div>
+      <div class="panel-sub" id="pat-appt-detail-reason-wrap" style="margin-top:8px;">Reason: <span id="pat-appt-detail-reason">—</span></div>
+      <div class="error-text" id="pat-appt-detail-error"></div>
+      <div class="save-row">
+        <button class="btn btn-secondary hold-btn hold-btn-danger" id="pat-appt-detail-delete" type="button" style="color:var(--red); border-color:var(--red);"><span class="hold-fill"></span><span class="hold-label">Hold to cancel appointment</span></button>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div id="view-pat-book-appt" class="view hidden">
+    <header class="topbar">
+      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="topbar-right">
+        <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
+      </div>
+    </header>
+    <main class="dash-main">
+      <div class="panel">
+        <span class="eyebrow">Appointments</span>
+        <h3 style="margin-top:6px;">Book an appointment</h3>
+
+        <div id="book-appt-search-step">
+          <p class="panel-sub" style="margin-top:8px;">Search for a doctor by name or clinic/hospital.</p>
+          <div class="lookup-row">
+            <input type="text" id="book-appt-search-input" placeholder="e.g. Dr. Bilal or Shifa International">
+          </div>
+          <div id="book-appt-doctor-list" style="margin-top:8px;"></div>
+          <div class="empty-state" id="book-appt-doctor-empty">No doctors found.</div>
+        </div>
+
+        <div id="book-appt-form-step" class="hidden">
+          <button class="link-btn" id="book-appt-change-doctor" style="margin:8px 0 4px;">Choose a different doctor or clinic</button>
+          <div id="book-appt-doctor-name" class="book-appt-doctor-name">—</div>
+          <div id="book-appt-clinic-name" class="book-appt-clinic-name">—</div>
+          <div id="book-appt-clinic-address" class="book-appt-clinic-address hidden"></div>
+          <div class="field" style="margin-top:12px;">
+            <label>Date</label>
+            <div id="book-appt-date-tabs" class="date-tab-row"></div>
+            <div class="empty-state" id="book-appt-date-empty">This doctor hasn't set any bookable hours yet.</div>
+          </div>
+          <div class="field" id="book-appt-slots-field">
+            <label>Available times</label>
+            <div id="book-appt-slots"></div>
+            <div class="empty-state" id="book-appt-slots-empty">Pick a date to see available times.</div>
+          </div>
+          <div class="field"><label for="book-appt-reason">Reason (optional)</label><textarea id="book-appt-reason" placeholder="What's this visit for?"></textarea></div>
+          <div class="error-text" id="book-appt-error"></div>
+          <div class="save-row">
+            <button class="btn btn-primary" id="book-appt-save">Book appointment</button>
+            <button class="btn btn-secondary" id="book-appt-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <div class="modal-overlay hidden" id="book-appt-confirm-modal">
+      <div class="modal-card">
+        <button class="modal-close" id="book-appt-confirm-close" aria-label="Close">&times;</button>
+        <span class="eyebrow">Confirm appointment</span>
+        <h3 style="margin-top:6px;">Book this appointment?</h3>
+        <div class="book-appt-doctor-name" id="book-appt-confirm-doctor" style="margin-top:14px;">—</div>
+        <div class="book-appt-clinic-name" id="book-appt-confirm-clinic">—</div>
+        <div class="book-appt-clinic-address" id="book-appt-confirm-address">—</div>
+        <div class="appt-datetime" id="book-appt-confirm-date">—</div>
+        <div class="appt-datetime" id="book-appt-confirm-time">—</div>
+        <p class="panel-sub" style="margin-top:14px;">Confirming this appointment gives the doctor standing access to your health record.</p>
+        <div class="error-text" id="book-appt-confirm-error"></div>
+        <div class="save-row">
+          <button class="btn btn-primary hold-btn" id="book-appt-confirm-save" type="button"><span class="hold-fill"></span><span class="hold-label">Hold to confirm booking</span></button>
+          <button class="btn btn-secondary" id="book-appt-confirm-cancel">Cancel</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -445,6 +516,16 @@
         <div class="empty-state" id="pat-prescriptions-empty">No prescriptions on file yet.</div>
       </div>
     </main>
+
+    <div class="modal-overlay hidden" id="pat-prescription-modal">
+      <div class="modal-card">
+        <button class="modal-close" id="pat-prescription-modal-close" aria-label="Close">&times;</button>
+        <span class="eyebrow" id="prescription-modal-date">—</span>
+        <h3 id="prescription-modal-doctor" style="margin-top:6px;">—</h3>
+        <h4 class="subhead" style="margin-top:18px;">Medicine</h4>
+        <ul class="rx-medicine-list" id="prescription-modal-list"></ul>
+      </div>
+    </div>
   </div>
 
   <div id="view-patient-eyes" class="view hidden">
@@ -456,57 +537,75 @@
     </header>
     <main class="dash-main">
       <div class="panel">
-        <span class="eyebrow">Eye health</span>
-        <h3 style="margin-top:6px;">My Eyes</h3>
-        <p class="panel-sub" style="margin-top:8px;">Your eyeglass prescription over time.</p>
-        <button class="btn btn-primary btn-block" id="add-eye-btn" style="margin-top:14px;">Add eye check</button>
-        <span class="save-note" id="add-eye-note" style="display:block; text-align:center; margin:8px 0 6px;">Eye check added</span>
-        <div id="pat-eyes-charts" class="hidden">
-          <h4 class="subhead">SPH over time</h4>
-          <div id="eyes-sph-chart-wrap"></div>
-          <h4 class="subhead">CYL over time</h4>
-          <div id="eyes-cyl-chart-wrap"></div>
-          <h4 class="subhead">History</h4>
+        <div class="panel-header-row">
+          <div>
+            <span class="eyebrow">Eye health</span>
+            <h3 style="margin-top:6px;">My Eyes</h3>
+          </div>
+          <button class="btn btn-primary btn-sm eye-rx-add-btn" id="add-eye-btn" type="button">Add new prescription</button>
         </div>
-        <div id="pat-eyes-list"></div>
+
+        <div class="eye-rx-panel" id="eye-rx-current-panel">
+          <div class="eye-rx-header">
+            <span class="eyebrow">Current prescription</span>
+            <h3 id="eye-rx-current-date" style="margin-top:4px;">—</h3>
+          </div>
+          <div class="eye-rx-columns" id="eye-rx-current-columns"></div>
+        </div>
+        <span class="save-note" id="add-eye-note" style="display:block; text-align:center; margin:8px 0 6px;">Prescription added</span>
         <div class="empty-state" id="pat-eyes-empty">No eye checks recorded yet. Add your first one to start tracking your prescription over time.</div>
+      </div>
+
+      <button class="btn btn-secondary btn-block eye-rx-prev-toggle hidden" id="eye-rx-prev-toggle" type="button">Previous prescriptions</button>
+
+      <div class="panel hidden" id="pat-eyes-charts">
+        <h3>History</h3>
+        <p class="panel-sub" style="margin-top:8px;">Your eyeglass prescription over time.</p>
+        <div class="eye-charts-row">
+          <div>
+            <h4 class="subhead">SPH over time</h4>
+            <div class="eye-chart-wrap" id="eyes-sph-chart-wrap"></div>
+          </div>
+          <div>
+            <h4 class="subhead">CYL over time</h4>
+            <div class="eye-chart-wrap" id="eyes-cyl-chart-wrap"></div>
+          </div>
+        </div>
       </div>
     </main>
 
     <div class="modal-overlay hidden" id="add-eye-modal">
       <div class="modal-card">
       <button class="modal-close" id="add-eye-close" aria-label="Close">&times;</button>
-      <h3>Add eye check</h3>
+      <h3>Add new prescription</h3>
       <div class="field"><label for="eye-date">Date</label><input type="date" id="eye-date"></div>
       <h4 class="subhead">Left eye</h4>
-      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="form-grid eye-rx-fields-grid">
         <div class="field"><label for="eye-sph-l">SPH</label><input type="number" step="0.25" id="eye-sph-l" placeholder="-2.00"></div>
         <div class="field"><label for="eye-cyl-l">CYL</label><input type="number" step="0.25" id="eye-cyl-l" placeholder="-0.50"></div>
-        <div class="field"><label for="eye-axis-l">Axis</label><input type="number" min="0" max="180" id="eye-axis-l" placeholder="90"></div>
+        <div class="field"><label for="eye-axis-l">Axis</label><input type="number" min="1" max="180" id="eye-axis-l" placeholder="90"></div>
       </div>
       <h4 class="subhead">Right eye</h4>
-      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="form-grid eye-rx-fields-grid">
         <div class="field"><label for="eye-sph-r">SPH</label><input type="number" step="0.25" id="eye-sph-r" placeholder="-2.25"></div>
         <div class="field"><label for="eye-cyl-r">CYL</label><input type="number" step="0.25" id="eye-cyl-r" placeholder="-0.75"></div>
-        <div class="field"><label for="eye-axis-r">Axis</label><input type="number" min="0" max="180" id="eye-axis-r" placeholder="85"></div>
+        <div class="field"><label for="eye-axis-r">Axis</label><input type="number" min="1" max="180" id="eye-axis-r" placeholder="85"></div>
       </div>
       <div class="error-text" id="add-eye-error"></div>
       <div class="save-row">
-        <button class="btn btn-primary" id="add-eye-save">Save eye check</button>
+        <button class="btn btn-primary" id="add-eye-save">Save prescription</button>
         <button class="btn btn-secondary" id="add-eye-cancel">Cancel</button>
       </div>
     </div>
   </div>
 
-  <div class="modal-overlay hidden" id="eye-modal">
+  <div class="modal-overlay hidden" id="eye-rx-prev-modal">
     <div class="modal-card">
-      <button class="modal-close" id="eye-modal-close" aria-label="Close">&times;</button>
-      <span class="eyebrow" id="eye-modal-date">—</span>
-      <h3 style="margin-top:6px;">Eye check</h3>
-      <dl class="kv" style="margin-top:16px;">
-        <dt>Left — SPH / CYL / Axis</dt><dd id="eye-modal-left">—</dd>
-        <dt>Right — SPH / CYL / Axis</dt><dd id="eye-modal-right">—</dd>
-      </dl>
+      <button class="modal-close" id="eye-rx-prev-modal-close" aria-label="Close">&times;</button>
+      <span class="eyebrow">Eye health</span>
+      <h3 style="margin-top:6px;">Previous prescriptions</h3>
+      <p class="panel-sub" style="margin-top:8px;">Select a date to see that prescription.</p>
+      <div id="eye-rx-prev-modal-list"></div>
     </div>
   </div>
   </div>
@@ -694,30 +793,42 @@
             <div class="copy-note" style="margin:-8px 0 4px; color:var(--muted);" id="res-access-note">—</div>
             <button class="link-btn" id="lookup-change-btn" style="margin-bottom:16px;">Search a different patient</button>
 
-            <div class="record-list">
-              <button class="record-row" type="button" data-goto="view-doctor-record-visits">
-                <div class="record-row-art record-row-art-teal">
-                  <img src="images/visits.jpg" alt="Visits">
-                </div>
-                <div class="record-row-body">
-                  <div class="record-row-title">Visits</div>
-                  <svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-                </div>
-              </button>
+            <div class="tabs">
+              <button class="tab active" id="doc-pt-tab-visits" type="button">Visits</button>
+              <button class="tab" id="doc-pt-tab-lab" type="button">Lab results</button>
+              <button class="tab" id="doc-pt-tab-rx" type="button">Prescriptions</button>
+            </div>
 
-              <button class="record-row" type="button" data-goto="view-doctor-record-tests">
-                <div class="record-row-art record-row-art-amber">
-                  <img src="images/lab-results.jpg" alt="Tests">
-                </div>
-                <div class="record-row-body">
-                  <div class="record-row-title">Tests</div>
-                  <svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-                </div>
-              </button>
+            <div id="doc-pt-pane-visits">
+              <button class="btn btn-primary btn-block" id="add-visit-btn" style="margin-top:16px;">Add visit note</button>
+              <span class="save-note" id="add-visit-note" style="display:block; text-align:center; margin:8px 0 6px;">Visit added</span>
+              <div id="doc-visits-list"></div>
+              <div class="empty-state" id="doc-visits-empty">No visits recorded yet.</div>
+            </div>
+
+            <div id="doc-pt-pane-lab" class="hidden">
+              <button class="btn btn-primary btn-block" id="add-test-btn" style="margin-top:16px;">Add test / report</button>
+              <span class="save-note" id="add-test-note" style="display:block; text-align:center; margin:8px 0 6px;">Test added</span>
+              <div id="doc-tests-list"></div>
+              <div class="empty-state" id="doc-tests-empty">No tests on file yet.</div>
+            </div>
+
+            <div id="doc-pt-pane-rx" class="hidden">
+              <p class="panel-sub" style="margin-top:16px;">Pulled from visit notes where a prescription was recorded.</p>
+              <div id="doc-prescriptions-list"></div>
+              <div class="empty-state" id="doc-prescriptions-empty">No prescriptions on file yet.</div>
             </div>
           </div>
 
           <div class="empty-state" id="lookup-empty">No patient looked up yet.</div>
+        </div>
+
+        <div class="panel" style="margin-top:20px;">
+          <span class="eyebrow">Appointments</span>
+          <h3 style="margin-top:6px;">Upcoming appointments</h3>
+          <p class="panel-sub" style="margin-top:8px;">Booked by patients through Pak Health.</p>
+          <div id="doc-appts-list"></div>
+          <div class="empty-state hidden" id="doc-appts-empty">No upcoming appointments.</div>
         </div>
       </div>
     </div>
@@ -757,11 +868,21 @@
   </div>
 </div>
 
-<!-- These four modals are opened from view-doctor-record-visits / view-doctor-record-tests
-     (separate pages from view-doctor-dash, reached via the Visits/Tests tiles), so they
-     live here as top-level siblings of every .view rather than nested inside any one view —
-     a modal nested inside a hidden .view is unreachable, since display:none on the
-     ancestor collapses it regardless of its own hidden class. -->
+<!-- These five modals are opened from the Visits/Lab results/Prescriptions tabs inside
+     #patient-result on view-doctor-dash, so they live here as top-level siblings of every
+     .view rather than nested inside any one view — a modal nested inside a hidden .view is
+     unreachable, since display:none on the ancestor collapses it regardless of its own
+     hidden class. -->
+<div class="modal-overlay hidden" id="doc-prescription-modal">
+  <div class="modal-card">
+    <button class="modal-close" id="doc-prescription-modal-close" aria-label="Close">&times;</button>
+    <span class="eyebrow" id="doc-prescription-modal-date">—</span>
+    <h3 id="doc-prescription-modal-doctor" style="margin-top:6px;">—</h3>
+    <h4 class="subhead" style="margin-top:18px;">Medicine</h4>
+    <ul class="rx-medicine-list" id="doc-prescription-modal-list"></ul>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="doc-test-modal">
   <div class="modal-card">
     <button class="modal-close" id="doc-test-modal-close" aria-label="Close">&times;</button>
@@ -873,8 +994,8 @@
 
       <hr>
       <h4 class="subhead">Clinics</h4>
-      <p class="panel-sub" style="margin-bottom:12px;">Add the clinics or hospitals you work from. Pick which one you're currently at from the dashboard — it's added automatically to visit notes you write.</p>
-      <div class="chip-list" id="doc-clinics-list" style="margin-bottom:12px;"></div>
+      <p class="panel-sub" style="margin-bottom:12px;">Add the clinics or hospitals you work from. Set bookable hours for one so patients can book directly, and "Currently seeing patients at" on your dashboard will pick itself based on that schedule.</p>
+      <div id="doc-clinics-list" style="margin-bottom:12px;"></div>
       <div class="lookup-row">
         <input type="text" id="doc-clinic-input" placeholder="e.g. Shifa International Hospital">
         <button class="btn btn-secondary" id="doc-clinic-add-btn">Add</button>
@@ -886,6 +1007,41 @@
       <span class="save-note" id="doc-save-note">Saved</span>
     </div>
   </main>
+
+  <div class="modal-overlay hidden" id="doc-manage-bookings-modal">
+    <div class="modal-card modal-card-wide">
+      <button class="modal-close" id="doc-manage-bookings-close" aria-label="Close">&times;</button>
+      <span class="eyebrow">Bookings</span>
+      <h3 style="margin-top:6px;" id="doc-manage-bookings-title">Manage</h3>
+      <p class="panel-sub" style="margin-top:8px;">Set your hours for each day patients can book at this clinic. Leave a day blank if you're not there — use "Add another slot" for a split shift like mornings and evenings.</p>
+
+      <div class="field" style="margin-top:14px;">
+        <label for="avail-clinic-address">Address</label>
+        <input type="text" id="avail-clinic-address" placeholder="e.g. Sector G-9, Islamabad">
+      </div>
+      <div class="field" style="max-width:260px;">
+        <label for="avail-slot-minutes">Avg. minutes per patient</label>
+        <input type="number" id="avail-slot-minutes" value="15" min="1">
+      </div>
+
+      <div id="avail-days" style="margin-top:12px;"></div>
+
+      <div class="field" style="margin-top:16px;">
+        <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+          <input type="checkbox" id="avail-repeat-check" checked style="width:auto;">
+          Repeat weekly for the next
+          <input type="number" id="avail-repeat-weeks" value="4" min="1" max="4" style="width:56px;">
+          week(s) — 4-week maximum
+        </label>
+      </div>
+
+      <div class="error-text" id="avail-error"></div>
+      <div class="save-row">
+        <button class="btn btn-primary" id="avail-save-btn">Save</button>
+        <button class="btn btn-secondary" id="avail-cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="view-doc-stats" class="view hidden">
@@ -910,46 +1066,6 @@
   </main>
 </div>
 
-<div id="view-doctor-record-visits" class="view hidden">
-  <header class="topbar">
-    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
-    <div class="topbar-right">
-      <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
-    </div>
-  </header>
-  <main class="dash-main">
-    <div class="panel">
-      <span class="eyebrow">Records</span>
-      <h3 style="margin-top:6px;" id="doc-record-visits-heading">Visits</h3>
-      <p class="panel-sub" style="margin-top:8px;">Every visit you've logged for this patient.</p>
-      <button class="btn btn-primary btn-block" id="add-visit-btn">Add visit note</button>
-      <span class="save-note" id="add-visit-note" style="display:block; text-align:center; margin:8px 0 6px;">Visit added</span>
-      <div id="doc-visits-list"></div>
-      <div class="empty-state" id="doc-visits-empty">No visits recorded yet.</div>
-    </div>
-  </main>
-</div>
-
-<div id="view-doctor-record-tests" class="view hidden">
-  <header class="topbar">
-    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
-    <div class="topbar-right">
-      <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
-    </div>
-  </header>
-  <main class="dash-main">
-    <div class="panel">
-      <span class="eyebrow">Records</span>
-      <h3 style="margin-top:6px;" id="doc-record-tests-heading">Tests</h3>
-      <p class="panel-sub" style="margin-top:8px;">Every test or report you've logged for this patient.</p>
-      <button class="btn btn-primary btn-block" id="add-test-btn">Add test / report</button>
-      <span class="save-note" id="add-test-note" style="display:block; text-align:center; margin:8px 0 6px;">Test added</span>
-      <div id="doc-tests-list"></div>
-      <div class="empty-state" id="doc-tests-empty">No tests on file yet.</div>
-    </div>
-  </main>
-</div>
-
-<script src="app.js"></script>
+<script src="app.js?v=35"></script>
 </body>
 </html>

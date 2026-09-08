@@ -125,7 +125,7 @@
   .field{ margin-bottom:16px; }
   .field label{ display:block; font-size:0.8rem; font-weight:600; color: var(--ink-soft); margin-bottom:6px; }
   .field .hint{ font-size:0.76rem; color:var(--muted); margin-top:5px; }
-  input[type=text], input[type=email], input[type=tel], input[type=date], input[type=password], select, textarea{
+  input[type=text], input[type=email], input[type=tel], input[type=date], input[type=password], input[type=number], select, textarea{
     width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:6px;
     font-family:'IBM Plex Sans', sans-serif; font-size:0.94rem; background: var(--paper); color: var(--ink);
   }
@@ -142,6 +142,21 @@
   .btn-secondary:hover{ border-color: var(--ink); }
   .btn-block{ width:100%; }
   .btn:disabled{ opacity:0.55; cursor:not-allowed; }
+
+  /* ---------- Hold-to-confirm buttons ---------- */
+  .hold-btn{ position:relative; overflow:hidden; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  .hold-btn .hold-fill{
+    position:absolute; inset:0; width:0%; background: var(--teal-dark); z-index:0; pointer-events:none;
+  }
+  .hold-btn-danger .hold-fill{ background: var(--red); }
+  .hold-btn .hold-label{ position:relative; z-index:1; }
+  .hold-btn.holding .hold-label{ color:#fff; transition: color 0.3s ease; }
+  /* .btn-primary's own :hover already paints the whole button --teal-dark —
+     the exact color the fill sweeps in, so on a primary hold-button the two
+     would blend into each other and the sweep would look like it's doing
+     nothing. Pin hover back to the resting teal just for hold-buttons so the
+     darker fill stays visible against it. */
+  .btn-primary.hold-btn:hover{ background: var(--teal); }
 
   .error-text{ color: var(--red); font-size:0.85rem; margin-top:10px; display:none; }
   .error-text.show{ display:block; }
@@ -242,6 +257,21 @@
   .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   @media (max-width: 560px){ .form-grid{ grid-template-columns:1fr; } }
   .form-grid .span-2{ grid-column: 1 / -1; }
+  /* Grid items default to min-width:auto, which respects an input's intrinsic
+     content width (number-spinner inputs in particular) instead of letting the
+     1fr column shrink — that's what was pushing modal-card wider than its
+     max-width and introducing a horizontal scrollbar. */
+  .form-grid > .field{ min-width:0; }
+  #add-eye-modal input{ font-size:1.15rem; padding:10px 10px; }
+  /* Three equal columns (SPH/CYL/Axis) works at the modal's normal 440px width,
+     but was previously an inline style, which beats .form-grid's own
+     max-width:560px media query on specificity alone — so on a narrow
+     viewport (where .modal-overlay's own 20px side padding eats further into
+     the available width) it never collapsed, and the larger font size above
+     made three always-equal columns visibly crowd/overlap. A class-based rule
+     can be overridden the same way the rest of .form-grid already is. */
+  .eye-rx-fields-grid{ grid-template-columns:1fr 1fr 1fr; }
+  @media (max-width:480px){ .eye-rx-fields-grid{ grid-template-columns:1fr; } }
 
   .save-row{ display:flex; align-items:center; gap:14px; margin-top:6px; }
   .save-note{ font-size:0.84rem; color: var(--teal-dark); opacity:0; transition: opacity 0.3s ease; }
@@ -251,7 +281,7 @@
   .lookup-row input{ flex:1 1 180px; min-width:0; }
   .lookup-row .btn{ flex-shrink:0; }
 
-  .patient-result{ margin-top:20px; border-top:1px solid var(--line); padding-top:20px; }
+  .patient-result{ margin-top:20px; }
   .patient-result .name-row{ display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
   .patient-result h3{ font-size:1.25rem; }
   .kv{ display:grid; grid-template-columns: 140px 1fr; gap:8px 14px; font-size:0.9rem; margin-bottom:14px; }
@@ -352,7 +382,13 @@
   .list-item .li-sub{ font-size:0.8rem; color: var(--muted); margin-top:2px; }
   .list-item .chevron{ color: var(--muted); flex-shrink:0; }
   .list-item.static{ cursor:default; }
+
+  .rx-medicine-list{ margin:10px 0 0; padding-left:20px; }
+  .rx-medicine-list li{ margin-bottom:8px; line-height:1.5; }
+  .rx-medicine-list li:last-child{ margin-bottom:0; }
   .list-item.static:hover{ background:none; }
+  .book-doctor-clinics{ background: var(--bg); padding-left:16px; }
+  .book-doctor-clinics .list-item:last-child{ border-bottom:none; }
 
   /* ---------- Appointments calendar ---------- */
   .calendar-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
@@ -451,6 +487,50 @@
   .chip button{ background:none; border:none; color: var(--teal-dark); opacity:0.7; font-size:1rem; line-height:1; padding:0 2px; }
   .chip button:hover{ opacity:1; color: var(--red); }
 
+  /* ---------- Booking slot picker ---------- */
+  .slot-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+  .slot-btn{
+    background: var(--paper); border:1px solid var(--line); color: var(--ink);
+    border-radius:999px; padding:7px 14px; font-size:0.82rem; font-weight:600; cursor:pointer;
+  }
+  .slot-btn:hover{ border-color: var(--teal); }
+  .slot-btn.selected{ background: var(--teal); border-color: var(--teal); color:#fff; }
+
+  .date-tab-row{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; }
+  .date-tab-btn{
+    flex-shrink:0; min-width:60px; background: var(--paper); border:1px solid var(--line);
+    border-radius:10px; padding:8px 10px; text-align:center; cursor:pointer; color: var(--ink);
+  }
+  .date-tab-btn .dow{ display:block; font-size:0.68rem; font-weight:600; color: var(--muted); text-transform:uppercase; letter-spacing:0.03em; }
+  .date-tab-btn .dnum{ display:block; font-size:1.05rem; font-weight:700; margin-top:2px; }
+  .date-tab-btn .dmon{ display:block; font-size:0.68rem; font-weight:600; color: var(--muted); text-transform:uppercase; letter-spacing:0.03em; margin-top:1px; }
+  .date-tab-btn:hover{ border-color: var(--teal); }
+  .date-tab-btn.selected{ background: var(--teal); border-color: var(--teal); color:#fff; }
+  .date-tab-btn.selected .dow, .date-tab-btn.selected .dmon{ color: rgba(255,255,255,0.8); }
+
+  /* ---------- Doctor weekly availability grid (Manage bookings) ---------- */
+  .avail-day-row{ display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .avail-day-row:last-child{ border-bottom:none; }
+  .avail-day-label{ width:88px; flex-shrink:0; font-weight:600; font-size:0.85rem; padding-top:8px; }
+  .avail-day-body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:8px; }
+  .avail-slot-pair{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .avail-slot-pair input[type=time]{ width:auto; flex:0 0 auto; }
+  .avail-slot-pair span{ color: var(--muted); font-size:0.82rem; }
+  .avail-remove-pair{ background:none; border:none; color: var(--muted); font-size:1.1rem; line-height:1; cursor:pointer; padding:0 2px; }
+  .avail-remove-pair:hover{ color: var(--red); }
+  .avail-add-pair{ background:none; border:none; color: var(--teal-dark); font-size:0.8rem; font-weight:600; cursor:pointer; text-align:left; padding:2px 0; align-self:flex-start; }
+
+  /* ---------- Book-appointment: enlarged doctor/clinic name display ---------- */
+  #book-appt-doctor-list .book-doctor-name{ font-size:1.05rem; }
+  .book-appt-doctor-name{ font-size:1.2rem; font-weight:700; color: var(--ink); font-family:'Spectral', serif; margin-top:6px; }
+  .book-appt-clinic-name{ font-size:1rem; font-weight:600; color: var(--teal-dark); margin-top:3px; }
+  .book-appt-clinic-address{ font-size:0.85rem; color: var(--muted); margin-top:2px; }
+  .appt-datetime{ font-size:2.2rem; font-weight:700; color: var(--ink); margin-top:16px; line-height:1.25; }
+  .appt-datetime + .appt-datetime{ margin-top:2px; }
+
+  #book-appt-confirm-modal .modal-card, #pat-appt-detail-modal .modal-card{ text-align:center; }
+  #book-appt-confirm-modal .save-row, #pat-appt-detail-modal .save-row{ justify-content:center; }
+
   /* ---------- Stats ---------- */
   .stats-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-top:18px; }
   @media (max-width: 420px){ .stats-grid{ grid-template-columns: 1fr; } }
@@ -461,6 +541,67 @@
   /* ---------- Chart legend ---------- */
   .chart-legend{ display:flex; gap:16px; margin-top:8px; font-size:0.78rem; color: var(--muted); align-items:center; }
   .chart-legend .legend-dot{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+
+  /* ---------- Eye prescription panel (number-line style) ---------- */
+  .eye-rx-panel{
+    border:1px solid var(--line); border-radius: var(--radius); padding:22px; margin-top:16px;
+  }
+  .eye-rx-header{ margin-bottom:20px; }
+  .eye-rx-columns{ display:grid; grid-template-columns:1fr 1fr; gap:36px; }
+  .eye-rx-col-label{ font-family:'Spectral', serif; font-weight:600; font-size:0.95rem; margin-bottom:16px; }
+  @media (max-width:560px){ .eye-rx-columns{ grid-template-columns:1fr; gap:24px; } }
+
+  /* view-patient-eyes now stacks three separate top-level sections (the main
+     panel, the previous-prescriptions button, and the history panel) instead
+     of one panel holding everything. .panel already carries a 20px
+     margin-bottom on its own, so the button only needs a matching
+     margin-bottom (not margin-top, which would double up unevenly against
+     the panel's built-in spacing) to keep both gaps equal. */
+  #view-patient-eyes .eye-rx-prev-toggle{ margin-bottom:20px; }
+  .eye-rx-add-btn{ width:auto; }
+
+  /* "Previous prescriptions" popup — a plain date list that accordion-expands
+     each row into the same number-line detail used for the current prescription,
+     instead of opening yet another modal per date. */
+  .eye-rx-prev-row{ border-bottom:1px solid var(--line); }
+  .eye-rx-prev-row:last-child{ border-bottom:none; }
+  .eye-rx-prev-row-toggle{
+    display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%;
+    background:none; border:none; padding:14px 2px; cursor:pointer; text-align:left;
+    font-family:inherit; font-size:0.94rem; font-weight:600; color: var(--ink);
+  }
+  .eye-rx-prev-row-toggle .chevron{ flex-shrink:0; transition: transform 0.2s ease; }
+  .eye-rx-prev-row.open .eye-rx-prev-row-toggle .chevron{ transform: rotate(90deg); }
+  .eye-rx-prev-row-detail{ padding:6px 2px 22px; }
+  .eye-rx-prev-row-detail.hidden{ display:none; }
+
+  .eye-charts-row{ display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-top:8px; align-items:stretch; }
+  .eye-charts-row > div{ display:flex; flex-direction:column; }
+  .eye-chart-wrap{ flex:1; min-height:240px; display:flex; flex-direction:column; }
+  .eye-chart-wrap svg{ width:100%; flex:1; min-height:0; display:block; }
+  .eye-chart-wrap .chart-legend{ flex-shrink:0; }
+  @media (max-width:720px){ .eye-charts-row{ grid-template-columns:1fr; } }
+
+  .number-line{ margin-bottom:22px; }
+  .number-line:last-child{ margin-bottom:0; }
+  .number-line-label{
+    font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color: var(--muted);
+    margin-bottom:18px; font-family:'IBM Plex Mono', monospace;
+  }
+  .number-line-track{ position:relative; height:3px; background: var(--line); border-radius:2px; margin:0 6px; }
+  .number-line-marker{
+    position:absolute; top:50%; transform:translate(-50%,-50%); width:11px; height:11px; border-radius:50%;
+    background: var(--teal); border:2px solid var(--paper); box-shadow:0 0 0 1px var(--teal);
+  }
+  .number-line-value{
+    position:absolute; top:-24px; left:50%; transform:translateX(-50%);
+    font-family:'IBM Plex Mono', monospace; font-size:0.8rem; font-weight:600; color: var(--ink); white-space:nowrap;
+  }
+  .number-line-range{
+    display:flex; justify-content:space-between; font-size:0.68rem; color: var(--muted);
+    font-family:'IBM Plex Mono', monospace; margin-top:6px;
+  }
+  .number-line-empty{ color: var(--muted); font-size:0.8rem; margin-top:4px; }
 
   /* ---------- Patient record list ---------- */
   .record-list{ display:flex; flex-direction:column; gap:18px; }

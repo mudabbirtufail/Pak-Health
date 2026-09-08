@@ -180,31 +180,39 @@ verified, which would defeat the point of having the tag at all.
 - Doctor dashboard: redeem a patient's live code (or pick them from the roster) → the
   find-a-patient box is replaced by the patient's name, an access note (standing
   trust vs. one-time code with its remaining time), a "Search a different patient"
-  link, and two **Visits / Tests tiles** (`.record-row`, the same photo-banner style
-  and even the same two photos as the patient's own record list) that navigate to
-  dedicated full-screen pages (`view-doctor-record-visits` / `view-doctor-record-tests`,
-  each with a "← Back to dashboard" link) rather than switching an in-page tab — this
-  mirrors the patient side's own tabs-to-pages promotion (see below) so a doctor's
-  patient-record view works the same way. "Add visit note" and "Add test / report"
-  buttons sit above each list, inside its page, and open a form modal — that modal's
-  HTML lives as a top-level sibling of every `.view` div (not nested inside
-  `view-doctor-dash`), which matters: a modal nested inside a *different, currently
+  link, and a **Visits / Lab results / Prescriptions tab row** (`.tabs`/`.tab`, the
+  same pattern as the "Enter a code" vs. "My patients" tabs one level up) that swaps
+  content in place inside `#patient-result` — `switchPatientResultTab()` in `app.js`
+  toggles which of `#doc-pt-pane-visits` / `#doc-pt-pane-lab` / `#doc-pt-pane-rx` is
+  visible, no navigation involved. This replaced an earlier design (two `.record-row`
+  tiles that navigated to dedicated full-screen pages, `view-doctor-record-visits` /
+  `view-doctor-record-tests`) — the tile-to-fullpage pattern remains correct for the
+  *patient's* own record list (see below), but for the doctor looking up one patient
+  at a time, switching tabs in place read better than leaving and re-entering the
+  panel for every category. Prescriptions is derived the same way as the patient's
+  own My Prescriptions page — scans that patient's visits for a non-empty,
+  non-"None" `prescription` field (`renderDocPrescriptionsList()`, `isMeaningfulPrescription()`
+  shared with the patient-side function) — read-only, no add button, since a
+  prescription is written as part of a visit note, not as its own entry. "Add visit
+  note" and "Add test / report" buttons sit above their respective pane and open a
+  form modal — that modal's HTML (along with the five doctor-side detail/add/prescription
+  modals) lives as a top-level sibling of every `.view` div, not nested inside
+  `view-doctor-dash`, which matters: a modal nested inside a *different, currently
   hidden* view is unreachable, since `display:none` on the ancestor collapses it
-  regardless of the modal's own hidden state. This was a real bug found and fixed
-  during the RLS migration's browser verification (the four doctor record-detail/
-  add modals had been left inside `view-doctor-dash` since whenever the Visits/Tests
-  tiles were promoted to their own pages) — the patient-side equivalents were already
-  correctly placed as top-level siblings, so only the doctor side needed the fix.
-  Saving
+  regardless of the modal's own hidden state — a real bug found and fixed once already
+  during the RLS migration's browser verification, so the tabs redesign kept the same
+  top-level placement rather than reintroducing it. Saving
   re-validates the grant, stamps `writtenViaGrantId` and an `unverified` snapshot,
   then writes directly into that patient's record, so the patient sees it immediately
-  next time they sign in. Clicking a row still opens the same detail modal as before
-  — only the category-level navigation (Visits vs. Tests) changed, not the individual
-  entry view. Going back to the dashboard doesn't lose the looked-up patient — nothing
-  resets `currentLookupCode`/`currentLookupData`, so `#patient-result` just shows the
-  same patient again, exactly like the patient side's own record pages don't reset
-  `currentPatientData`. This is the core loop of the app. The doctor card's own
-  checklist only lists "Medical
+  next time they sign in; a newly added visit's prescription also re-renders the
+  Prescriptions pane immediately, not just the Visits pane. Clicking a row still opens
+  the same detail modal as before — only the category-level switch (Visits vs. Lab
+  results vs. Prescriptions) changed, not the individual entry view. Going back to the
+  dashboard doesn't lose the looked-up patient — nothing resets
+  `currentLookupCode`/`currentLookupData`, so `#patient-result` just shows the same
+  patient again (defaulting back to the Visits tab), exactly like the patient side's
+  own record pages don't reset `currentPatientData`. This is the core loop of the app.
+  The doctor card's own checklist only lists "Medical
   license number" now — email and phone were dropped from it (the "Verified" badge
   itself still requires all three via `isDoctorVerified()`, which is unaffected; only
   the checklist's display was trimmed, matching the patient side no longer echoing
@@ -316,20 +324,157 @@ verified, which would defeat the point of having the tag at all.
   any day with an appointment (a small dot) using a 42-cell grid that always shows
   complete leading/trailing weeks from adjacent months, so an appointment just past a
   month boundary still shows a dot on the dimmed "outside" days. The panel below lists
-  every appointment with `date >= today`, soonest first, non-clickable (`.list-item
-  static` — same visual as visits/tests rows but without the pointer/hover affordance,
-  since there's no detail to open yet), with an empty state when there are none. A
-  "Book new appointment" button opens a modal that's honest about scope: it explains
-  online booking isn't wired up yet rather than pretending to submit a request. Backed
-  by the `appointments` table (see "Data model" above) — new accounts start with
+  every appointment with `date >= today`, soonest first — no panel-sub caption above
+  the list any more (removed as redundant under the "Upcoming appointments" heading),
+  clickable rows opening the detail/cancel popup described further down, with an
+  empty state when there are none. A
+  "Book new appointment" button opens a real booking flow now: a full-screen page
+  (`view-pat-book-appt`, same "← Back to dashboard" pattern as the other patient
+  sub-pages — promoted from an earlier modal version since searching a doctor
+  directory wants real screen room, not a ~440px card) with a search step first
+  (`#book-appt-search-step`, a directory of every registered doctor, filtered
+  client-side as the patient types against name, current clinic, and the full
+  `clinics` array — no server-side search, consistent with the rest of the app's
+  small-pilot scale). Clicking a doctor doesn't navigate anywhere — it expands
+  a **clinics sub-list right under that row** (`toggleDoctorClinics()`,
+  `.book-doctor-clinics`), accordion-style: same `.list-item` markup as the
+  doctor row itself, just indented and on a faint `--bg` tint so the nesting
+  reads clearly without inventing a second visual style, and opening one
+  doctor's sub-list collapses whichever else was open. This replaced an
+  earlier version with a separate clinic-selection step (a whole page transition
+  just to pick a clinic, plus a native `<select>` that looked nothing like the
+  rest of the list-driven UI) — expanding in place is fewer clicks and stays
+  visually consistent with how the doctor list itself already looks. The
+  sub-list is populated by `distinctBookableClinics()`, which only offers
+  clinics that still have at least one non-expired `doctor_availability` block
+  today — a clinic whose schedule has fully lapsed just doesn't appear, rather
+  than offering a dead end; no bookable clinics at all shows a plain inline
+  message instead of a list. Picking a clinic row is what actually advances to
+  the date/time **form step** (`#book-appt-form-step`) — a clinic always has to
+  be chosen before any date or time shows up, since availability is per-clinic.
+  "Choose a different doctor or clinic" (form step) goes back to the search
+  step with its doctor list collapsed, not to a separate clinic step (there
+  isn't one anymore). Once a clinic is chosen (`bookApptSelectedClinic`), the
+  form step shows a row of
+  **date tabs** first, then **available time slots** below them; no free-text
+  date or time field anywhere in the flow. `generateBookableDates()` walks every
+  date from today out to a hard `BOOKING_HORIZON_DAYS = 28` cap and keeps only
+  the ones some block *for that clinic* actually covers (right weekday, not past
+  its `valid_until`), so the tab row only ever shows days the doctor is really
+  at that specific clinic, never a dead day the patient would tap into an empty
+  grid. Each tab shows weekday, day number, and month abbreviation
+  (`.dow`/`.dnum`/`.dmon`) since the 28-day window can span a month boundary and
+  a bare day number alone would be ambiguous. The first date tab auto-selects
+  itself once the row renders. Picking a date (`.date-tab-btn`, styled like
+  `.slot-btn`'s pill but for dates) looks up that weekday's blocks *for the
+  already-chosen clinic*, slices each into slots of its own `slot_minutes`
+  length (`generateSlotTimes()` in app.js), queries and filters out
+  already-booked times for that doctor+date, and merges every block's remaining
+  times into one flat `.slot-grid` — no more grouping/labelling by clinic within
+  the slot grid itself, since the clinic was already fixed a step earlier; a
+  split-shift day (two blocks, same clinic) just contributes two ranges of times
+  into the same grid. A date whose only slots are already taken shows a plain
+  message instead of an empty grid — this can only happen from a fully-booked
+  day now, since a day with no coverage at all never gets a tab in the first
+  place. The chosen slot's clinic is simply `bookApptSelectedClinic` (no longer
+  read off the slot button itself, now that it's fixed for the whole form step).
+  The form step header shows the doctor's name, clinic name, and clinic address
+  as three visually distinct lines (`.book-appt-doctor-name` / `.book-appt-clinic-name`
+  / `.book-appt-clinic-address` — enlarged and serif for the doctor's name,
+  teal-dark for the clinic, muted small text for the address, address line
+  hidden entirely when that clinic has none on file) rather than one small
+  inline `"Dr. X · Clinic Y"` string — the form step itself carries no access-grant
+  disclosure text any more (that used to sit here too, duplicating the confirm
+  modal's own wording; removed as redundant once the confirm step existed).
+  Clicking "Book appointment" doesn't insert right away — it opens a **confirm
+  modal** (`#book-appt-confirm-modal`) summarizing what's about to be booked,
+  styled to match the form step's own header rather than a generic `.kv`
+  label/value table: the same `.book-appt-doctor-name`/`.book-appt-clinic-name`/
+  `.book-appt-clinic-address` stack, then **date and time as two separate
+  `.appt-datetime` lines** (date first, time directly below — not one combined
+  line) at roughly double the size of the name/clinic text above them, then the
+  access-grant disclosure as plain text ("Confirming this appointment gives the
+  doctor standing access to your health record") below that. **The whole modal
+  is center-aligned** (`#book-appt-confirm-modal .modal-card{text-align:center}`,
+  plus `.save-row{justify-content:center}` so the buttons center too, scoped by
+  id rather than touching `.modal-card`/`.save-row` generally since every other
+  modal in the app stays left-aligned) — one continuous centered read top to
+  bottom instead of a table to scan. Only that modal's own "Confirm booking"
+  button actually writes the row; "Book appointment" itself just validates a
+  date and slot are picked and hands off. The address shown at both the
+  accordion clinic-picker step and this confirm
+  step, and the `clinic_address` snapshotted onto the appointment row itself
+  (new `appointments.clinic_address text` column, same snapshot reasoning as
+  `doctor_name`/`clinic_name`), all come from the same `{name, address}` clinic
+  object — see "Doctor clinics" above for where that address is set. `appointments`
+  also carries a `unique(doctor_id, date, time)` constraint as the real backstop
+  against two patients grabbing the same slot — the client-side filter is what a
+  patient sees, the constraint is what actually stops a race; a `23505` on
+  insert closes the confirm modal, re-renders the slot list, and tells the
+  patient to pick another. Booking is **auto-confirmed and auto-grants
+  access** — there's no doctor review step, and the insert immediately
+  calls `createTrustGrant()` (the same function "Manage access" already used for a
+  patient-initiated trust grant), so the doctor gets standing access to the
+  patient's record the moment the appointment is booked, not just visibility into
+  the booking itself — the confirm modal (above) is where this gets disclosed now,
+  a single place rather than two. This was a deliberate scope choice over a
+  pending/confirm flow — simpler for a small supervised pilot, revisit if real
+  doctors want review-before-booking.
+  **Upcoming appointments are now manageable, not just a static list** — the
+  patient dashboard's "Upcoming appointments" rows are clickable (`.list-item`,
+  not `.list-item.static` any more — no chevron on these rows though, unlike
+  every other clickable list in the app; deliberately plain since the row
+  itself already reads as tappable without one), opening
+  `#pat-appt-detail-modal`. That modal uses the same center-aligned, stacked
+  layout as the booking confirm modal — doctor/clinic/address, then date and
+  time as two separate large `.appt-datetime` lines, then reason as a small muted note (hidden
+  entirely when there isn't one) — plus a "Hold to cancel appointment" button
+  that deletes the row outright. **Both this button and "Hold to confirm
+  booking" on the confirm modal are press-and-hold, not click** —
+  `makeHoldButton(el, 2000, onComplete)` (a shared helper near `showError`/
+  `clearError`) wires `mousedown`/`touchstart` to sweep a `.hold-fill` overlay
+  across the button over exactly `holdMs` via a plain CSS `width` transition,
+  and only calls `onComplete` (the actual delete/insert) if the press survives
+  the full duration; `mouseup`/`mouseleave`/`touchend`/`touchcancel` before then
+  snaps the fill back to 0 over a quick 0.2s and does nothing else — a plain
+  click is a harmless blip, not an accidental confirm/cancel. `.hold-label`
+  text goes white once `.holding` is added so it stays legible against the
+  sweeping fill. Two real bugs surfaced building this, both fixed: (1) `.btn-primary`
+  already has its own `:hover{background:var(--teal-dark)}`, the exact color
+  the fill sweeps in — on the confirm button (primary) the hovering mouse
+  meant the whole button was already painted the fill's color before the fill
+  even started, so the sweep was invisible against itself; fixed with
+  `.btn-primary.hold-btn:hover{background:var(--teal)}` to pin hover back to
+  the resting color just for hold-buttons. (2) The fill wasn't animating at
+  all at first, snapping straight to 100% — setting `fillEl.style.transition`
+  and the new `width` in the same synchronous tick let the browser coalesce
+  both into one frame with no committed "before" state to transition from;
+  fixed by explicitly resetting to `width:0%` with `transition:none` and
+  forcing a reflow (`void fillEl.offsetWidth`) before turning the transition
+  back on and setting `width:100%` — the standard fix for "set transition +
+  value together" not animating. This exists specifically because both actions are
+  one-click-irreversible (an appointment genuinely gone, a real booking with a
+  real access grant) and this app has no separate "are you sure?" dialog
+  pattern elsewhere to reuse — the hold itself *is* the confirmation, instead
+  of stacking a second modal on top of the one already asking. Cancelling only removes the appointment — it does
+  *not* revoke the trust grant booking created; that stays a separate,
+  patient-initiated action in "Manage access", consistent with the rest of the
+  access model never letting one action silently imply another. No
+  reschedule yet, only cancel. The doctor side gets a matching read-only
+  "Upcoming appointments" panel on their own dashboard (below "Find a patient"),
+  backed by a new `appointments_select_doctor`
+  RLS policy (`doctor_id = auth.uid()`) — the doctor never gets write access to
+  appointments, only to the patient record via the grant the booking already created.
+  Backed by the `appointments` table (see "Data model" above), which gained a
+  nullable `doctor_id uuid references doctors(id)` column for this — nullable so it
+  never breaks on old rows that predate real booking (`doctor_name`/`clinic_name`
+  stay as text snapshots, same reasoning as visits/tests). New accounts start with
   **no** entries and the empty-state copy handles that; the earlier demo's
   fake-sample-data seeding at signup (`sampleVisits()`/`sampleTests()`/
   `sampleAppointments()`) was deliberately removed when this moved to real Supabase
   Auth accounts, since fabricating visit/test/appointment history into what's now a
   potentially real patient's chart would be actively misleading, not just a demo
-  nicety. **The booking mechanism itself (who it notifies, whether a doctor confirms
-  it, how it writes into `appointments`) is deliberately not built** — this is
-  UI-only, waiting on that design decision.
+  nicety.
 - Patient "My Eyes" page: self-entered eyeglass prescription tracking — SPH, CYL, and
   axis for each eye, one entry per date, newest first, click a row for the full
   detail. Two hand-drawn inline SVG line charts (same no-dependency approach as the
@@ -339,10 +484,60 @@ verified, which would defeat the point of having the tag at all.
   have no visibility into this — it's entirely patient-owned data, unlike visits/tests
   which doctors write.
 - Doctor clinics: a "Currently seeing patients at" dropdown on the doctor dashboard,
-  fed by a `clinics` list the doctor builds in Account settings (add/remove chips).
-  Whichever clinic is selected as `currentClinic` is stamped onto every new visit note
-  as `clinicName`, and shown to the patient (and the doctor) in the visit list and
-  detail modal — this is the only place clinic data flows from.
+  fed by a `clinics` list the doctor builds in Account settings. Whichever clinic is
+  selected as `currentClinic` is stamped onto every new visit note as `clinicName`,
+  and shown to the patient (and the doctor) in the visit list and detail modal.
+  **Each clinic is now `{name, address}`, not a bare name string** —
+  `normalizeClinic()` in app.js upgrades a legacy bare-string element (the
+  original shape) to `{name: that string, address: ''}` on every read, so
+  existing rows never needed a data migration when this changed. The top-level
+  "Add clinic" form stays name-only, though (just an input + "Add" button,
+  same as before addresses existed) — **address entry lives inside the
+  per-clinic modal instead**, alongside the schedule, since both are "details
+  about this one clinic" rather than something to fill in at the moment of
+  adding it. Each clinic row (no longer a bare chip — a
+  `.list-item` row, since it now carries more than just a name) has a
+  **"Manage" button** (plain "Manage", not "Manage bookings" — the modal it
+  opens does more than scheduling now) opening a modal
+  (`.modal-card-wide`) built as an address field on top of a **fixed Monday→Sunday
+  grid**, not an incremental
+  add-one-row-then-see-it-in-a-list flow (that version shipped first and the
+  doctor found it "confusing and difficult to manage" — this replaced it). Each
+  day row has its own From/To time inputs and an "+ Add another slot"
+  link that appends a second (or third...) from/to pair to that same day, for a
+  split shift like mornings-and-evenings; a shared "avg. minutes per patient"
+  field applies to the whole clinic, not per day. A single "Repeat weekly for the
+  next __ week(s)" checkbox + number (max 4) controls how far the whole schedule
+  extends. **Saving replaces the clinic's entire schedule** — every existing
+  `doctor_availability` row for that clinic is superseded by whatever the grid
+  currently shows, computed as `valid_until = today + repeat_weeks*7` on every row
+  — rather than editing rows in place. The write order matters and was a real bug
+  once: the first version deleted the clinic's old rows *then* inserted the new
+  ones, so a failed insert (as happened live once, testing before the
+  `valid_until` migration had been run) silently wiped the doctor's existing
+  schedule with nothing to replace it. Fixed to insert the new rows first and only
+  delete the old ones (by the specific ids captured before the insert, not a
+  blanket clinic_name delete) once the insert has actually succeeded — a failed
+  save now leaves the previous schedule untouched. The modal's one "Save" button
+  covers both writes — the address field (a plain `doctors.clinics` update,
+  independent of the schedule tables) only fires when the address actually
+  changed from what the modal opened with, then the schedule replace runs as
+  above. Removing a clinic still deletes
+  its availability rows outright (no replacement to protect there). **The 4-week
+  figure is a hard cap enforced twice**: the "Repeat weekly" number input is
+  clamped to 4 when saving, and separately `generateBookableDates()` (patient
+  side, below) never looks past `today + 28 days` regardless of what any row's
+  `valid_until` says — so no single doctor's setting, or a bad row, can push a
+  patient's booking window past the app-wide limit. **`currentClinic` also picks
+  itself**: every dashboard load, `autoDetectCurrentClinic()` checks whether right
+  now falls inside one of the doctor's still-valid weekly blocks
+  (`isAvailabilityBlockActive()` — skips anything past its `valid_until`,
+  including legacy rows saved before that column existed, since those come back
+  `null`) and, if so, persists that clinic as current — the same write path as
+  picking it manually from the dropdown — so the doctor doesn't have to remember
+  to flip it themselves, and a patient searching the directory sees where they
+  actually are. These same `doctor_availability` rows are what the patient booking
+  flow slices into bookable slots — see "Appointments" below.
 - Doctor statistics: a "My statistics" modal on the doctor dashboard showing total
   unique patients seen, total visits logged, and unique patients seen today / this
   calendar month / this calendar year (actual counts against real calendar
@@ -475,11 +670,11 @@ and "Auth." What's still not built, matching the doc's own scope and deferred li
    actual phone.
 7. Real file upload for test reports (once there's file storage wired up — Supabase
    Storage is a natural fit given everything else is already on Supabase).
-8. Appointment booking mechanism — the "Book new appointment" button on the patient
-   dashboard currently just explains it's not wired up yet (see "Appointments" above).
-   Needs a design decision: does a doctor confirm/reject a request, does it write
-   straight into `appointments`, does it notify the doctor at all given there's
-   no notification system yet.
+8. **RESOLVED — appointment booking.** Patients search the full doctor directory by
+   name or clinic and book directly (see "Appointments" above); auto-confirmed,
+   auto-grants access, no doctor review step by deliberate scope choice. A real
+   pending/confirm flow and appointment cancellation are the natural follow-ups if a
+   pilot doctor asks for review-before-booking.
 
 ## Design system (for consistency if extending the UI)
 

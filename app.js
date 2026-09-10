@@ -9,8 +9,8 @@
   // mechanism, different step markup and DOM ids since each role's modal lives
   // inside its own view). The slides themselves are static HTML side-by-side inside
   // `ids.track`; stepping just translates the track — content isn't injected by JS.
-  var STEPPER_NEXT_ICON = '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M6,2 L12,8 L6,14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  var STEPPER_DONE_ICON = '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M3,8 L7,12 L13,4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var STEPPER_NEXT_ICON = '<svg width="13" height="13" viewBox="0 0 16 16"><path d="M6,2 L12,8 L6,14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var STEPPER_DONE_ICON = '<svg width="13" height="13" viewBox="0 0 16 16"><path d="M3,8 L7,12 L13,4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function makeStepperModal(ids){
     var idx = 0;
     var total = 0;
@@ -50,6 +50,10 @@
     document.querySelectorAll('.view').forEach(function(v){ v.classList.add('hidden'); });
     $(id).classList.remove('hidden');
     window.scrollTo(0,0);
+    // Landing back on the doctor dashboard (from a patient record, or via browser
+    // back/forward) re-pulls this doctor's appointments so a patient's new booking
+    // shows up without needing a full reload — see refreshDoctorAppointments().
+    if (id === 'view-doctor-dash') refreshDoctorAppointments();
     if (suppressHistoryPush) return;
     if (!history.state){
       history.replaceState({ view: id }, '', '#' + id);
@@ -58,7 +62,7 @@
     }
   }
   var PATIENT_ONLY_VIEWS = ['view-patient-dash','view-record-visits','view-record-tests','view-record-prescriptions','view-patient-eyes','view-pat-profile','view-pat-account-settings','view-pat-stats','view-pat-book-appt'];
-  var DOCTOR_ONLY_VIEWS = ['view-doctor-dash', 'view-doc-profile', 'view-doc-account-settings', 'view-doc-stats'];
+  var DOCTOR_ONLY_VIEWS = ['view-doctor-dash', 'view-doctor-record', 'view-doc-profile', 'view-doc-account-settings', 'view-doc-clinics', 'view-doc-stats'];
   window.addEventListener('popstate', function(e){
     var requested = (e.state && e.state.view) || 'view-landing';
     var id = requested;
@@ -90,7 +94,7 @@
   }catch(e){}
   if (!supabaseClient){
     document.addEventListener('DOMContentLoaded', function(){
-      document.body.innerHTML = '<div style="max-width:520px;margin:80px auto;padding:24px;font-family:sans-serif;text-align:center;">'
+      document.body.innerHTML = '<div style="max-width:416px;margin:64px auto;padding:19px;font-family:sans-serif;text-align:center;">'
         + '<h2>Can’t connect</h2><p>Pak Health couldn’t reach its backend. Please reload the page, or contact support if this keeps happening.</p></div>';
     });
     return;
@@ -128,7 +132,9 @@
   // rows saved before this change still come back as bare strings, so every read
   // normalizes through here instead of the DB needing a migration.
   function normalizeClinic(c){
-    return typeof c === 'string' ? { name: c, address: '' } : { name: c.name || '', address: c.address || '' };
+    return typeof c === 'string'
+      ? { name: c, address: '', phone: '', note: '' }
+      : { name: c.name || '', address: c.address || '', phone: c.phone || '', note: c.note || '' };
   }
   function mapDoctorRow(row){
     return {
@@ -155,7 +161,7 @@
     return { id: row.id, date: row.date, sphL: row.sph_l || '', cylL: row.cyl_l || '', axisL: row.axis_l || '', sphR: row.sph_r || '', cylR: row.cyl_r || '', axisR: row.axis_r || '' };
   }
   function mapAppointmentRow(row){
-    return { id: row.id, doctorId: row.doctor_id || null, doctorName: row.doctor_name || '', clinicName: row.clinic_name || '', clinicAddress: row.clinic_address || '', date: row.date, time: row.time || '', reason: row.reason || '' };
+    return { id: row.id, doctorId: row.doctor_id || null, patientId: row.patient_id || null, doctorName: row.doctor_name || '', clinicName: row.clinic_name || '', clinicAddress: row.clinic_address || '', date: row.date, time: row.time || '', reason: row.reason || '' };
   }
 
   async function loadPatientProfile(id){
@@ -669,7 +675,7 @@
     var name = d.name ? ('Dr. ' + d.name.replace(/^Dr\.?\s*/i,'')) : (d.doctorId || 'Unknown doctor');
     var verified = !!d.verified;
     return '<div class="list-item" data-grant="'+entry.grant.id+'" style="cursor:default;">'
-      + '<div><div class="li-title">'+escapeHtml(name)+' <span class="badge '+(verified?'verified':'unverified')+'" style="margin-left:6px;">'+(verified?'Verified':'Unverified')+'</span></div>'
+      + '<div><div class="li-title">'+escapeHtml(name)+' <span class="badge '+(verified?'verified':'unverified')+'" style="margin-left:5px;">'+(verified?'Verified':'Unverified')+'</span></div>'
       + '<div class="li-sub">'+escapeHtml(maskPhone(d.phone))+(subtext ? ' · '+subtext : '')+'</div></div>'
       + (showRevoke ? '<button class="btn btn-secondary btn-sm revoke-grant-btn" data-grant="'+entry.grant.id+'">Revoke</button>' : '')
       + '</div>';
@@ -947,7 +953,7 @@
     if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
   }
-  var chevronSvg = '<svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+  var chevronSvg = '<svg class="chevron" width="11" height="7" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
 
   function renderVisitsList(visits){
     var listEl = $('pat-visits-list');
@@ -1189,7 +1195,7 @@
       var sub = [d.specialty, (d.clinics || []).map(function(c){ return c.name; }).join(', ')].filter(Boolean).join(' · ');
       return '<div class="book-doctor-entry" data-idx="'+i+'">'
         + '<div class="list-item" data-idx="'+i+'">'
-        + '<div><div class="li-title book-doctor-name">'+escapeHtml(doctorDisplayName(d))+' <span class="badge '+(d.verified?'verified':'unverified')+'" style="margin-left:6px;">'+(d.verified?'Verified':'Unverified')+'</span></div>'
+        + '<div><div class="li-title book-doctor-name">'+escapeHtml(doctorDisplayName(d))+' <span class="badge '+(d.verified?'verified':'unverified')+'" style="margin-left:5px;">'+(d.verified?'Verified':'Unverified')+'</span></div>'
         + '<div class="li-sub">'+escapeHtml(sub || 'No clinic on file')+'</div></div>'
         + chevronSvg + '</div>'
         + '<div class="book-doctor-clinics hidden"></div>'
@@ -1225,12 +1231,12 @@
     });
     if (alreadyOpen) return;
     clinicsEl.classList.remove('hidden');
-    clinicsEl.innerHTML = '<div class="li-sub" style="padding:10px 12px;">Loading…</div>';
+    clinicsEl.innerHTML = '<div class="li-sub" style="padding:8px 10px;">Loading…</div>';
     var res = await supabaseClient.from('doctor_availability').select('*').eq('doctor_id', d.id);
     var availability = (res.data || []).map(mapAvailabilityRow);
     var clinicNames = distinctBookableClinics(availability);
     if (!clinicNames.length){
-      clinicsEl.innerHTML = '<div class="li-sub" style="padding:10px 12px;">No bookable clinics yet.</div>';
+      clinicsEl.innerHTML = '<div class="li-sub" style="padding:8px 10px;">No bookable clinics yet.</div>';
       return;
     }
     var clinics = clinicNames.map(function(name){ return findClinicByName(d, name); });
@@ -1249,22 +1255,27 @@
   }
   function findClinicByName(d, name){
     var match = (d.clinics || []).find(function(c){ return c.name === name; });
-    return match || { name: name, address: '' };
+    return match || { name: name, address: '', phone: '', note: '' };
   }
   var bookApptSelectedClinicAddress = '';
   function selectBookApptDoctorClinic(d, availability, clinicName){
     bookApptSelectedDoctor = d;
     bookApptAvailability = availability;
     bookApptSelectedClinic = clinicName;
-    bookApptSelectedClinicAddress = findClinicByName(d, clinicName).address || '';
-    bookApptSelectedSlot = null;
-    bookApptSelectedDate = null;
+    var clinic = findClinicByName(d, clinicName);
+    bookApptSelectedClinicAddress = clinic.address || '';
     $('book-appt-search-step').classList.add('hidden');
     $('book-appt-form-step').classList.remove('hidden');
     $('book-appt-doctor-name').textContent = doctorDisplayName(d);
     $('book-appt-clinic-name').textContent = clinicName;
     $('book-appt-clinic-address').textContent = bookApptSelectedClinicAddress;
     $('book-appt-clinic-address').classList.toggle('hidden', !bookApptSelectedClinicAddress);
+    $('book-appt-clinic-phone').textContent = clinic.phone ? ('Phone: ' + clinic.phone) : '';
+    $('book-appt-clinic-phone').classList.toggle('hidden', !clinic.phone);
+    $('book-appt-clinic-note').textContent = clinic.note ? ('Phone hours: ' + clinic.note) : '';
+    $('book-appt-clinic-note').classList.toggle('hidden', !clinic.note);
+    bookApptSelectedSlot = null;
+    bookApptSelectedDate = null;
     $('book-appt-reason').value = '';
     clearError($('book-appt-error'));
     $('book-appt-date-tabs').innerHTML = '';
@@ -1400,7 +1411,6 @@
   }
   function closeBookApptConfirmModal(){ $('book-appt-confirm-modal').classList.add('hidden'); }
   $('book-appt-confirm-close').addEventListener('click', closeBookApptConfirmModal);
-  $('book-appt-confirm-cancel').addEventListener('click', closeBookApptConfirmModal);
   $('book-appt-confirm-modal').addEventListener('click', function(e){ if (e.target === $('book-appt-confirm-modal')) closeBookApptConfirmModal(); });
   $('book-appt-save').addEventListener('click', function(){
     if (!bookApptSelectedDoctor) return;
@@ -1797,25 +1807,115 @@
     });
     return match ? match.clinicName : null;
   }
-  function renderDoctorAppointmentsList(appointments){
-    var listEl = $('doc-appts-list');
-    var emptyEl = $('doc-appts-empty');
-    var todayKey = toDateKey(new Date());
-    var upcoming = (appointments || [])
-      .filter(function(a){ return a.date && a.date >= todayKey; })
-      .sort(function(a, b){ return (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')); });
-    if (!upcoming.length){
-      listEl.innerHTML = '';
-      emptyEl.classList.remove('hidden');
-      return;
+  // ---- Doctor dashboard day-view calendar (a single day's appointments as
+  // time-positioned blocks, Google-Calendar-day-view style, not a plain list) ----
+  var DAYGRID_START_HOUR = 7;
+  var DAYGRID_END_HOUR = 21;
+  var DAYGRID_ROW_H = 45;
+  var doctorDayGridDate = null; // null = today; set by prev/next
+  function formatHourLabel(h){
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + (h < 12 ? ' AM' : ' PM');
+  }
+  function formatCurrentTime(){
+    var d = new Date();
+    var h = d.getHours();
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    var mm = (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+    return h12 + ':' + mm + (h < 12 ? ' AM' : ' PM');
+  }
+  // Appointment times are stored as "9:00 AM"-style strings (or, for a few old
+  // manually-entered rows predating the slot system, bare "10:00" 24h text) —
+  // this covers both.
+  function parseApptTimeToMinutes(t){
+    if (!t) return null;
+    var m = /^(\d{1,2}):(\d{2})\s*([AaPp][Mm])?$/.exec(t.trim());
+    if (!m) return null;
+    var hh = parseInt(m[1], 10);
+    var mm = parseInt(m[2], 10);
+    var ampm = m[3] ? m[3].toUpperCase() : null;
+    if (ampm === 'PM' && hh !== 12) hh += 12;
+    if (ampm === 'AM' && hh === 12) hh = 0;
+    return hh * 60 + mm;
+  }
+  // A block's height comes from the matching doctor_availability slot length
+  // (same clinic/weekday/time-range the appointment was booked from), falling
+  // back to a generic 20 minutes for anything that doesn't match (e.g. an old
+  // appointment from before per-slot durations existed).
+  function findApptDurationMinutes(a, startMinutes){
+    var dow = new Date(a.date + 'T00:00:00').getDay();
+    var match = (currentDoctorData.availability || []).find(function(av){
+      return av.clinicName === a.clinicName && av.dayOfWeek === dow
+        && startMinutes >= minutesFromTimeStr(av.startTime) && startMinutes < minutesFromTimeStr(av.endTime);
+    });
+    return match ? match.slotMinutes : 20;
+  }
+  function renderDoctorDayGrid(){
+    var dateObj = doctorDayGridDate || new Date();
+    var dateStr = toDateKey(dateObj);
+    $('doc-daygrid-label').textContent = dateObj.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+    var dayAppts = (currentDoctorData.appointments || [])
+      .filter(function(a){ return a.date === dateStr; })
+      .sort(function(a, b){ return (parseApptTimeToMinutes(a.time) || 0) - (parseApptTimeToMinutes(b.time) || 0); });
+
+    var totalRows = DAYGRID_END_HOUR - DAYGRID_START_HOUR;
+    var linesHtml = '';
+    var labelsHtml = '';
+    for (var r = 0; r <= totalRows; r++){
+      linesHtml += '<div class="daygrid-hourline" style="top:' + (r * DAYGRID_ROW_H) + 'px;"></div>';
+      if (r < totalRows){
+        labelsHtml += '<div class="daygrid-hour-label" style="top:' + (r * DAYGRID_ROW_H) + 'px;">' + formatHourLabel(DAYGRID_START_HOUR + r) + '</div>';
+      }
     }
-    emptyEl.classList.add('hidden');
-    listEl.innerHTML = upcoming.map(function(a){
-      return '<div class="list-item static">'
-        + '<div><div class="li-title">'+escapeHtml(a.patientName)+'</div>'
-        + '<div class="li-sub">'+escapeHtml(formatDateDisplay(a.date))+(a.time ? ' · '+escapeHtml(a.time) : '')+(a.reason ? ' · '+escapeHtml(a.reason) : '')+'</div></div>'
+    var blocksHtml = dayAppts.map(function(a, i){
+      var startMin = parseApptTimeToMinutes(a.time);
+      if (startMin == null) return '';
+      var top = (startMin - DAYGRID_START_HOUR * 60) / 60 * DAYGRID_ROW_H;
+      var durMin = findApptDurationMinutes(a, startMin);
+      var height = Math.max(18, durMin / 60 * DAYGRID_ROW_H - 2);
+      var titleAttr = a.reason ? (a.patientName + ' — ' + a.reason) : a.patientName;
+      return '<div class="daygrid-block" data-idx="' + i + '" style="top:' + top + 'px; height:' + height + 'px;" title="' + escapeHtml(titleAttr) + '">'
+        + '<span class="daygrid-block-title">' + escapeHtml(a.patientName) + '</span>'
+        + (a.reason ? ' - ' + escapeHtml(a.reason) : '')
         + '</div>';
     }).join('');
+
+    $('doc-daygrid').innerHTML = '<div class="daygrid-events" style="height:' + (totalRows * DAYGRID_ROW_H) + 'px;">' + linesHtml + labelsHtml + blocksHtml + '</div>';
+    $('doc-daygrid-empty').classList.toggle('hidden', dayAppts.length > 0);
+
+    $('doc-daygrid').querySelectorAll('.daygrid-block').forEach(function(el){
+      el.addEventListener('click', async function(){
+        var a = dayAppts[parseInt(el.getAttribute('data-idx'), 10)];
+        if (!a || !a.patientId) return;
+        var full = await loadPatientRecordForDoctor(a.patientId);
+        if (!full) return;
+        var grant = await getActiveGrant(a.patientId, session.id);
+        showLookupResult(a.patientId, full, grant);
+      });
+    });
+  }
+  $('doc-daygrid-prev').addEventListener('click', function(){
+    doctorDayGridDate = new Date(doctorDayGridDate || new Date());
+    doctorDayGridDate.setDate(doctorDayGridDate.getDate() - 1);
+    renderDoctorDayGrid();
+  });
+  $('doc-daygrid-next').addEventListener('click', function(){
+    doctorDayGridDate = new Date(doctorDayGridDate || new Date());
+    doctorDayGridDate.setDate(doctorDayGridDate.getDate() + 1);
+    renderDoctorDayGrid();
+  });
+  // The calendar only ever reflects appointments as of the last time this doctor's
+  // data was fetched — there's no realtime subscription (consistent with the rest
+  // of this app, which is all fetch-on-load, not live). A patient booking a slot
+  // while the doctor is sitting on the dashboard, or already inside a patient's
+  // record, wouldn't otherwise show up until a full reload/re-sign-in. Re-querying
+  // specifically when the doctor *lands back on the dashboard* (see the showView()
+  // hook below) covers that without needing a poll/subscription — cheap enough at
+  // this pilot's scale.
+  async function refreshDoctorAppointments(){
+    if (!currentDoctorData || session.type !== 'doctor') return;
+    currentDoctorData.appointments = await loadDoctorAppointments(session.id);
+    renderDoctorDayGrid();
   }
   async function enterDoctorDash(id){
     var data = await loadDoctorProfile(id);
@@ -1836,6 +1936,7 @@
     }
     var doctorLoads = await Promise.all([loadDoctorVisitLog(id), loadDoctorAppointments(id), loadDoctorAvailability(id)]);
     data.visitLog = doctorLoads[0];
+    data.appointments = doctorLoads[1];
     data.availability = doctorLoads[2];
     // "Currently seeing patients at" picks itself from the doctor's own weekly
     // schedule (see doctor_availability) whenever right now falls inside one of
@@ -1861,23 +1962,23 @@
     renderVerifyBanner('doc', authUser.email, !!authUser.email_confirmed_at);
     renderDoctorVerification(data);
     renderClinicSelect(data);
-    renderDoctorAppointmentsList(doctorLoads[1]);
+    doctorDayGridDate = null;
+    renderDoctorDayGrid();
     $('lookup-code').value = '';
     $('lookup-row').classList.remove('hidden');
     $('lookup-subtitle').classList.remove('hidden');
-    $('patient-result').classList.add('hidden');
     $('lookup-not-found').classList.add('hidden');
-    $('lookup-empty').classList.remove('hidden');
     currentLookupCode = null;
     currentLookupData = null;
     currentLookupGrant = null;
     switchFindTab('code');
     renderRoster();
-    closeAddVisitModal();
+    collapseAddVisitFields();
     closeDocVisitModal();
-    closeAddTestModal();
+    collapseAddTestFields();
     closeDocTestModal();
     closeManageBookingsModal();
+    closeDeleteClinicModal();
     closeDocAcctDropdown();
     docHowItWorks.close();
     showView('view-doctor-dash');
@@ -1891,22 +1992,15 @@
     $('doc-find-code-pane').classList.toggle('hidden', !code);
     $('doc-find-roster-pane').classList.toggle('hidden', code);
     // Clicking either tab means "let me search again" — drop whatever patient
-    // was previously loaded, otherwise #patient-result stays visible (it's
-    // never touched by the toggles above) and renders alongside the pane that
-    // was just revealed, which looks like the old tab never actually left.
-    // This also has to restore lookup-row/lookup-subtitle, since
-    // showLookupResult() hides both of those (not just patient-result) —
-    // missing this the first time round left the code tab showing only the
-    // "No patient looked up yet" empty state with no search field above it.
+    // was previously loaded. This also has to restore lookup-row/lookup-subtitle,
+    // since showLookupResult() hides both before navigating to the record page.
     currentLookupCode = null;
     currentLookupData = null;
     currentLookupGrant = null;
     $('lookup-code').value = '';
     $('lookup-row').classList.remove('hidden');
     $('lookup-subtitle').classList.remove('hidden');
-    $('patient-result').classList.add('hidden');
     $('lookup-not-found').classList.add('hidden');
-    $('lookup-empty').classList.toggle('hidden', !code);
   }
   $('doc-find-tab-code').addEventListener('click', function(){ switchFindTab('code'); });
   $('doc-find-tab-roster').addEventListener('click', function(){ switchFindTab('roster'); renderRoster(); });
@@ -1967,30 +2061,16 @@
       listEl.innerHTML = '<span class="hint">No clinics added yet.</span>';
       return;
     }
-    listEl.innerHTML = clinics.map(function(c, i){
+    listEl.innerHTML = clinics.map(function(c){
       return '<div class="list-item" style="cursor:default;">'
         + '<div><div class="li-title">'+escapeHtml(c.name)+'</div>'
         + (c.address ? '<div class="li-sub">'+escapeHtml(c.address)+'</div>' : '')
         + '</div>'
-        + '<div style="display:flex; align-items:center; gap:8px;">'
         + '<button type="button" class="btn btn-secondary btn-sm manage-bookings-btn" data-clinic="'+escapeHtml(c.name)+'">Manage</button>'
-        + '<button type="button" class="clinic-remove-btn" data-idx="'+i+'" aria-label="Remove clinic" style="background:none; border:none; color:var(--muted); font-size:1.2rem; line-height:1; cursor:pointer; padding:0 2px;">&times;</button>'
-        + '</div></div>';
+        + '</div>';
     }).join('');
     listEl.querySelectorAll('.manage-bookings-btn').forEach(function(btn){
       btn.addEventListener('click', function(){ openManageBookingsModal(btn.getAttribute('data-clinic')); });
-    });
-    listEl.querySelectorAll('.clinic-remove-btn').forEach(function(btn){
-      btn.addEventListener('click', async function(){
-        var idx = parseInt(btn.getAttribute('data-idx'), 10);
-        var removed = currentDoctorData.clinics.splice(idx, 1)[0];
-        if (currentDoctorData.currentClinic === removed.name) currentDoctorData.currentClinic = '';
-        await supabaseClient.from('doctors').update({ clinics: currentDoctorData.clinics, current_clinic: currentDoctorData.currentClinic }).eq('id', session.id);
-        await supabaseClient.from('doctor_availability').delete().eq('doctor_id', session.id).eq('clinic_name', removed.name);
-        currentDoctorData.availability = (currentDoctorData.availability || []).filter(function(a){ return a.clinicName !== removed.name; });
-        renderClinicsList(currentDoctorData);
-        renderClinicSelect(currentDoctorData);
-      });
     });
   }
 
@@ -2053,12 +2133,50 @@
     });
     return result;
   }
+  // Shared by address/phone/note — each is {key}-view (text + Edit button) vs
+  // a plain {key} input/textarea. New clinics skip straight to the input
+  // (nothing to show yet); editing an existing clinic starts in view mode and
+  // only swaps to the input if the doctor clicks Edit — the input still gets
+  // prefilled either way, so saving without ever touching it can't blank the
+  // field out.
+  function showClinicFieldView(key, value, emptyLabel){
+    $('avail-clinic-'+key+'-text').textContent = value || emptyLabel;
+    $('avail-clinic-'+key+'-view').classList.remove('hidden');
+    $('avail-clinic-'+key).classList.add('hidden');
+  }
+  function showClinicFieldInput(key){
+    $('avail-clinic-'+key+'-view').classList.add('hidden');
+    $('avail-clinic-'+key).classList.remove('hidden');
+    $('avail-clinic-'+key).focus();
+  }
+  ['address', 'phone', 'note'].forEach(function(key){
+    $('avail-clinic-'+key+'-edit-btn').addEventListener('click', function(){ showClinicFieldInput(key); });
+  });
+  // clinicName omitted (or falsy) opens the modal in "create a new clinic"
+  // mode instead of editing an existing one — same form, just with a name
+  // field revealed up top and no existing data to prefill.
   function openManageBookingsModal(clinicName){
-    manageBookingsClinic = clinicName;
-    $('doc-manage-bookings-title').textContent = 'Manage — ' + clinicName;
+    manageBookingsClinic = clinicName || null;
+    var isNew = !clinicName;
+    $('doc-manage-bookings-title').textContent = isNew ? 'Add a clinic' : 'Manage — ' + clinicName;
     clearError($('avail-error'));
-    $('avail-clinic-address').value = findClinicByName(currentDoctorData, clinicName).address || '';
-    var blocks = (currentDoctorData.availability || []).filter(function(a){ return a.clinicName === clinicName; });
+    $('avail-clinic-name-field').classList.toggle('hidden', !isNew);
+    $('avail-clinic-name').value = '';
+    $('avail-delete-clinic-btn').classList.toggle('hidden', isNew);
+    var blocks = isNew ? [] : (currentDoctorData.availability || []).filter(function(a){ return a.clinicName === clinicName; });
+    var clinic = isNew ? { address: '', phone: '', note: '' } : findClinicByName(currentDoctorData, clinicName);
+    $('avail-clinic-address').value = clinic.address || '';
+    $('avail-clinic-phone').value = clinic.phone || '';
+    $('avail-clinic-note').value = clinic.note || '';
+    if (isNew){
+      showClinicFieldInput('address');
+      showClinicFieldInput('phone');
+      showClinicFieldInput('note');
+    } else {
+      showClinicFieldView('address', clinic.address, 'No address on file');
+      showClinicFieldView('phone', clinic.phone, 'No phone number on file');
+      showClinicFieldView('note', clinic.note, 'No note on file');
+    }
     $('avail-slot-minutes').value = blocks.length ? blocks[0].slotMinutes : 15;
     var todayStr = toDateKey(new Date());
     var maxValidUntil = blocks.reduce(function(max, b){
@@ -2080,6 +2198,20 @@
   $('doc-manage-bookings-modal').addEventListener('click', function(e){ if (e.target === $('doc-manage-bookings-modal')) closeManageBookingsModal(); });
   $('avail-save-btn').addEventListener('click', async function(){
     clearError($('avail-error'));
+    var isNew = !manageBookingsClinic;
+    var newName = '';
+    if (isNew){
+      newName = $('avail-clinic-name').value.trim();
+      if (!newName){
+        showError($('avail-error'), 'Enter a clinic or hospital name.');
+        return;
+      }
+      var dupe = (currentDoctorData.clinics || []).some(function(c){ return c.name.toLowerCase() === newName.toLowerCase(); });
+      if (dupe){
+        showError($('avail-error'), 'You already have a clinic with that name.');
+        return;
+      }
+    }
     var slotMinutes = parseInt($('avail-slot-minutes').value, 10);
     if (!slotMinutes || slotMinutes < 1){
       showError($('avail-error'), 'Enter how many minutes an average patient takes.');
@@ -2099,27 +2231,40 @@
     validUntilDate.setDate(validUntilDate.getDate() + repeatWeeks * 7);
     var validUntilStr = toDateKey(validUntilDate);
 
-    // Insert the replacement rows BEFORE deleting the old ones, and delete only
-    // those specific old row ids — never a blanket "delete then insert" on the
-    // same clinic_name. If the insert fails partway (e.g. a network blip), the
-    // doctor's existing schedule is still sitting there untouched instead of
-    // having already been wiped by a delete that ran first.
-    var oldIds = (currentDoctorData.availability || [])
-      .filter(function(a){ return a.clinicName === manageBookingsClinic; })
-      .map(function(a){ return a.id; });
     $('avail-save-btn').disabled = true;
     $('avail-save-btn').textContent = 'Saving...';
     try{
       var address = $('avail-clinic-address').value.trim();
-      var clinicEntry = findClinicByName(currentDoctorData, manageBookingsClinic);
-      if (clinicEntry.address !== address){
-        clinicEntry.address = address;
-        currentDoctorData.clinics = currentDoctorData.clinics.map(function(c){
-          return c.name === manageBookingsClinic ? { name: c.name, address: address } : c;
-        });
-        await supabaseClient.from('doctors').update({ clinics: currentDoctorData.clinics }).eq('id', session.id);
+      var phone = $('avail-clinic-phone').value.trim();
+      var note = $('avail-clinic-note').value.trim();
+      if (isNew){
+        // The clinic's identity (its doctors.clinics entry) has to exist
+        // before any doctor_availability row can reference it by name.
+        currentDoctorData.clinics = (currentDoctorData.clinics || []).concat([{ name: newName, address: address, phone: phone, note: note }]);
+        if (!currentDoctorData.currentClinic) currentDoctorData.currentClinic = newName;
+        await supabaseClient.from('doctors').update({ clinics: currentDoctorData.clinics, current_clinic: currentDoctorData.currentClinic }).eq('id', session.id);
+        manageBookingsClinic = newName;
         renderClinicsList(currentDoctorData);
+        renderClinicSelect(currentDoctorData);
+      } else {
+        var clinicEntry = findClinicByName(currentDoctorData, manageBookingsClinic);
+        if (clinicEntry.address !== address || clinicEntry.phone !== phone || clinicEntry.note !== note){
+          currentDoctorData.clinics = currentDoctorData.clinics.map(function(c){
+            return c.name === manageBookingsClinic ? { name: c.name, address: address, phone: phone, note: note } : c;
+          });
+          await supabaseClient.from('doctors').update({ clinics: currentDoctorData.clinics }).eq('id', session.id);
+          renderClinicsList(currentDoctorData);
+        }
       }
+      // Insert the replacement rows BEFORE deleting the old ones, and delete
+      // only those specific old row ids — never a blanket "delete then
+      // insert" on the same clinic_name. If the insert fails partway (e.g. a
+      // network blip), the doctor's existing schedule is still sitting there
+      // untouched instead of having already been wiped by a delete that ran
+      // first. For a brand-new clinic this is always empty anyway.
+      var oldIds = (currentDoctorData.availability || [])
+        .filter(function(a){ return a.clinicName === manageBookingsClinic; })
+        .map(function(a){ return a.id; });
       var newRows = [];
       if (pairs.length){
         var insertRows = pairs.map(function(p){
@@ -2146,25 +2291,52 @@
       $('avail-save-btn').textContent = 'Save';
     }
   });
-  $('doc-clinic-add-btn').addEventListener('click', async function(){
-    var input = $('doc-clinic-input');
-    var name = input.value.trim();
-    if (!name) return;
-    if (!currentDoctorData.clinics) currentDoctorData.clinics = [];
-    var exists = currentDoctorData.clinics.some(function(c){ return c.name.toLowerCase() === name.toLowerCase(); });
-    if (!exists){
-      currentDoctorData.clinics.push({ name: name, address: '' });
-      if (!currentDoctorData.currentClinic) currentDoctorData.currentClinic = name;
+  $('doc-clinic-add-btn').addEventListener('click', function(){
+    openManageBookingsModal(null);
+  });
+
+  // ---- Delete clinic: a hold-to-confirm popup opened from inside "Manage" ----
+  var deleteClinicTarget = null;
+  function openDeleteClinicModal(clinicName){
+    deleteClinicTarget = clinicName;
+    $('doc-delete-clinic-name').textContent = clinicName;
+    clearError($('doc-delete-clinic-error'));
+    $('doc-delete-clinic-modal').classList.remove('hidden');
+  }
+  function closeDeleteClinicModal(){ $('doc-delete-clinic-modal').classList.add('hidden'); deleteClinicTarget = null; }
+  $('avail-delete-clinic-btn').addEventListener('click', function(){
+    if (manageBookingsClinic) openDeleteClinicModal(manageBookingsClinic);
+  });
+  $('doc-delete-clinic-close').addEventListener('click', closeDeleteClinicModal);
+  $('doc-delete-clinic-cancel').addEventListener('click', closeDeleteClinicModal);
+  $('doc-delete-clinic-modal').addEventListener('click', function(e){ if (e.target === $('doc-delete-clinic-modal')) closeDeleteClinicModal(); });
+  makeHoldButton($('doc-delete-clinic-confirm'), 2000, async function(){
+    if (!deleteClinicTarget) return;
+    var removedName = deleteClinicTarget;
+    var btn = $('doc-delete-clinic-confirm');
+    var label = btn.querySelector('.hold-label');
+    clearError($('doc-delete-clinic-error'));
+    btn.disabled = true;
+    label.textContent = 'Deleting...';
+    try{
+      var idx = currentDoctorData.clinics.findIndex(function(c){ return c.name === removedName; });
+      if (idx !== -1) currentDoctorData.clinics.splice(idx, 1);
+      if (currentDoctorData.currentClinic === removedName) currentDoctorData.currentClinic = '';
       await supabaseClient.from('doctors').update({ clinics: currentDoctorData.clinics, current_clinic: currentDoctorData.currentClinic }).eq('id', session.id);
+      await supabaseClient.from('doctor_availability').delete().eq('doctor_id', session.id).eq('clinic_name', removedName);
+      currentDoctorData.availability = (currentDoctorData.availability || []).filter(function(a){ return a.clinicName !== removedName; });
       renderClinicsList(currentDoctorData);
       renderClinicSelect(currentDoctorData);
+      closeDeleteClinicModal();
+      closeManageBookingsModal();
+    }catch(e){
+      showError($('doc-delete-clinic-error'), 'Something went wrong deleting this clinic. Please try again.');
+    }finally{
+      btn.disabled = false;
+      label.textContent = 'Hold to delete clinic';
     }
-    input.value = '';
-    input.focus();
   });
-  $('doc-clinic-input').addEventListener('keydown', function(e){
-    if (e.key === 'Enter'){ e.preventDefault(); $('doc-clinic-add-btn').click(); }
-  });
+
   $('doc-current-clinic').addEventListener('change', async function(){
     currentDoctorData.currentClinic = $('doc-current-clinic').value;
     await supabaseClient.from('doctors').update({ current_clinic: currentDoctorData.currentClinic }).eq('id', session.id);
@@ -2260,12 +2432,16 @@
   });
 
   function openDocAccountSettingsPage(){
-    renderClinicsList(currentDoctorData);
-    $('doc-clinic-input').value = '';
     closeDocAcctDropdown();
     showView('view-doc-account-settings');
   }
   $('doc-account-settings-btn').addEventListener('click', openDocAccountSettingsPage);
+
+  $('doc-clinics-btn').addEventListener('click', function(){
+    renderClinicsList(currentDoctorData);
+    closeDocAcctDropdown();
+    showView('view-doc-clinics');
+  });
 
   $('doc-myprofile-btn').addEventListener('click', function(){
     closeDocAcctDropdown();
@@ -2298,7 +2474,7 @@
   $('doc-howitworks-btn').addEventListener('click', docHowItWorks.open);
 
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape'){ closeVisitModal(); closeTestModal(); closePrescriptionModal(); closeAddVisitModal(); closeDocVisitModal(); closeDocTestModal(); closeAddTestModal(); closeAddEyeModal(); closeEyeRxPrevModal(); closePatAccessModal(); closePatApptDetailModal(); closeBookApptConfirmModal(); closeManageBookingsModal(); closePatAcctDropdown(); patHowItWorks.close(); closeDocAcctDropdown(); docHowItWorks.close(); }
+    if (e.key === 'Escape'){ closeVisitModal(); closeTestModal(); closePrescriptionModal(); collapseAddVisitFields(); closeDocVisitModal(); closeDocTestModal(); collapseAddTestFields(); closeAddEyeModal(); closeEyeRxPrevModal(); closePatAccessModal(); closePatApptDetailModal(); closeBookApptConfirmModal(); closeManageBookingsModal(); closeDeleteClinicModal(); closePatAcctDropdown(); patHowItWorks.close(); closeDocAcctDropdown(); docHowItWorks.close(); }
   });
 
   function escapeHtml(s){
@@ -2307,7 +2483,7 @@
     return d.innerHTML;
   }
   function unverifiedTagHtml(entry){
-    return entry && entry.unverified ? ' <span class="badge unverified" style="padding:2px 8px; font-size:0.68rem;">Unverified</span>' : '';
+    return entry && entry.unverified ? ' <span class="badge unverified" style="padding:2px 6px; font-size:0.54rem;">Unverified</span>' : '';
   }
   var currentLookupCode = null;
   var currentLookupData = null;
@@ -2388,30 +2564,24 @@
     currentLookupCode = patientId;
     currentLookupData = data;
     currentLookupGrant = grant || null;
-    $('lookup-row').classList.add('hidden');
-    $('lookup-subtitle').classList.add('hidden');
-    $('doc-find-code-pane').classList.add('hidden');
-    $('doc-find-roster-pane').classList.add('hidden');
-    $('lookup-not-found').classList.add('hidden');
-    $('lookup-empty').classList.add('hidden');
-    $('patient-result').classList.remove('hidden');
     $('res-name').textContent = data.name || 'Unnamed patient';
-    $('add-visit-patient-name').textContent = data.name || 'this patient';
-    var accessNote = 'Access: standing trust';
-    if (currentLookupGrant && currentLookupGrant.granted_via === 'code' && currentLookupGrant.expires_at){
-      var mins = Math.max(0, Math.ceil((new Date(currentLookupGrant.expires_at).getTime() - Date.now()) / 60000));
-      accessNote = 'Access: one-time code · ends in ~' + mins + 'm';
-    }
-    $('res-access-note').textContent = accessNote;
+    collapseAddVisitFields();
+    collapseAddTestFields();
     renderDoctorVisitsList(data.visits || []);
     renderDoctorTestsList(data.tests || []);
     renderDocPrescriptionsList(data.visits || []);
     switchPatientResultTab('visits');
+    showView('view-doctor-record');
   }
 
-  // ---- Patient-result tabs: Visits / Lab results / Prescriptions, switched
-  // in place (no navigation) inside #patient-result. ----
+  // ---- Patient record tabs: Visits / Lab results / Prescriptions, and the
+  // matching "Add ..." section shown above the tab row (only one relevant to
+  // the active tab — Prescriptions has neither, since it's derived). ----
   function switchPatientResultTab(tab){
+    collapseAddVisitFields();
+    collapseAddTestFields();
+    $('doc-pt-add-visit-section').classList.toggle('hidden', tab !== 'visits');
+    $('doc-pt-add-test-section').classList.toggle('hidden', tab !== 'lab');
     $('doc-pt-tab-visits').classList.toggle('active', tab === 'visits');
     $('doc-pt-tab-lab').classList.toggle('active', tab === 'lab');
     $('doc-pt-tab-rx').classList.toggle('active', tab === 'rx');
@@ -2466,16 +2636,13 @@
     switchFindTab('code');
     $('lookup-row').classList.remove('hidden');
     $('lookup-subtitle').classList.remove('hidden');
-    $('patient-result').classList.add('hidden');
     $('lookup-not-found').classList.add('hidden');
-    $('lookup-empty').classList.remove('hidden');
+    showView('view-doctor-dash');
     $('lookup-code').focus();
   }
   $('lookup-btn').addEventListener('click', async function(){
     var code = $('lookup-code').value.replace(/[^0-9]/g,'');
-    $('lookup-empty').classList.add('hidden');
     if (code.length !== 6){
-      $('patient-result').classList.add('hidden');
       $('lookup-not-found').classList.remove('hidden');
       $('lookup-not-found').textContent = 'Enter the 6-digit live code your patient showed you.';
       currentLookupCode = null;
@@ -2486,14 +2653,12 @@
     try{
       var result = await redeemAccessCode(code);
       if (!result.ok){
-        $('patient-result').classList.add('hidden');
         $('lookup-not-found').classList.remove('hidden');
         $('lookup-not-found').textContent = mapRedeemErrorText(result.error);
         return;
       }
       var full = await loadPatientRecordForDoctor(result.patientId);
       if (!full){
-        $('patient-result').classList.add('hidden');
         $('lookup-not-found').classList.remove('hidden');
         $('lookup-not-found').textContent = 'That patient’s record could not be found.';
         return;
@@ -2514,34 +2679,26 @@
     if (name) return 'Dr. ' + name.replace(/^Dr\.?\s*/i, '');
     return (currentDoctorData && currentDoctorData.doctorId) || 'Doctor';
   }
-  function openAddVisitModal(){
+  function expandAddVisitFields(){
     if (!currentLookupCode) return;
-    $('visit-date').value = new Date().toISOString().slice(0, 10);
-    $('visit-time').value = '';
     $('visit-symptoms').value = '';
     $('visit-diagnosis').value = '';
     $('visit-prescription').value = '';
     $('visit-notes').value = '';
     clearError($('add-visit-error'));
-    $('add-visit-modal').classList.remove('hidden');
+    $('add-visit-fields').classList.remove('hidden');
   }
-  function closeAddVisitModal(){
-    $('add-visit-modal').classList.add('hidden');
+  function collapseAddVisitFields(){
+    $('add-visit-fields').classList.add('hidden');
   }
-  $('add-visit-btn').addEventListener('click', openAddVisitModal);
-  $('add-visit-close').addEventListener('click', closeAddVisitModal);
-  $('add-visit-cancel').addEventListener('click', closeAddVisitModal);
-  $('add-visit-modal').addEventListener('click', function(e){
-    if (e.target === $('add-visit-modal')) closeAddVisitModal();
+  $('add-visit-btn').addEventListener('click', function(){
+    if ($('add-visit-fields').classList.contains('hidden')) expandAddVisitFields();
+    else collapseAddVisitFields();
   });
+  $('add-visit-cancel').addEventListener('click', collapseAddVisitFields);
   $('add-visit-save').addEventListener('click', async function(){
     if (!currentLookupCode){
       showError($('add-visit-error'), 'No patient selected.');
-      return;
-    }
-    var date = $('visit-date').value;
-    if (!date){
-      showError($('add-visit-error'), 'Please choose a date.');
       return;
     }
     clearError($('add-visit-error'));
@@ -2559,8 +2716,8 @@
         written_via_grant_id: activeGrant.id,
         doctor_name: currentDoctorDisplayName(),
         clinic_name: (currentDoctorData && currentDoctorData.currentClinic) || '',
-        date: date,
-        time: $('visit-time').value.trim(),
+        date: new Date().toISOString().slice(0, 10),
+        time: formatCurrentTime(),
         symptoms: $('visit-symptoms').value.trim(),
         diagnosis: $('visit-diagnosis').value.trim(),
         prescription: $('visit-prescription').value.trim(),
@@ -2579,7 +2736,7 @@
       currentLookupData.visits = [mapVisitRow(res.data)].concat(currentLookupData.visits || []);
       renderDoctorVisitsList(currentLookupData.visits);
       renderDocPrescriptionsList(currentLookupData.visits);
-      closeAddVisitModal();
+      collapseAddVisitFields();
       var note = $('add-visit-note');
       note.classList.add('show');
       setTimeout(function(){ note.classList.remove('show'); }, 2200);
@@ -2591,24 +2748,22 @@
     }
   });
 
-  function openAddTestModal(){
+  function expandAddTestFields(){
     if (!currentLookupCode) return;
     $('test-name').value = '';
     $('test-date').value = new Date().toISOString().slice(0, 10);
     $('test-result').value = '';
     clearError($('add-test-error'));
-    $('add-test-patient-name').textContent = (currentLookupData && currentLookupData.name) || 'this patient';
-    $('add-test-modal').classList.remove('hidden');
+    $('add-test-fields').classList.remove('hidden');
   }
-  function closeAddTestModal(){
-    $('add-test-modal').classList.add('hidden');
+  function collapseAddTestFields(){
+    $('add-test-fields').classList.add('hidden');
   }
-  $('add-test-btn').addEventListener('click', openAddTestModal);
-  $('add-test-close').addEventListener('click', closeAddTestModal);
-  $('add-test-cancel').addEventListener('click', closeAddTestModal);
-  $('add-test-modal').addEventListener('click', function(e){
-    if (e.target === $('add-test-modal')) closeAddTestModal();
+  $('add-test-btn').addEventListener('click', function(){
+    if ($('add-test-fields').classList.contains('hidden')) expandAddTestFields();
+    else collapseAddTestFields();
   });
+  $('add-test-cancel').addEventListener('click', collapseAddTestFields);
   $('add-test-save').addEventListener('click', async function(){
     if (!currentLookupCode){
       showError($('add-test-error'), 'No patient selected.');
@@ -2650,7 +2805,7 @@
       }
       currentLookupData.tests = [mapTestRow(res.data)].concat(currentLookupData.tests || []);
       renderDoctorTestsList(currentLookupData.tests);
-      closeAddTestModal();
+      collapseAddTestFields();
       var note = $('add-test-note');
       note.classList.add('show');
       setTimeout(function(){ note.classList.remove('show'); }, 2200);

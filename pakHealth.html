@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<link rel="stylesheet" href="style.css?v=23">
+<link rel="stylesheet" href="style.css?v=27">
 </head>
 <body>
 
@@ -15,12 +15,12 @@
 <div id="view-landing" class="view">
   <header class="topbar">
     <div class="wordmark">
-      <svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Pak Health
     </div>
   </header>
 
-  <svg class="pulse animate" viewBox="0 0 1000 40" preserveAspectRatio="none" style="height:40px;">
+  <svg class="pulse animate" viewBox="0 0 1000 40" preserveAspectRatio="none" style="height:32px;">
     <path d="M0,20 L120,20 L140,4 L160,36 L180,20 L300,20 L320,8 L340,20 L460,20 L480,2 L500,38 L520,20 L640,20 L660,8 L680,20 L800,20 L820,4 L840,36 L860,20 L1000,20"/>
   </svg>
 
@@ -33,22 +33,22 @@
 
     <div class="choices">
       <button class="choice" id="choice-individual">
-        <svg class="choice-icon" width="46" height="46" viewBox="0 0 46 46"><circle cx="23" cy="15" r="8" fill="none" stroke="#1F6F63" stroke-width="2"/><path d="M8,40 C8,29 14,25 23,25 C32,25 38,29 38,40" fill="none" stroke="#1F6F63" stroke-width="2" stroke-linecap="round"/></svg>
+        <svg class="choice-icon" width="37" height="37" viewBox="0 0 46 46"><circle cx="23" cy="15" r="8" fill="none" stroke="#1F6F63" stroke-width="2"/><path d="M8,40 C8,29 14,25 23,25 C32,25 38,29 38,40" fill="none" stroke="#1F6F63" stroke-width="2" stroke-linecap="round"/></svg>
         <span class="num">01</span>
         <h2>I am an individual</h2>
         <p>Sign up in seconds, get your own private code, and fill in your health history whenever you're ready.</p>
         <span class="go">Continue as an individual
-          <svg width="16" height="10" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          <svg width="13" height="8" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
         </span>
       </button>
 
       <button class="choice" id="choice-doctor">
-        <svg class="choice-icon" width="46" height="46" viewBox="0 0 46 46"><path d="M14,6 V18 C14,25 18,29 23,29 C28,29 32,25 32,18 V6" fill="none" stroke="#1F6F63" stroke-width="2" stroke-linecap="round"/><circle cx="32" cy="9" r="3" fill="none" stroke="#1F6F63" stroke-width="2"/><path d="M23,29 V36" stroke="#1F6F63" stroke-width="2" stroke-linecap="round"/></svg>
+        <svg class="choice-icon" width="37" height="37" viewBox="0 0 46 46"><path d="M14,6 V18 C14,25 18,29 23,29 C28,29 32,25 32,18 V6" fill="none" stroke="#1F6F63" stroke-width="2" stroke-linecap="round"/><circle cx="32" cy="9" r="3" fill="none" stroke="#1F6F63" stroke-width="2"/><path d="M23,29 V36" stroke="#1F6F63" stroke-width="2" stroke-linecap="round"/></svg>
         <span class="num">02</span>
         <h2>I am a doctor</h2>
         <p>Create your account, then enter a patient's code any time you need to pull up their record.</p>
         <span class="go">Continue as a doctor
-          <svg width="16" height="10" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          <svg width="13" height="8" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
         </span>
       </button>
     </div>
@@ -62,12 +62,12 @@
 <!-- ============ DOCTOR AUTH ============ -->
 <div id="view-doctor-auth" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
   </header>
   <div class="auth-wrap">
     <div class="auth-card">
       <button class="auth-back" data-goto="view-landing">
-        <svg width="14" height="10" viewBox="0 0 16 10"><path d="M16,5 H2 M7,0 L2,5 L7,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        <svg width="11" height="8" viewBox="0 0 16 10"><path d="M16,5 H2 M7,0 L2,5 L7,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
         Back
       </button>
       <div class="auth-title"><h2>Doctor access</h2></div>
@@ -87,7 +87,7 @@
 
       <div id="doc-signup-pane" class="hidden">
         <button type="button" class="link-btn" id="doc-back-to-signin-btn">&larr; Back to sign in</button>
-        <p class="auth-sub" style="margin-top:14px;">A few basics to get started — add your license later to get verified.</p>
+        <p class="auth-sub" style="margin-top:11px;">A few basics to get started — add your license later to get verified.</p>
         <div class="field"><label for="doc-signup-first">First name</label><input type="text" id="doc-signup-first" placeholder="Bilal"></div>
         <div class="field"><label for="doc-signup-middle">Middle name (optional)</label><input type="text" id="doc-signup-middle" placeholder=""></div>
         <div class="field"><label for="doc-signup-last">Last name</label><input type="text" id="doc-signup-last" placeholder="Chaudhry"></div>
@@ -107,7 +107,7 @@
         <div class="field"><label for="doc-signup-license">Medical license number (optional)</label><input type="text" id="doc-signup-license" placeholder="License / registration no."></div>
         <button class="btn btn-primary btn-block" id="doc-create-btn">Submit</button>
         <div class="error-text" id="doc-create-error"></div>
-        <div class="demo-note hidden" id="doc-signup-checkemail" style="margin-top:14px;">Account created — check <strong id="doc-signup-checkemail-addr"></strong> for a confirmation link before signing in.</div>
+        <div class="demo-note hidden" id="doc-signup-checkemail" style="margin-top:11px;">Account created — check <strong id="doc-signup-checkemail-addr"></strong> for a confirmation link before signing in.</div>
       </div>
     </div>
   </div>
@@ -116,8 +116,8 @@
     <div class="modal-card">
       <button class="modal-close" id="doc-forgot-close" aria-label="Close">&times;</button>
       <span class="eyebrow">Password reset</span>
-      <h3 style="margin-top:6px;">Forgot your password?</h3>
-      <p class="panel-sub" style="margin-top:8px;">Self-service password reset isn't available in this demo yet. For now, contact support to have your account looked into.</p>
+      <h3 style="margin-top:5px;">Forgot your password?</h3>
+      <p class="panel-sub" style="margin-top:6px;">Self-service password reset isn't available in this demo yet. For now, contact support to have your account looked into.</p>
       <button class="btn btn-secondary btn-block" id="doc-forgot-ok">Got it</button>
     </div>
   </div>
@@ -126,12 +126,12 @@
 <!-- ============ PATIENT AUTH ============ -->
 <div id="view-patient-auth" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
   </header>
   <div class="auth-wrap">
     <div class="auth-card">
       <button class="auth-back" data-goto="view-landing">
-        <svg width="14" height="10" viewBox="0 0 16 10"><path d="M16,5 H2 M7,0 L2,5 L7,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        <svg width="11" height="8" viewBox="0 0 16 10"><path d="M16,5 H2 M7,0 L2,5 L7,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
         Back
       </button>
       <div class="auth-title"><h2>Individual access</h2></div>
@@ -151,7 +151,7 @@
 
       <div id="pat-signup-pane" class="hidden">
         <button type="button" class="link-btn" id="pat-back-to-signin-btn">&larr; Back to sign in</button>
-        <p class="auth-sub" style="margin-top:14px;">A few basics to get started — add the rest of your history later.</p>
+        <p class="auth-sub" style="margin-top:11px;">A few basics to get started — add the rest of your history later.</p>
         <div class="field"><label for="pat-signup-first">First name</label><input type="text" id="pat-signup-first" placeholder="Ayesha"></div>
         <div class="field"><label for="pat-signup-middle">Middle name (optional)</label><input type="text" id="pat-signup-middle" placeholder=""></div>
         <div class="field"><label for="pat-signup-last">Last name</label><input type="text" id="pat-signup-last" placeholder="Khan"></div>
@@ -170,7 +170,7 @@
         <div class="field"><label for="pat-signup-password">Password</label><input type="password" id="pat-signup-password" placeholder="At least 6 characters"></div>
         <button class="btn btn-primary btn-block" id="pat-create-btn">Submit</button>
         <div class="error-text" id="pat-create-error"></div>
-        <div class="demo-note hidden" id="pat-signup-checkemail" style="margin-top:14px;">Account created — check <strong id="pat-signup-checkemail-addr"></strong> for a confirmation link before signing in.</div>
+        <div class="demo-note hidden" id="pat-signup-checkemail" style="margin-top:11px;">Account created — check <strong id="pat-signup-checkemail-addr"></strong> for a confirmation link before signing in.</div>
       </div>
     </div>
   </div>
@@ -179,8 +179,8 @@
     <div class="modal-card">
       <button class="modal-close" id="pat-forgot-close" aria-label="Close">&times;</button>
       <span class="eyebrow">Password reset</span>
-      <h3 style="margin-top:6px;">Forgot your password?</h3>
-      <p class="panel-sub" style="margin-top:8px;">Self-service password reset isn't available in this demo yet. For now, contact support to have your account looked into.</p>
+      <h3 style="margin-top:5px;">Forgot your password?</h3>
+      <p class="panel-sub" style="margin-top:6px;">Self-service password reset isn't available in this demo yet. For now, contact support to have your account looked into.</p>
       <button class="btn btn-secondary btn-block" id="pat-forgot-ok">Got it</button>
     </div>
   </div>
@@ -189,13 +189,13 @@
 <!-- ============ PATIENT DASHBOARD ============ -->
 <div id="view-patient-dash" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
     <div class="topbar-right">
       <span class="role-chip">Individual account</span>
       <div class="dropdown-wrap" id="pat-account-dropdown-wrap">
         <button class="btn btn-secondary btn-sm dropdown-trigger" id="pat-account-dropdown-trigger" type="button" aria-haspopup="true" aria-expanded="false">
           Account
-          <svg width="10" height="6" viewBox="0 0 10 6"><path d="M1,1 L5,5 L9,1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg width="8" height="5" viewBox="0 0 10 6"><path d="M1,1 L5,5 L9,1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="dropdown-menu hidden" id="pat-account-dropdown-menu">
           <button type="button" id="pat-howitworks-btn">How it works</button>
@@ -233,7 +233,7 @@
                 <span class="health-card-code-label">Live code</span>
                 <div class="health-card-code mono" id="pat-live-code">— — — — — —</div>
               </div>
-              <svg class="live-code-ring" viewBox="0 0 46 46" width="46" height="46">
+              <svg class="live-code-ring" viewBox="0 0 46 46" width="37" height="37">
                 <circle class="ring-track" cx="23" cy="23" r="21"></circle>
                 <circle class="ring-progress" id="pat-live-code-ring" cx="23" cy="23" r="21"></circle>
               </svg>
@@ -256,7 +256,7 @@
             </div>
             <div class="record-row-body">
               <div class="record-row-title">Visits</div>
-              <svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              <svg class="chevron" width="11" height="7" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
             </div>
           </button>
 
@@ -266,7 +266,7 @@
             </div>
             <div class="record-row-body">
               <div class="record-row-title">Lab Results</div>
-              <svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              <svg class="chevron" width="11" height="7" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
             </div>
           </button>
 
@@ -276,7 +276,7 @@
             </div>
             <div class="record-row-body">
               <div class="record-row-title">My Prescriptions</div>
-              <svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              <svg class="chevron" width="11" height="7" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
             </div>
           </button>
 
@@ -286,7 +286,7 @@
             </div>
             <div class="record-row-body">
               <div class="record-row-title">My Eyes</div>
-              <svg class="chevron" width="14" height="9" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              <svg class="chevron" width="11" height="7" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
             </div>
           </button>
         </div>
@@ -296,10 +296,10 @@
        <div class="sticky-inner">
         <div class="panel">
           <span class="eyebrow">Appointments</span>
-          <h3 style="margin-top:6px;">Upcoming appointments</h3>
-          <div id="pat-appts-list" style="margin-top:8px;"></div>
+          <h3 style="margin-top:5px;">Upcoming appointments</h3>
+          <div id="pat-appts-list" style="margin-top:6px;"></div>
           <div class="empty-state hidden" id="pat-appts-empty">No upcoming appointments.</div>
-          <button class="btn btn-primary btn-block" id="pat-book-appt-btn" type="button" style="margin-top:16px;">Book new appointment</button>
+          <button class="btn btn-primary btn-block" id="pat-book-appt-btn" type="button" style="margin-top:13px;">Book new appointment</button>
         </div>
 
         <div class="panel calendar-panel">
@@ -322,12 +322,12 @@
     <div class="modal-card">
       <button class="modal-close" id="pat-appt-detail-close" aria-label="Close">&times;</button>
       <span class="eyebrow">Appointment</span>
-      <div class="book-appt-doctor-name" id="pat-appt-detail-doctor" style="margin-top:6px;">—</div>
+      <div class="book-appt-doctor-name" id="pat-appt-detail-doctor" style="margin-top:5px;">—</div>
       <div class="book-appt-clinic-name" id="pat-appt-detail-clinic">—</div>
       <div class="book-appt-clinic-address" id="pat-appt-detail-address">—</div>
       <div class="appt-datetime" id="pat-appt-detail-date">—</div>
       <div class="appt-datetime" id="pat-appt-detail-time">—</div>
-      <div class="panel-sub" id="pat-appt-detail-reason-wrap" style="margin-top:8px;">Reason: <span id="pat-appt-detail-reason">—</span></div>
+      <div class="panel-sub" id="pat-appt-detail-reason-wrap" style="margin-top:6px;">Reason: <span id="pat-appt-detail-reason">—</span></div>
       <div class="error-text" id="pat-appt-detail-error"></div>
       <div class="save-row">
         <button class="btn btn-secondary hold-btn hold-btn-danger" id="pat-appt-detail-delete" type="button" style="color:var(--red); border-color:var(--red);"><span class="hold-fill"></span><span class="hold-label">Hold to cancel appointment</span></button>
@@ -338,7 +338,7 @@
 
   <div id="view-pat-book-appt" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -346,23 +346,25 @@
     <main class="dash-main">
       <div class="panel">
         <span class="eyebrow">Appointments</span>
-        <h3 style="margin-top:6px;">Book an appointment</h3>
+        <h3 style="margin-top:5px;">Book an appointment</h3>
 
         <div id="book-appt-search-step">
-          <p class="panel-sub" style="margin-top:8px;">Search for a doctor by name or clinic/hospital.</p>
+          <p class="panel-sub" style="margin-top:6px;">Search for a doctor by name or clinic/hospital.</p>
           <div class="lookup-row">
             <input type="text" id="book-appt-search-input" placeholder="e.g. Dr. Bilal or Shifa International">
           </div>
-          <div id="book-appt-doctor-list" style="margin-top:8px;"></div>
+          <div id="book-appt-doctor-list" style="margin-top:6px;"></div>
           <div class="empty-state" id="book-appt-doctor-empty">No doctors found.</div>
         </div>
 
         <div id="book-appt-form-step" class="hidden">
-          <button class="link-btn" id="book-appt-change-doctor" style="margin:8px 0 4px;">Choose a different doctor or clinic</button>
+          <button class="link-btn" id="book-appt-change-doctor" style="margin:6px 0 3px;">Choose a different doctor or clinic</button>
           <div id="book-appt-doctor-name" class="book-appt-doctor-name">—</div>
           <div id="book-appt-clinic-name" class="book-appt-clinic-name">—</div>
           <div id="book-appt-clinic-address" class="book-appt-clinic-address hidden"></div>
-          <div class="field" style="margin-top:12px;">
+          <div id="book-appt-clinic-phone" class="book-appt-clinic-address hidden"></div>
+          <div id="book-appt-clinic-note" class="book-appt-clinic-address hidden"></div>
+          <div class="field" style="margin-top:10px;">
             <label>Date</label>
             <div id="book-appt-date-tabs" class="date-tab-row"></div>
             <div class="empty-state" id="book-appt-date-empty">This doctor hasn't set any bookable hours yet.</div>
@@ -386,17 +388,16 @@
       <div class="modal-card">
         <button class="modal-close" id="book-appt-confirm-close" aria-label="Close">&times;</button>
         <span class="eyebrow">Confirm appointment</span>
-        <h3 style="margin-top:6px;">Book this appointment?</h3>
-        <div class="book-appt-doctor-name" id="book-appt-confirm-doctor" style="margin-top:14px;">—</div>
+        <h3 style="margin-top:5px;">Book this appointment?</h3>
+        <div class="book-appt-doctor-name" id="book-appt-confirm-doctor" style="margin-top:11px;">—</div>
         <div class="book-appt-clinic-name" id="book-appt-confirm-clinic">—</div>
         <div class="book-appt-clinic-address" id="book-appt-confirm-address">—</div>
         <div class="appt-datetime" id="book-appt-confirm-date">—</div>
         <div class="appt-datetime" id="book-appt-confirm-time">—</div>
-        <p class="panel-sub" style="margin-top:14px;">Confirming this appointment gives the doctor standing access to your health record.</p>
+        <p class="panel-sub" style="margin-top:11px;">Confirming this appointment gives the doctor standing access to your health record.</p>
         <div class="error-text" id="book-appt-confirm-error"></div>
         <div class="save-row">
           <button class="btn btn-primary hold-btn" id="book-appt-confirm-save" type="button"><span class="hold-fill"></span><span class="hold-label">Hold to confirm booking</span></button>
-          <button class="btn btn-secondary" id="book-appt-confirm-cancel">Cancel</button>
         </div>
       </div>
     </div>
@@ -428,7 +429,7 @@
       </div>
       <div class="stepper-nav">
         <button class="stepper-arrow" id="pat-howitworks-back" type="button" aria-label="Back">
-          <svg width="16" height="16" viewBox="0 0 16 16"><path d="M10,2 L4,8 L10,14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg width="13" height="13" viewBox="0 0 16 16"><path d="M10,2 L4,8 L10,14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <button class="stepper-arrow stepper-arrow-primary" id="pat-howitworks-next" type="button" aria-label="Next"></button>
       </div>
@@ -440,8 +441,8 @@
     <div class="modal-card modal-card-wide">
       <button class="modal-close" id="pat-access-close" aria-label="Close">&times;</button>
       <span class="eyebrow">Access</span>
-      <h3 style="margin-top:6px;">Manage access</h3>
-      <p class="panel-sub" style="margin-top:8px;">Trusted doctors have standing access until you revoke it. A live code only ever grants one hour, and only to whoever redeems it.</p>
+      <h3 style="margin-top:5px;">Manage access</h3>
+      <p class="panel-sub" style="margin-top:6px;">Trusted doctors have standing access until you revoke it. A live code only ever grants one hour, and only to whoever redeems it.</p>
 
       <h4 class="subhead">Trusted doctors</h4>
       <div id="pat-trusted-list"></div>
@@ -449,7 +450,7 @@
 
       <hr>
       <h4 class="subhead">Trust a doctor</h4>
-      <p class="panel-sub" style="margin-bottom:12px;">Only you can grant trust — a doctor can never request it. Ask them for their doctor ID.</p>
+      <p class="panel-sub" style="margin-bottom:10px;">Only you can grant trust — a doctor can never request it. Ask them for their doctor ID.</p>
       <div class="lookup-row">
         <input type="text" id="pat-trust-input" placeholder="DR-482913">
         <button class="btn btn-secondary" id="pat-trust-add-btn">Trust</button>
@@ -466,7 +467,7 @@
 
   <div id="view-record-visits" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -474,8 +475,8 @@
     <main class="dash-main">
       <div class="panel">
         <span class="eyebrow">Records</span>
-        <h3 style="margin-top:6px;">Visits</h3>
-        <p class="panel-sub" style="margin-top:8px;">Every visit a doctor has logged for you.</p>
+        <h3 style="margin-top:5px;">Visits</h3>
+        <p class="panel-sub" style="margin-top:6px;">Every visit a doctor has logged for you.</p>
         <div id="pat-visits-list"></div>
         <div class="empty-state" id="pat-visits-empty">No visits recorded yet. Your visit history will appear here after a doctor sees you.</div>
       </div>
@@ -484,7 +485,7 @@
 
   <div id="view-record-tests" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -492,8 +493,8 @@
     <main class="dash-main">
       <div class="panel">
         <span class="eyebrow">Records</span>
-        <h3 style="margin-top:6px;">Lab Results</h3>
-        <p class="panel-sub" style="margin-top:8px;">Tests and reports on file.</p>
+        <h3 style="margin-top:5px;">Lab Results</h3>
+        <p class="panel-sub" style="margin-top:6px;">Tests and reports on file.</p>
         <div id="pat-tests-list"></div>
         <div class="empty-state" id="pat-tests-empty">No tests on file yet.</div>
       </div>
@@ -502,7 +503,7 @@
 
   <div id="view-record-prescriptions" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -510,8 +511,8 @@
     <main class="dash-main">
       <div class="panel">
         <span class="eyebrow">Records</span>
-        <h3 style="margin-top:6px;">My Prescriptions</h3>
-        <p class="panel-sub" style="margin-top:8px;">Pulled from visit notes where a doctor recorded one.</p>
+        <h3 style="margin-top:5px;">My Prescriptions</h3>
+        <p class="panel-sub" style="margin-top:6px;">Pulled from visit notes where a doctor recorded one.</p>
         <div id="pat-prescriptions-list"></div>
         <div class="empty-state" id="pat-prescriptions-empty">No prescriptions on file yet.</div>
       </div>
@@ -521,8 +522,8 @@
       <div class="modal-card">
         <button class="modal-close" id="pat-prescription-modal-close" aria-label="Close">&times;</button>
         <span class="eyebrow" id="prescription-modal-date">—</span>
-        <h3 id="prescription-modal-doctor" style="margin-top:6px;">—</h3>
-        <h4 class="subhead" style="margin-top:18px;">Medicine</h4>
+        <h3 id="prescription-modal-doctor" style="margin-top:5px;">—</h3>
+        <h4 class="subhead" style="margin-top:14px;">Medicine</h4>
         <ul class="rx-medicine-list" id="prescription-modal-list"></ul>
       </div>
     </div>
@@ -530,7 +531,7 @@
 
   <div id="view-patient-eyes" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -540,7 +541,7 @@
         <div class="panel-header-row">
           <div>
             <span class="eyebrow">Eye health</span>
-            <h3 style="margin-top:6px;">My Eyes</h3>
+            <h3 style="margin-top:5px;">My Eyes</h3>
           </div>
           <button class="btn btn-primary btn-sm eye-rx-add-btn" id="add-eye-btn" type="button">Add new prescription</button>
         </div>
@@ -548,11 +549,11 @@
         <div class="eye-rx-panel" id="eye-rx-current-panel">
           <div class="eye-rx-header">
             <span class="eyebrow">Current prescription</span>
-            <h3 id="eye-rx-current-date" style="margin-top:4px;">—</h3>
+            <h3 id="eye-rx-current-date" style="margin-top:3px;">—</h3>
           </div>
           <div class="eye-rx-columns" id="eye-rx-current-columns"></div>
         </div>
-        <span class="save-note" id="add-eye-note" style="display:block; text-align:center; margin:8px 0 6px;">Prescription added</span>
+        <span class="save-note" id="add-eye-note" style="display:block; text-align:center; margin:6px 0 5px;">Prescription added</span>
         <div class="empty-state" id="pat-eyes-empty">No eye checks recorded yet. Add your first one to start tracking your prescription over time.</div>
       </div>
 
@@ -560,7 +561,7 @@
 
       <div class="panel hidden" id="pat-eyes-charts">
         <h3>History</h3>
-        <p class="panel-sub" style="margin-top:8px;">Your eyeglass prescription over time.</p>
+        <p class="panel-sub" style="margin-top:6px;">Your eyeglass prescription over time.</p>
         <div class="eye-charts-row">
           <div>
             <h4 class="subhead">SPH over time</h4>
@@ -603,8 +604,8 @@
     <div class="modal-card">
       <button class="modal-close" id="eye-rx-prev-modal-close" aria-label="Close">&times;</button>
       <span class="eyebrow">Eye health</span>
-      <h3 style="margin-top:6px;">Previous prescriptions</h3>
-      <p class="panel-sub" style="margin-top:8px;">Select a date to see that prescription.</p>
+      <h3 style="margin-top:5px;">Previous prescriptions</h3>
+      <p class="panel-sub" style="margin-top:6px;">Select a date to see that prescription.</p>
       <div id="eye-rx-prev-modal-list"></div>
     </div>
   </div>
@@ -614,8 +615,8 @@
     <div class="modal-card">
       <button class="modal-close" id="pat-visit-modal-close" aria-label="Close">&times;</button>
       <span class="eyebrow" id="visit-modal-date">—</span>
-      <h3 id="visit-modal-doctor" style="margin-top:6px;">—</h3>
-      <dl class="kv" style="margin-top:18px;">
+      <h3 id="visit-modal-doctor" style="margin-top:5px;">—</h3>
+      <dl class="kv" style="margin-top:14px;">
         <dt>Clinic</dt><dd id="visit-modal-clinic">—</dd>
         <dt>Symptoms</dt><dd class="block" id="visit-modal-symptoms">—</dd>
         <dt>Diagnosis</dt><dd class="block" id="visit-modal-diagnosis">—</dd>
@@ -629,8 +630,8 @@
     <div class="modal-card">
       <button class="modal-close" id="pat-test-modal-close" aria-label="Close">&times;</button>
       <span class="eyebrow" id="test-modal-date">—</span>
-      <h3 id="test-modal-name" style="margin-top:6px;">—</h3>
-      <dl class="kv" style="margin-top:16px;">
+      <h3 id="test-modal-name" style="margin-top:5px;">—</h3>
+      <dl class="kv" style="margin-top:13px;">
         <dt>Ordered by</dt><dd id="test-modal-doctor">—</dd>
         <dt>Result summary</dt><dd class="block" id="test-modal-result">—</dd>
       </dl>
@@ -639,7 +640,7 @@
 
   <div id="view-pat-profile" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -647,8 +648,8 @@
     <main class="dash-main">
       <div class="panel">
         <span class="eyebrow">Profile</span>
-        <h3 style="margin-top:6px;">My profile</h3>
-        <p class="panel-sub" style="margin-top:8px;">Your name, as doctors will see it on your visits.</p>
+        <h3 style="margin-top:5px;">My profile</h3>
+        <p class="panel-sub" style="margin-top:6px;">Your name, as doctors will see it on your visits.</p>
         <div class="field"><label for="pat-name">Full name</label><input type="text" id="pat-name" placeholder="Ayesha Khan"></div>
         <div class="save-row">
           <button class="btn btn-primary btn-block" id="pat-profile-save-btn">Save changes</button>
@@ -660,7 +661,7 @@
 
   <div id="view-pat-account-settings" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -668,8 +669,8 @@
     <main class="dash-main">
       <div class="panel">
         <span class="eyebrow">Settings</span>
-        <h3 style="margin-top:6px;">Account settings</h3>
-        <p class="panel-sub" style="margin-top:8px;">Add your email and phone so doctors can reach you if needed.</p>
+        <h3 style="margin-top:5px;">Account settings</h3>
+        <p class="panel-sub" style="margin-top:6px;">Add your email and phone so doctors can reach you if needed.</p>
         <div class="field"><label for="pat-email">Email</label><input type="email" id="pat-email" placeholder="you@example.com"></div>
         <div class="field"><label for="pat-phone">Phone</label><input type="tel" id="pat-phone" placeholder="+92 300 1234567"></div>
         <div class="save-row">
@@ -682,7 +683,7 @@
 
   <div id="view-pat-stats" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -690,8 +691,8 @@
     <main class="dash-main">
       <div class="panel">
         <span class="eyebrow">Your activity</span>
-        <h3 style="margin-top:6px;">Statistics</h3>
-        <p class="panel-sub" style="margin-top:8px;">Based on the visits recorded in your record.</p>
+        <h3 style="margin-top:5px;">Statistics</h3>
+        <p class="panel-sub" style="margin-top:6px;">Based on the visits recorded in your record.</p>
         <div class="stats-grid" id="pat-stats-grid"></div>
         <div class="empty-state" id="pat-stats-empty">No visits recorded yet.</div>
       </div>
@@ -701,18 +702,19 @@
 <!-- ============ DOCTOR DASHBOARD ============ -->
 <div id="view-doctor-dash" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
     <div class="topbar-right">
       <span class="role-chip">Doctor account</span>
       <div class="dropdown-wrap" id="doc-account-dropdown-wrap">
         <button class="btn btn-secondary btn-sm dropdown-trigger" id="doc-account-dropdown-trigger" type="button" aria-haspopup="true" aria-expanded="false">
           Account
-          <svg width="10" height="6" viewBox="0 0 10 6"><path d="M1,1 L5,5 L9,1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg width="8" height="5" viewBox="0 0 10 6"><path d="M1,1 L5,5 L9,1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="dropdown-menu hidden" id="doc-account-dropdown-menu">
           <button type="button" id="doc-howitworks-btn">How it works</button>
           <button type="button" id="doc-myprofile-btn">My profile</button>
           <button type="button" id="doc-account-settings-btn">Account settings</button>
+          <button type="button" id="doc-clinics-btn">Manage clinics</button>
           <button type="button" id="doc-stats-btn">My statistics</button>
         </div>
       </div>
@@ -725,7 +727,8 @@
       <button type="button" class="btn btn-secondary btn-sm" id="doc-verify-btn">Resend email</button>
     </div>
     <div class="dash-grid">
-      <div>
+      <div class="sidebar">
+       <div class="sticky-inner">
         <div class="health-card">
           <svg class="health-card-watermark" viewBox="0 0 220 60" preserveAspectRatio="none"><path d="M0,30 L50,30 L58,14 L66,46 L74,30 L120,30 L128,18 L136,30 L180,30 L188,12 L196,48 L204,30 L220,30" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <div class="health-card-top">
@@ -755,12 +758,13 @@
         <div class="panel">
           <div class="copy-note" id="doc-dash-copy-note"></div>
           <ul class="checklist" id="doc-checklist"></ul>
-          <div class="field" style="margin-top:16px;">
+          <div class="field" style="margin-top:13px;">
             <label for="doc-current-clinic">Currently seeing patients at</label>
             <select id="doc-current-clinic"><option value="">No clinic selected</option></select>
             <div class="hint" id="doc-clinic-hint">Add clinics in account settings to select one here.</div>
           </div>
         </div>
+       </div>
       </div>
 
       <div class="center-col">
@@ -785,51 +789,25 @@
             <div id="doc-roster-list"></div>
             <div class="empty-state" id="doc-roster-empty">No patient has trusted you yet.</div>
           </div>
-
-          <div class="patient-result hidden" id="patient-result">
-            <div class="name-row">
-              <h3 id="res-name">—</h3>
-            </div>
-            <div class="copy-note" style="margin:-8px 0 4px; color:var(--muted);" id="res-access-note">—</div>
-            <button class="link-btn" id="lookup-change-btn" style="margin-bottom:16px;">Search a different patient</button>
-
-            <div class="tabs">
-              <button class="tab active" id="doc-pt-tab-visits" type="button">Visits</button>
-              <button class="tab" id="doc-pt-tab-lab" type="button">Lab results</button>
-              <button class="tab" id="doc-pt-tab-rx" type="button">Prescriptions</button>
-            </div>
-
-            <div id="doc-pt-pane-visits">
-              <button class="btn btn-primary btn-block" id="add-visit-btn" style="margin-top:16px;">Add visit note</button>
-              <span class="save-note" id="add-visit-note" style="display:block; text-align:center; margin:8px 0 6px;">Visit added</span>
-              <div id="doc-visits-list"></div>
-              <div class="empty-state" id="doc-visits-empty">No visits recorded yet.</div>
-            </div>
-
-            <div id="doc-pt-pane-lab" class="hidden">
-              <button class="btn btn-primary btn-block" id="add-test-btn" style="margin-top:16px;">Add test / report</button>
-              <span class="save-note" id="add-test-note" style="display:block; text-align:center; margin:8px 0 6px;">Test added</span>
-              <div id="doc-tests-list"></div>
-              <div class="empty-state" id="doc-tests-empty">No tests on file yet.</div>
-            </div>
-
-            <div id="doc-pt-pane-rx" class="hidden">
-              <p class="panel-sub" style="margin-top:16px;">Pulled from visit notes where a prescription was recorded.</p>
-              <div id="doc-prescriptions-list"></div>
-              <div class="empty-state" id="doc-prescriptions-empty">No prescriptions on file yet.</div>
-            </div>
-          </div>
-
-          <div class="empty-state" id="lookup-empty">No patient looked up yet.</div>
         </div>
+      </div>
 
-        <div class="panel" style="margin-top:20px;">
+      <div class="right-col">
+       <div class="sticky-inner">
+        <div class="panel">
           <span class="eyebrow">Appointments</span>
-          <h3 style="margin-top:6px;">Upcoming appointments</h3>
-          <p class="panel-sub" style="margin-top:8px;">Booked by patients through Pak Health.</p>
-          <div id="doc-appts-list"></div>
-          <div class="empty-state hidden" id="doc-appts-empty">No upcoming appointments.</div>
+          <h3 style="margin-top:5px;">Upcoming appointments</h3>
+          <div class="daygrid-header" style="margin-top:10px;">
+            <button class="cal-nav-btn" id="doc-daygrid-prev" type="button" aria-label="Previous day">&lsaquo;</button>
+            <div class="calendar-month-label" id="doc-daygrid-label">—</div>
+            <button class="cal-nav-btn" id="doc-daygrid-next" type="button" aria-label="Next day">&rsaquo;</button>
+          </div>
+          <div class="daygrid-scroll">
+            <div class="daygrid" id="doc-daygrid"></div>
+          </div>
+          <div class="empty-state hidden" id="doc-daygrid-empty">No appointments this day.</div>
         </div>
+       </div>
       </div>
     </div>
   </main>
@@ -860,7 +838,7 @@
       </div>
       <div class="stepper-nav">
         <button class="stepper-arrow" id="doc-howitworks-back" type="button" aria-label="Back">
-          <svg width="16" height="16" viewBox="0 0 16 16"><path d="M10,2 L4,8 L10,14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg width="13" height="13" viewBox="0 0 16 16"><path d="M10,2 L4,8 L10,14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <button class="stepper-arrow stepper-arrow-primary" id="doc-howitworks-next" type="button" aria-label="Next"></button>
       </div>
@@ -868,90 +846,118 @@
   </div>
 </div>
 
-<!-- These five modals are opened from the Visits/Lab results/Prescriptions tabs inside
-     #patient-result on view-doctor-dash, so they live here as top-level siblings of every
-     .view rather than nested inside any one view — a modal nested inside a hidden .view is
-     unreachable, since display:none on the ancestor collapses it regardless of its own
-     hidden class. -->
-<div class="modal-overlay hidden" id="doc-prescription-modal">
-  <div class="modal-card">
-    <button class="modal-close" id="doc-prescription-modal-close" aria-label="Close">&times;</button>
-    <span class="eyebrow" id="doc-prescription-modal-date">—</span>
-    <h3 id="doc-prescription-modal-doctor" style="margin-top:6px;">—</h3>
-    <h4 class="subhead" style="margin-top:18px;">Medicine</h4>
-    <ul class="rx-medicine-list" id="doc-prescription-modal-list"></ul>
-  </div>
-</div>
-
-<div class="modal-overlay hidden" id="doc-test-modal">
-  <div class="modal-card">
-    <button class="modal-close" id="doc-test-modal-close" aria-label="Close">&times;</button>
-    <span class="eyebrow" id="doc-test-modal-date">—</span>
-    <h3 id="doc-test-modal-name" style="margin-top:6px;">—</h3>
-    <dl class="kv" style="margin-top:16px;">
-      <dt>Ordered by</dt><dd id="doc-test-modal-doctor">—</dd>
-      <dt>Result summary</dt><dd class="block" id="doc-test-modal-result">—</dd>
-    </dl>
-  </div>
-</div>
-
-<div class="modal-overlay hidden" id="add-test-modal">
-  <div class="modal-card">
-    <button class="modal-close" id="add-test-close" aria-label="Close">&times;</button>
-    <span class="eyebrow">New test for <span id="add-test-patient-name">this patient</span></span>
-    <h3 style="margin-top:6px;">Add test / report</h3>
-    <div class="form-grid" style="margin-top:18px;">
-      <div class="field span-2"><label for="test-name">Test name</label><input type="text" id="test-name" placeholder="e.g. Complete Blood Count (CBC)"></div>
-      <div class="field span-2"><label for="test-date">Date</label><input type="date" id="test-date"></div>
+<div id="view-doctor-record" class="view hidden">
+  <header class="topbar">
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="topbar-right">
+      <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
     </div>
-    <div class="field"><label for="test-result">Result summary</label><textarea id="test-result" placeholder="Key findings, values, or 'Pending' if results aren't back yet"></textarea></div>
-    <div class="error-text" id="add-test-error"></div>
-    <div class="save-row">
-      <button class="btn btn-primary" id="add-test-save">Save test</button>
-      <button class="btn btn-secondary" id="add-test-cancel">Cancel</button>
+  </header>
+  <main class="dash-main">
+    <div class="panel">
+      <div class="name-row">
+        <h3 id="res-name">—</h3>
+      </div>
+      <button class="link-btn" id="lookup-change-btn" style="margin-bottom:13px;">Search a different patient</button>
+
+      <div id="doc-pt-add-visit-section">
+        <button class="btn btn-primary btn-block" id="add-visit-btn" type="button">Add visit note</button>
+        <div id="add-visit-fields" class="hidden" style="margin-top:11px;">
+          <div class="field"><label for="visit-symptoms">Symptoms</label><textarea id="visit-symptoms" placeholder="What the patient reported"></textarea></div>
+          <div class="field"><label for="visit-diagnosis">Diagnosis</label><textarea id="visit-diagnosis" placeholder="Your assessment"></textarea></div>
+          <div class="field"><label for="visit-prescription">Prescription</label><textarea id="visit-prescription" placeholder="Medication, dose, duration — or 'None'"></textarea></div>
+          <div class="field"><label for="visit-notes">Notes</label><textarea id="visit-notes" placeholder="Anything else worth recording"></textarea></div>
+          <div class="error-text" id="add-visit-error"></div>
+          <div class="save-row">
+            <button class="btn btn-primary" id="add-visit-save">Save visit note</button>
+            <button class="btn btn-secondary" id="add-visit-cancel">Cancel</button>
+          </div>
+        </div>
+        <span class="save-note" id="add-visit-note" style="display:block; text-align:center; margin:6px 0 5px;">Visit added</span>
+      </div>
+
+      <div id="doc-pt-add-test-section" class="hidden">
+        <button class="btn btn-primary btn-block" id="add-test-btn" type="button">Add test / report</button>
+        <div id="add-test-fields" class="hidden" style="margin-top:11px;">
+          <div class="form-grid">
+            <div class="field span-2"><label for="test-name">Test name</label><input type="text" id="test-name" placeholder="e.g. Complete Blood Count (CBC)"></div>
+            <div class="field span-2"><label for="test-date">Date</label><input type="date" id="test-date"></div>
+          </div>
+          <div class="field"><label for="test-result">Result summary</label><textarea id="test-result" placeholder="Key findings, values, or 'Pending' if results aren't back yet"></textarea></div>
+          <div class="error-text" id="add-test-error"></div>
+          <div class="save-row">
+            <button class="btn btn-primary" id="add-test-save">Save test</button>
+            <button class="btn btn-secondary" id="add-test-cancel">Cancel</button>
+          </div>
+        </div>
+        <span class="save-note" id="add-test-note" style="display:block; text-align:center; margin:6px 0 5px;">Test added</span>
+      </div>
+
+      <div class="tabs" style="margin-top:13px;">
+        <button class="tab active" id="doc-pt-tab-visits" type="button">Visits</button>
+        <button class="tab" id="doc-pt-tab-lab" type="button">Lab results</button>
+        <button class="tab" id="doc-pt-tab-rx" type="button">Prescriptions</button>
+      </div>
+
+      <div id="doc-pt-pane-visits" style="margin-top:13px;">
+        <div id="doc-visits-list"></div>
+        <div class="empty-state" id="doc-visits-empty">No visits recorded yet.</div>
+      </div>
+
+      <div id="doc-pt-pane-lab" class="hidden" style="margin-top:13px;">
+        <div id="doc-tests-list"></div>
+        <div class="empty-state" id="doc-tests-empty">No tests on file yet.</div>
+      </div>
+
+      <div id="doc-pt-pane-rx" class="hidden" style="margin-top:13px;">
+        <p class="panel-sub">Pulled from visit notes where a prescription was recorded.</p>
+        <div id="doc-prescriptions-list"></div>
+        <div class="empty-state" id="doc-prescriptions-empty">No prescriptions on file yet.</div>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-overlay hidden" id="doc-prescription-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="doc-prescription-modal-close" aria-label="Close">&times;</button>
+      <span class="eyebrow" id="doc-prescription-modal-date">—</span>
+      <h3 id="doc-prescription-modal-doctor" style="margin-top:5px;">—</h3>
+      <h4 class="subhead" style="margin-top:14px;">Medicine</h4>
+      <ul class="rx-medicine-list" id="doc-prescription-modal-list"></ul>
     </div>
   </div>
-</div>
 
-<div class="modal-overlay hidden" id="doc-visit-modal">
-  <div class="modal-card">
-    <button class="modal-close" id="doc-visit-modal-close" aria-label="Close">&times;</button>
-    <span class="eyebrow" id="doc-visit-modal-date">—</span>
-    <h3 id="doc-visit-modal-doctor" style="margin-top:6px;">—</h3>
-    <dl class="kv" style="margin-top:18px;">
-      <dt>Clinic</dt><dd id="doc-visit-modal-clinic">—</dd>
-      <dt>Symptoms</dt><dd class="block" id="doc-visit-modal-symptoms">—</dd>
-      <dt>Diagnosis</dt><dd class="block" id="doc-visit-modal-diagnosis">—</dd>
-      <dt>Prescription</dt><dd class="block" id="doc-visit-modal-prescription">—</dd>
-      <dt>Notes</dt><dd class="block" id="doc-visit-modal-notes">—</dd>
-    </dl>
-  </div>
-</div>
-
-<div class="modal-overlay hidden" id="add-visit-modal">
-  <div class="modal-card">
-    <button class="modal-close" id="add-visit-close" aria-label="Close">&times;</button>
-    <span class="eyebrow">New visit note for <span id="add-visit-patient-name">this patient</span></span>
-    <h3 style="margin-top:6px;">Add visit note</h3>
-    <div class="form-grid" style="margin-top:18px;">
-      <div class="field"><label for="visit-date">Date</label><input type="date" id="visit-date"></div>
-      <div class="field"><label for="visit-time">Time</label><input type="text" id="visit-time" placeholder="10:30 AM"></div>
+  <div class="modal-overlay hidden" id="doc-test-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="doc-test-modal-close" aria-label="Close">&times;</button>
+      <span class="eyebrow" id="doc-test-modal-date">—</span>
+      <h3 id="doc-test-modal-name" style="margin-top:5px;">—</h3>
+      <dl class="kv" style="margin-top:13px;">
+        <dt>Ordered by</dt><dd id="doc-test-modal-doctor">—</dd>
+        <dt>Result summary</dt><dd class="block" id="doc-test-modal-result">—</dd>
+      </dl>
     </div>
-    <div class="field"><label for="visit-symptoms">Symptoms</label><textarea id="visit-symptoms" placeholder="What the patient reported"></textarea></div>
-    <div class="field"><label for="visit-diagnosis">Diagnosis</label><textarea id="visit-diagnosis" placeholder="Your assessment"></textarea></div>
-    <div class="field"><label for="visit-prescription">Prescription</label><textarea id="visit-prescription" placeholder="Medication, dose, duration — or 'None'"></textarea></div>
-    <div class="field"><label for="visit-notes">Notes</label><textarea id="visit-notes" placeholder="Anything else worth recording"></textarea></div>
-    <div class="error-text" id="add-visit-error"></div>
-    <div class="save-row">
-      <button class="btn btn-primary" id="add-visit-save">Save visit note</button>
-      <button class="btn btn-secondary" id="add-visit-cancel">Cancel</button>
+  </div>
+
+  <div class="modal-overlay hidden" id="doc-visit-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="doc-visit-modal-close" aria-label="Close">&times;</button>
+      <span class="eyebrow" id="doc-visit-modal-date">—</span>
+      <h3 id="doc-visit-modal-doctor" style="margin-top:5px;">—</h3>
+      <dl class="kv" style="margin-top:14px;">
+        <dt>Clinic</dt><dd id="doc-visit-modal-clinic">—</dd>
+        <dt>Symptoms</dt><dd class="block" id="doc-visit-modal-symptoms">—</dd>
+        <dt>Diagnosis</dt><dd class="block" id="doc-visit-modal-diagnosis">—</dd>
+        <dt>Prescription</dt><dd class="block" id="doc-visit-modal-prescription">—</dd>
+        <dt>Notes</dt><dd class="block" id="doc-visit-modal-notes">—</dd>
+      </dl>
     </div>
   </div>
 </div>
 
 <div id="view-doc-profile" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
     <div class="topbar-right">
       <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
     </div>
@@ -959,8 +965,8 @@
   <main class="dash-main">
     <div class="panel">
       <span class="eyebrow">Profile</span>
-      <h3 style="margin-top:6px;">My profile</h3>
-      <p class="panel-sub" style="margin-top:8px;">Your name and professional background — the "About" text is visible to patients once you're verified.</p>
+      <h3 style="margin-top:5px;">My profile</h3>
+      <p class="panel-sub" style="margin-top:6px;">Your name and professional background — the "About" text is visible to patients once you're verified.</p>
       <div class="field"><label for="doc-name">Full name</label><input type="text" id="doc-name" placeholder="Dr. Bilal Chaudhry"></div>
       <div class="field"><label for="doc-specialty">Specialty</label><input type="text" id="doc-specialty" placeholder="e.g. Cardiology, Family Medicine"></div>
       <div class="field"><label for="doc-education">Education & qualifications</label><textarea id="doc-education" placeholder="Degrees, residency, board certifications..."></textarea></div>
@@ -975,7 +981,7 @@
 
 <div id="view-doc-account-settings" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
     <div class="topbar-right">
       <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
     </div>
@@ -983,7 +989,7 @@
   <main class="dash-main">
     <div class="panel">
       <span class="eyebrow">Doctor ID</span>
-      <div class="code mono" id="doc-modal-id" style="font-size:1.3rem; margin:10px 0 16px;">DR-000000</div>
+      <div class="code mono" id="doc-modal-id" style="font-size:1.04rem; margin:8px 0 13px;">DR-000000</div>
 
       <h3>Account settings</h3>
       <p class="panel-sub">Complete email, phone and license to get verified.</p>
@@ -992,19 +998,28 @@
       <div class="field"><label for="doc-phone">Phone</label><input type="tel" id="doc-phone" placeholder="+92 300 1234567"></div>
       <div class="field"><label for="doc-license">Medical license number</label><input type="text" id="doc-license" placeholder="License / registration no."></div>
 
-      <hr>
-      <h4 class="subhead">Clinics</h4>
-      <p class="panel-sub" style="margin-bottom:12px;">Add the clinics or hospitals you work from. Set bookable hours for one so patients can book directly, and "Currently seeing patients at" on your dashboard will pick itself based on that schedule.</p>
-      <div id="doc-clinics-list" style="margin-bottom:12px;"></div>
-      <div class="lookup-row">
-        <input type="text" id="doc-clinic-input" placeholder="e.g. Shifa International Hospital">
-        <button class="btn btn-secondary" id="doc-clinic-add-btn">Add</button>
-      </div>
-
       <div class="save-row">
         <button class="btn btn-primary btn-block" id="doc-save-btn">Save changes</button>
       </div>
       <span class="save-note" id="doc-save-note">Saved</span>
+    </div>
+  </main>
+</div>
+
+<div id="view-doc-clinics" class="view hidden">
+  <header class="topbar">
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="topbar-right">
+      <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
+    </div>
+  </header>
+  <main class="dash-main">
+    <div class="panel">
+      <span class="eyebrow">Clinics</span>
+      <h3 style="margin-top:5px;">Manage clinics</h3>
+      <p class="panel-sub" style="margin-top:6px; margin-bottom:10px;">Add the clinics or hospitals you work from. Set bookable hours for one so patients can book directly, and "Currently seeing patients at" on your dashboard will pick itself based on that schedule.</p>
+      <div id="doc-clinics-list" style="margin-bottom:10px;"></div>
+      <button class="btn btn-secondary btn-block" id="doc-clinic-add-btn" type="button">+ Add a clinic</button>
     </div>
   </main>
 
@@ -1012,25 +1027,49 @@
     <div class="modal-card modal-card-wide">
       <button class="modal-close" id="doc-manage-bookings-close" aria-label="Close">&times;</button>
       <span class="eyebrow">Bookings</span>
-      <h3 style="margin-top:6px;" id="doc-manage-bookings-title">Manage</h3>
-      <p class="panel-sub" style="margin-top:8px;">Set your hours for each day patients can book at this clinic. Leave a day blank if you're not there — use "Add another slot" for a split shift like mornings and evenings.</p>
+      <h3 style="margin-top:5px;" id="doc-manage-bookings-title">Manage</h3>
+      <p class="panel-sub" style="margin-top:6px;">Set your hours for each day patients can book at this clinic. Leave a day blank if you're not there — use "Add another slot" for a split shift like mornings and evenings.</p>
 
-      <div class="field" style="margin-top:14px;">
-        <label for="avail-clinic-address">Address</label>
+      <div class="field hidden" id="avail-clinic-name-field" style="margin-top:11px;">
+        <label for="avail-clinic-name">Clinic / hospital name</label>
+        <input type="text" id="avail-clinic-name" placeholder="e.g. Shifa International Hospital">
+      </div>
+      <div class="field" style="margin-top:11px;">
+        <label>Address</label>
+        <div id="avail-clinic-address-view" class="hidden" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+          <span id="avail-clinic-address-text" style="color:var(--ink); font-size:0.74rem;">—</span>
+          <button type="button" id="avail-clinic-address-edit-btn" class="btn btn-secondary btn-sm">Edit</button>
+        </div>
         <input type="text" id="avail-clinic-address" placeholder="e.g. Sector G-9, Islamabad">
       </div>
-      <div class="field" style="max-width:260px;">
+      <div class="field" style="margin-top:11px;">
+        <label>Phone number</label>
+        <div id="avail-clinic-phone-view" class="hidden" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+          <span id="avail-clinic-phone-text" style="color:var(--ink); font-size:0.74rem;">—</span>
+          <button type="button" id="avail-clinic-phone-edit-btn" class="btn btn-secondary btn-sm">Edit</button>
+        </div>
+        <input type="tel" id="avail-clinic-phone" placeholder="e.g. 051 111 222 333">
+      </div>
+      <div class="field" style="margin-top:11px;">
+        <label>Phone hours note</label>
+        <div id="avail-clinic-note-view" class="hidden" style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+          <span id="avail-clinic-note-text" style="color:var(--ink); font-size:0.74rem; white-space:pre-wrap;">—</span>
+          <button type="button" id="avail-clinic-note-edit-btn" class="btn btn-secondary btn-sm" style="flex-shrink:0;">Edit</button>
+        </div>
+        <textarea id="avail-clinic-note" placeholder="e.g. Reachable by phone Mon-Sat, 9am-6pm"></textarea>
+      </div>
+      <div class="field" style="max-width:208px;">
         <label for="avail-slot-minutes">Avg. minutes per patient</label>
         <input type="number" id="avail-slot-minutes" value="15" min="1">
       </div>
 
-      <div id="avail-days" style="margin-top:12px;"></div>
+      <div id="avail-days" style="margin-top:10px;"></div>
 
-      <div class="field" style="margin-top:16px;">
-        <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+      <div class="field" style="margin-top:13px;">
+        <label style="display:flex; align-items:center; gap:6px; font-weight:400;">
           <input type="checkbox" id="avail-repeat-check" checked style="width:auto;">
           Repeat weekly for the next
-          <input type="number" id="avail-repeat-weeks" value="4" min="1" max="4" style="width:56px;">
+          <input type="number" id="avail-repeat-weeks" value="4" min="1" max="4" style="width:45px;">
           week(s) — 4-week maximum
         </label>
       </div>
@@ -1040,13 +1079,28 @@
         <button class="btn btn-primary" id="avail-save-btn">Save</button>
         <button class="btn btn-secondary" id="avail-cancel-btn">Cancel</button>
       </div>
+      <button class="link-btn" id="avail-delete-clinic-btn" type="button" style="color:var(--red); margin-top:13px;">Delete clinic</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="doc-delete-clinic-modal">
+    <div class="modal-card">
+      <button class="modal-close" id="doc-delete-clinic-close" aria-label="Close">&times;</button>
+      <span class="eyebrow">Delete clinic</span>
+      <h3 style="margin-top:5px;" id="doc-delete-clinic-name">—</h3>
+      <p class="panel-sub" style="margin-top:6px;">This removes the clinic and its bookable hours. Patients won't be able to find or book it any more.</p>
+      <div class="error-text" id="doc-delete-clinic-error"></div>
+      <div class="save-row">
+        <button class="btn btn-secondary hold-btn hold-btn-danger" id="doc-delete-clinic-confirm" type="button" style="color:var(--red); border-color:var(--red);"><span class="hold-fill"></span><span class="hold-label">Hold to delete clinic</span></button>
+        <button class="btn btn-secondary" id="doc-delete-clinic-cancel">Cancel</button>
+      </div>
     </div>
   </div>
 </div>
 
 <div id="view-doc-stats" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
     <div class="topbar-right">
       <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
     </div>
@@ -1054,8 +1108,8 @@
   <main class="dash-main">
     <div class="panel">
       <span class="eyebrow">Your activity</span>
-      <h3 style="margin-top:6px;">Statistics</h3>
-      <p class="panel-sub" style="margin-top:8px;">Based on visit notes you've added through Pak Health.</p>
+      <h3 style="margin-top:5px;">Statistics</h3>
+      <p class="panel-sub" style="margin-top:6px;">Based on visit notes you've added through Pak Health.</p>
       <div class="stats-grid" id="doc-stats-grid"></div>
       <div class="empty-state" id="doc-stats-empty">No visits recorded yet — stats will appear after you add your first visit note.</div>
       <div id="doc-stats-chart-section" class="hidden">
@@ -1066,6 +1120,6 @@
   </main>
 </div>
 
-<script src="app.js?v=35"></script>
+<script src="app.js?v=46"></script>
 </body>
 </html>

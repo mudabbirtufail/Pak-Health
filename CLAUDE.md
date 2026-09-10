@@ -178,45 +178,134 @@ verified, which would defeat the point of having the tag at all.
   confirm the doctor's own roster query — RLS-scoped to `auth.uid()` — no longer
   returns that patient at all).
 - Doctor dashboard: redeem a patient's live code (or pick them from the roster) → the
-  find-a-patient box is replaced by the patient's name, an access note (standing
-  trust vs. one-time code with its remaining time), a "Search a different patient"
-  link, and a **Visits / Lab results / Prescriptions tab row** (`.tabs`/`.tab`, the
-  same pattern as the "Enter a code" vs. "My patients" tabs one level up) that swaps
-  content in place inside `#patient-result` — `switchPatientResultTab()` in `app.js`
-  toggles which of `#doc-pt-pane-visits` / `#doc-pt-pane-lab` / `#doc-pt-pane-rx` is
-  visible, no navigation involved. This replaced an earlier design (two `.record-row`
-  tiles that navigated to dedicated full-screen pages, `view-doctor-record-visits` /
-  `view-doctor-record-tests`) — the tile-to-fullpage pattern remains correct for the
-  *patient's* own record list (see below), but for the doctor looking up one patient
-  at a time, switching tabs in place read better than leaving and re-entering the
-  panel for every category. Prescriptions is derived the same way as the patient's
-  own My Prescriptions page — scans that patient's visits for a non-empty,
-  non-"None" `prescription` field (`renderDocPrescriptionsList()`, `isMeaningfulPrescription()`
-  shared with the patient-side function) — read-only, no add button, since a
-  prescription is written as part of a visit note, not as its own entry. "Add visit
-  note" and "Add test / report" buttons sit above their respective pane and open a
-  form modal — that modal's HTML (along with the five doctor-side detail/add/prescription
-  modals) lives as a top-level sibling of every `.view` div, not nested inside
-  `view-doctor-dash`, which matters: a modal nested inside a *different, currently
-  hidden* view is unreachable, since `display:none` on the ancestor collapses it
-  regardless of the modal's own hidden state — a real bug found and fixed once already
-  during the RLS migration's browser verification, so the tabs redesign kept the same
-  top-level placement rather than reintroducing it. Saving
-  re-validates the grant, stamps `writtenViaGrantId` and an `unverified` snapshot,
-  then writes directly into that patient's record, so the patient sees it immediately
-  next time they sign in; a newly added visit's prescription also re-renders the
-  Prescriptions pane immediately, not just the Visits pane. Clicking a row still opens
-  the same detail modal as before — only the category-level switch (Visits vs. Lab
-  results vs. Prescriptions) changed, not the individual entry view. Going back to the
-  dashboard doesn't lose the looked-up patient — nothing resets
-  `currentLookupCode`/`currentLookupData`, so `#patient-result` just shows the same
-  patient again (defaulting back to the Visits tab), exactly like the patient side's
-  own record pages don't reset `currentPatientData`. This is the core loop of the app.
-  The doctor card's own checklist only lists "Medical
-  license number" now — email and phone were dropped from it (the "Verified" badge
-  itself still requires all three via `isDoctorVerified()`, which is unaffected; only
-  the checklist's display was trimmed, matching the patient side no longer echoing
-  its own email/phone back on the dashboard either).
+  doctor is navigated to a real full-screen page, `view-doctor-record` (same
+  `showView()`/"← Back to dashboard" pattern as every other primary destination in
+  this app), rather than swapping content in place inside the dashboard — looking up
+  a patient is a primary destination now, not an incidental panel change. The page
+  shows the patient's name, a "Search a different patient" link (`resetLookup()`,
+  routes back to `view-doctor-dash`), then an **"Add visit note" button sitting
+  directly above the tab row**, then the **Visits / Lab results / Prescriptions tab
+  row** (`.tabs`/`.tab`, same pattern as the "Enter a code" vs. "My patients" tabs one
+  level up), then the tab panes themselves. There is deliberately no "Access:
+  standing trust / one-time code" note anywhere on this page any more — it was
+  removed outright rather than relocated. Prescriptions is derived the same way as
+  the patient's own My Prescriptions page — scans that patient's visits for a
+  non-empty, non-"None" `prescription` field (`renderDocPrescriptionsList()`,
+  `isMeaningfulPrescription()` shared with the patient-side function) — read-only, no
+  add button, since a prescription is written as part of a visit note, not as its own
+  entry. "Add test / report" is the same pattern as "Add visit note" but appears above
+  the Lab results pane instead — `switchPatientResultTab()` toggles which of
+  `#doc-pt-add-visit-section` / `#doc-pt-add-test-section` is shown (visits ↔ lab;
+  neither on the read-only Prescriptions tab) alongside which of
+  `#doc-pt-pane-visits` / `#doc-pt-pane-lab` / `#doc-pt-pane-rx` is visible.
+  **Clicking either add button expands a plain field section in place
+  (`#add-visit-fields`/`#add-test-fields`, toggled via
+  `expandAddVisitFields()`/`collapseAddVisitFields()` and their test-side
+  equivalents) directly underneath that same button — not a modal popup.** This
+  replaced an earlier modal-based version (`#add-visit-modal`/`#add-test-modal`) that
+  opened a form as an overlay; expanding inline reads better once the add button
+  already lives on the page itself rather than floating over dashboard content. The
+  three doctor-side *detail* modals (`#doc-visit-modal`/`#doc-test-modal`/
+  `#doc-prescription-modal`, opened by clicking an existing list row) still are real
+  modals — only the *add* forms moved off the modal pattern — and, since they're only
+  ever opened while `view-doctor-record` is the active view, they're nested directly
+  inside that view's markup rather than living as top-level siblings of every `.view`
+  div the way the old five doctor-side modals used to; a modal nested inside a
+  *different, currently hidden* view is unreachable, since `display:none` on the
+  ancestor collapses it regardless of the modal's own hidden state — a real bug found
+  and fixed once already during the RLS migration's browser verification, so this
+  nesting is safe specifically because these three modals have exactly one view they
+  can ever be opened from. **The visit note's date and time are not manually entered
+  at all** — there's no date/time field in `#add-visit-fields` any more; saving stamps
+  `date`/`time` with the current moment automatically (`new
+  Date().toISOString().slice(0, 10)` and `formatCurrentTime()`, a small `h:mm AM/PM`
+  formatter next to `formatHourLabel`), on the assumption a doctor is logging a note
+  for the visit happening right now, not backdating one — no reason to make them type
+  today's date. Test entries keep a manual date field, since a test result is
+  routinely added after the fact (or shows "Pending" before results are back), so
+  today's date isn't a safe assumption there the way it is for a visit note. Saving
+  a visit or test re-validates the grant, stamps
+  `writtenViaGrantId` and an `unverified` snapshot, then writes directly into that
+  patient's record, so the patient sees it immediately next time they sign in; a
+  newly added visit's prescription also re-renders the Prescriptions pane
+  immediately, not just the Visits pane, and the field section collapses back down
+  on a successful save. Clicking an existing row still opens the same detail modal as
+  before — only the category-level switch (Visits vs. Lab results vs. Prescriptions)
+  changed, not the individual entry view. Going back to the dashboard doesn't lose the
+  looked-up patient — nothing resets `currentLookupCode`/`currentLookupData`, so
+  re-entering `view-doctor-record` (e.g. via a day-grid block click, see
+  "Appointments" below) just shows the same patient again (defaulting back to the
+  Visits tab), exactly like the patient side's own record pages don't reset
+  `currentPatientData`. This is the core loop of the app. The doctor card's own
+  checklist only lists "Medical license number" now — email and phone were dropped
+  from it (the "Verified" badge itself still requires all three via
+  `isDoctorVerified()`, which is unaffected; only the checklist's display was
+  trimmed, matching the patient side no longer echoing its own email/phone back on
+  the dashboard either).
+- Doctor dashboard layout: retrofitted into the same `.dash-grid` 3-column pattern the
+  patient dashboard already used (`.sidebar` / `.center-col` / `.right-col`, each
+  wrapped in `.sticky-inner`) rather than needing new CSS — the doctor dashboard's
+  "right" track was simply unused before this. Sidebar holds the doctor card and the
+  license-checklist/clinic-picker panel; center holds "Find a patient" (code entry +
+  roster, no result content in-page any more now that a lookup navigates away — see
+  above); right holds a **Google-Calendar-style single-day appointment grid**
+  (`renderDoctorDayGrid()` in `app.js`) under the same "Upcoming appointments" heading
+  the old list-based panel used (`.eyebrow`+`<h3>`, same markup pattern as the
+  patient-side "Upcoming appointments" panel) — only what's rendered under that
+  heading changed, not the heading itself. Hour rows run
+  a fixed `DAYGRID_START_HOUR`–`DAYGRID_END_HOUR` (7am–9pm) range at a fixed
+  `DAYGRID_ROW_H = 56` px each. **There's no separate left-hand time column** — an
+  earlier version had one (like a plain spreadsheet gutter), but it was replaced with
+  a `.daygrid-hour-label` floated at the top-right of each `.daygrid-hourline`
+  (`position:absolute; right:6px; transform:translateY(-100%)`, same row-index math
+  as the lines themselves) so appointment blocks could stretch the full width of the
+  grid — from the left edge (`left:2px`) instead of starting after a gutter — rather
+  than losing ~46px of block width to labels that only need to mark the line, not
+  occupy their own column. Appointment blocks (`.daygrid-block`) are absolutely
+  positioned by parsed start time and sized by duration — duration comes from
+  matching the appointment's time against that doctor's `doctor_availability`
+  `slot_minutes` for the same clinic/weekday (falling back to 20 minutes if no match),
+  since `appointments` itself doesn't store a duration. **A block's text is one
+  single line** — patient name (bold, `.daygrid-block-title`) followed by `" - "` and
+  the `reason` if there is one, all in one `white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis` div, so as much of the reason shows as actually fits the
+  block's width rather than a fixed word count truncated in JS (an earlier version
+  hard-truncated to the reason's first 1-2 words on a second line; this reads more of
+  the reason on a wide sidebar and less on a narrow one, instead of a constant
+  regardless of space); the block's native
+  `title` attribute still carries the full `"name — reason"` text so hovering reveals
+  whatever the ellipsis cut off. Clicking a block
+  looks up that appointment's `patientId` (`mapAppointmentRow` now carries
+  `patientId` off `appointments.patient_id` for exactly this) via `getActiveGrant()` +
+  `loadPatientRecordForDoctor()` and calls `showLookupResult()` — the same function
+  the code-redemption and roster-click paths already call — so clicking a calendar
+  block lands on the identical `view-doctor-record` page described above. Prev/next
+  day buttons (`#doc-daygrid-prev`/`#doc-daygrid-next`) hold the currently-viewed date
+  in a module-level `doctorDayGridDate` variable (`null` means "today"); navigation
+  wasn't scoped to today-only since letting the doctor look ahead or back only adds
+  capability, not complexity, over a today-only view — **there's no bound on how far
+  back or forward it can go**, unlike the patient's booking calendar, which is capped
+  at `BOOKING_HORIZON_DAYS = 28` out (see "Appointments" below) since that cap exists
+  to stop a patient booking into a doctor's stale/unconfirmed future schedule, a
+  concern that doesn't apply to a doctor just paging through their own already-booked
+  history or future. An empty state shows when the
+  selected day has no appointments. **The calendar re-fetches this doctor's
+  appointments every time they land back on `view-doctor-dash`** — `showView()`
+  itself calls `refreshDoctorAppointments()` whenever its target is
+  `'view-doctor-dash'` (before the early-return that would otherwise skip it during
+  a suppressed/`popstate` navigation, so this fires for the topbar "← Back to
+  dashboard" link, "Search a different patient," and the browser's own back/forward
+  buttons alike, not just one specific button). This app has no realtime
+  subscription anywhere — everything is fetch-on-load/fetch-on-action, consistent
+  with the rest of it — so without this, an appointment a patient books while the
+  doctor is already mid-session (sitting on the dashboard, or inside a patient's
+  record) wouldn't show up until a full page reload or re-sign-in; re-querying
+  specifically on return-to-dashboard closes that gap cheaply at this pilot's scale
+  without needing a poll or a websocket. One accepted tradeoff: `enterDoctorDash()`
+  already loads fresh appointments itself (as part of its own `Promise.all`) and
+  then calls `showView('view-doctor-dash')` at the end, so every sign-in/reload
+  re-fetches appointments twice in a row — a harmless redundant query, not worth the
+  extra complexity of suppressing it just for that one path.
 - Patient dashboard: a **sidebar** (`.sidebar`, `position: sticky` — stays in place
   while the record list scrolls past it, disabled below the 860px breakpoint where
   the layout stacks to one column) with the health card (avatar + name + live code)
@@ -258,7 +347,14 @@ verified, which would defeat the point of having the tag at all.
   dropdown reuses `.dropdown-wrap`/`.dropdown-trigger`/`.dropdown-menu`, CSS that
   already existed in the stylesheet but had no markup using it until this was built.
   The doctor dashboard has the equivalent dropdown minus "Manage access" (no doctor
-  equivalent exists), so the doctor's sidebar panel below the card ends up holding
+  equivalent exists) plus one extra item, **"Manage clinics"** (`view-doc-clinics`,
+  `doc-clinics-btn`) — the Clinics section (list, "+ Add a clinic", the "Manage"
+  modal and its delete-confirm popup) used to live at the bottom of "Account
+  settings" and was pulled out into its own page, since it's a big enough
+  chunk of doctor-only functionality to deserve its own dropdown entry rather
+  than being buried under contact-info fields it has nothing to do with; see
+  "Doctor clinics" below for what that page actually contains now. The
+  doctor's sidebar panel below the card ends up holding
   just the clinic picker; the patient's sidebar panel below the card ends up holding
   no buttons at all, just the copy-note and privacy-note text.
 
@@ -378,11 +474,14 @@ verified, which would defeat the point of having the tag at all.
   day now, since a day with no coverage at all never gets a tab in the first
   place. The chosen slot's clinic is simply `bookApptSelectedClinic` (no longer
   read off the slot button itself, now that it's fixed for the whole form step).
-  The form step header shows the doctor's name, clinic name, and clinic address
-  as three visually distinct lines (`.book-appt-doctor-name` / `.book-appt-clinic-name`
-  / `.book-appt-clinic-address` — enlarged and serif for the doctor's name,
-  teal-dark for the clinic, muted small text for the address, address line
-  hidden entirely when that clinic has none on file) rather than one small
+  The form step header shows the doctor's name, clinic name, address, phone
+  number, and phone-hours note as visually distinct lines
+  (`.book-appt-doctor-name` / `.book-appt-clinic-name` / `.book-appt-clinic-address`
+  — enlarged and serif for the doctor's name, teal-dark for the clinic, and the
+  `.book-appt-clinic-address` muted-small-text style reused as-is for the phone
+  and note lines too via `#book-appt-clinic-phone`/`#book-appt-clinic-note`,
+  each prefixed "Phone: "/"Phone hours: " for context and hidden entirely when
+  that clinic has nothing on file for it) rather than one small
   inline `"Dr. X · Clinic Y"` string — the form step itself carries no access-grant
   disclosure text any more (that used to sit here too, duplicating the confirm
   modal's own wording; removed as redundant once the confirm step existed).
@@ -399,7 +498,11 @@ verified, which would defeat the point of having the tag at all.
   plus `.save-row{justify-content:center}` so the buttons center too, scoped by
   id rather than touching `.modal-card`/`.save-row` generally since every other
   modal in the app stays left-aligned) — one continuous centered read top to
-  bottom instead of a table to scan. Only that modal's own "Confirm booking"
+  bottom instead of a table to scan. **The `save-row` holds only the hold-to-confirm
+  button now, no separate "Cancel" next to it** — the modal's own × close (top
+  right) already dismisses it without booking anything, so a second, redundant
+  dismiss control next to the one-and-only real action wasn't adding anything.
+  Only that modal's own hold-to-confirm
   button actually writes the row; "Book appointment" itself just validates a
   date and slot are picked and hands off. The address shown at both the
   accordion clinic-picker step and this confirm
@@ -460,9 +563,10 @@ verified, which would defeat the point of having the tag at all.
   *not* revoke the trust grant booking created; that stays a separate,
   patient-initiated action in "Manage access", consistent with the rest of the
   access model never letting one action silently imply another. No
-  reschedule yet, only cancel. The doctor side gets a matching read-only
-  "Upcoming appointments" panel on their own dashboard (below "Find a patient"),
-  backed by a new `appointments_select_doctor`
+  reschedule yet, only cancel. The doctor side gets the day-grid calendar described
+  under "Doctor dashboard layout" above as its view into these same rows (an earlier
+  version had a plain read-only "Upcoming appointments" list here instead — replaced
+  by the day-grid), backed by a new `appointments_select_doctor`
   RLS policy (`doctor_id = auth.uid()`) — the doctor never gets write access to
   appointments, only to the patient record via the grant the booking already created.
   Backed by the `appointments` table (see "Data model" above), which gained a
@@ -484,22 +588,53 @@ verified, which would defeat the point of having the tag at all.
   have no visibility into this — it's entirely patient-owned data, unlike visits/tests
   which doctors write.
 - Doctor clinics: a "Currently seeing patients at" dropdown on the doctor dashboard,
-  fed by a `clinics` list the doctor builds in Account settings. Whichever clinic is
+  fed by a `clinics` list the doctor builds on its own **"Manage clinics" page**
+  (`view-doc-clinics`, reached from the Account dropdown — pulled out of Account
+  settings into its own page since it had grown into a big enough chunk of
+  functionality, schedule-management included, to not belong under
+  contact-info fields any more). Whichever clinic is
   selected as `currentClinic` is stamped onto every new visit note as `clinicName`,
   and shown to the patient (and the doctor) in the visit list and detail modal.
-  **Each clinic is now `{name, address}`, not a bare name string** —
-  `normalizeClinic()` in app.js upgrades a legacy bare-string element (the
-  original shape) to `{name: that string, address: ''}` on every read, so
-  existing rows never needed a data migration when this changed. The top-level
-  "Add clinic" form stays name-only, though (just an input + "Add" button,
-  same as before addresses existed) — **address entry lives inside the
-  per-clinic modal instead**, alongside the schedule, since both are "details
-  about this one clinic" rather than something to fill in at the moment of
-  adding it. Each clinic row (no longer a bare chip — a
-  `.list-item` row, since it now carries more than just a name) has a
-  **"Manage" button** (plain "Manage", not "Manage bookings" — the modal it
-  opens does more than scheduling now) opening a modal
-  (`.modal-card-wide`) built as an address field on top of a **fixed Monday→Sunday
+  **Each clinic is now `{name, address, phone, note}`, not a bare name string** —
+  `normalizeClinic()` in app.js upgrades a legacy element missing any of these
+  (a bare string from before addresses existed, or a `{name, address}` pair from
+  before phone/note existed) by defaulting whatever's missing to `''`, so
+  existing rows never needed a data migration each time this shape grew.
+  `phone` and `note` (a free-text "when the phone is actually answered" note,
+  e.g. "Phone lines open Mon-Sat, 9am-6pm") exist purely for patients to know
+  how to reach the clinic directly — nothing in the booking logic reads them,
+  they're display-only. **Add and
+  Manage share one modal** (`openManageBookingsModal(clinicName)` — omitting
+  `clinicName` opens it in "create a new clinic" mode instead of editing an
+  existing one): the top-level "+ Add a clinic" button is just a plain button
+  now, no adjacent text input — clicking it opens the same
+  `#doc-manage-bookings-modal` used for "Manage", with a name field revealed
+  at the top (`#avail-clinic-name-field`, hidden in edit mode) alongside
+  address, phone, note, and the weekly grid, so a doctor sets a new clinic's name,
+  contact details, *and* hours in one sitting instead of adding a bare name first and
+  configuring the rest later. **Address, phone, and note are each view/edit, not
+  bare textboxes, once a clinic already has values** — editing an existing clinic
+  shows each as plain text next to its own small "Edit" button
+  (`showClinicFieldView(key, ...)`/`showClinicFieldInput(key)`, one generic pair
+  driving all three fields by id prefix — `avail-clinic-{key}`/`-view`/`-text`/
+  `-edit-btn` — rather than three near-identical copies of the same toggle), and only clicking "Edit" swaps
+  in the actual `<input>`/`<textarea>` (pre-filled, so saving without ever touching it
+  can't blank the field out); creating a new clinic skips straight to the
+  inputs since there's nothing to display yet. Saving in create mode inserts the
+  full `{name, address, phone, note}` into `doctors.clinics` first (a clinic's identity has to
+  exist before any `doctor_availability` row can reference it by name), then
+  falls through into the exact same schedule-replace logic edit mode already
+  used; editing checks all three contact fields for a change (not just address)
+  before writing. Each clinic row (no longer a bare chip — a
+  `.list-item` row, since it now carries more than just a name) has only a
+  **"Manage" button** now (plain "Manage", not "Manage bookings" — the modal it
+  opens does more than scheduling now) — **no separate "×" remove button next
+  to the row any more**; deleting a clinic moved *inside* Manage instead (see
+  below), since removing a clinic and its whole schedule is exactly the kind
+  of action that benefits from the extra "are you sure" friction a bare inline
+  × never had. Manage opens
+  (`.modal-card-wide`) built as a name field (create mode only), an address
+  field, and a **fixed Monday→Sunday
   grid**, not an incremental
   add-one-row-then-see-it-in-a-list flow (that version shipped first and the
   doctor found it "confusing and difficult to manage" — this replaced it). Each
@@ -522,8 +657,20 @@ verified, which would defeat the point of having the tag at all.
   covers both writes — the address field (a plain `doctors.clinics` update,
   independent of the schedule tables) only fires when the address actually
   changed from what the modal opened with, then the schedule replace runs as
-  above. Removing a clinic still deletes
-  its availability rows outright (no replacement to protect there). **The 4-week
+  above (or, in create mode, the new clinic is inserted into `doctors.clinics`
+  first, same idea). **Deleting a clinic is a "Delete clinic" link at the
+  bottom of Manage** (hidden in create mode — nothing to delete yet), not a
+  bare row-level ×. It opens a second, smaller confirm popup
+  (`#doc-delete-clinic-modal`) stacked on top of Manage — same
+  press-and-hold pattern as the appointment confirm/cancel buttons
+  (`makeHoldButton`, "Hold to delete clinic", 2 seconds) rather than a plain
+  click, since removing a clinic wipes its whole schedule and can't be undone.
+  Confirming removes the clinic from `doctors.clinics`, clears `currentClinic`
+  if it pointed at the deleted one, deletes every `doctor_availability` row for
+  that `clinic_name`, and closes *both* popups — cancelling out of the confirm
+  popup (× or "Cancel") only closes that one, leaving Manage still open so the
+  doctor can keep editing — an outright delete, no replacement rows to protect
+  the way the schedule-save above does. **The 4-week
   figure is a hard cap enforced twice**: the "Repeat weekly" number input is
   clamped to 4 when saving, and separately `generateBookableDates()` (patient
   side, below) never looks past `today + 28 days` regardless of what any row's
@@ -693,6 +840,39 @@ and "Auth." What's still not built, matching the doc's own scope and deferred li
   `.tab` for in-page tab switching, `.list-item` for clickable list rows (visits/tests),
   `.btn-primary` (teal, filled) / `.btn-secondary` (white, outlined) / `.btn-block`
   (full width), `.badge.verified` / `.badge.unverified` for status pills.
+- **The whole type/spacing scale is ~80% of the numbers you'd naively expect,
+  on purpose.** Every size/spacing decision made across this session was eyeballed
+  against a browser that turned out to be sitting at 80% zoom the whole time,
+  without either side realizing it (discovered 2026-09-10, when a fresh check at
+  true 100% zoom showed everything rendering noticeably larger than intended). The
+  first fix attempt was a single `html{ zoom: 80%; }` rule — quick, but a real hack:
+  it renders correctly but leaves every actual value in the file lying about its own
+  size (a declared `padding:12px 20px` never actually renders at 12/20px to any
+  visitor), which would confuse the next person editing this file and silently
+  compounds with a visitor's own browser zoom. It was reverted in favor of doing it
+  properly: every genuine visual-size value in `style.css` (`font-size` in `rem`,
+  every `padding`/`margin`/`gap`/`width`/`height`/`border-radius`/positioning
+  offset/`box-shadow` px value, `--radius`, the `.dash-grid` column widths, etc.) was
+  hand-multiplied by 0.8 and rounded to a clean px/0.01rem value — same approach
+  applied to inline HTML `style="...px"` attributes scattered through
+  `pakHealth.html` and template strings in `app.js`, plus every inline `<svg
+  width="…" height="…">` icon's outer dimensions (`viewBox` and path/circle
+  coordinates untouched — only the outer render size shrinks) and the
+  `DAYGRID_ROW_H` constant driving the day-grid's real pixel math. **`@media
+  (max-width: …)` breakpoint thresholds were deliberately left unscaled** — those
+  test real device/viewport width (a phone is still ~390–430px wide regardless of
+  our internal type scale), not a value this rescale has any business touching;
+  everything *inside* a media query block that represents an actual component
+  dimension (e.g. `.dash-grid{ grid-template-columns: 336px 1fr; }` under the
+  1180px tier) was scaled like everywhere else. **Two elements needed the opposite
+  treatment — reverted rather than scaled**: `.live-code-ring`'s `stroke-width`/
+  `transform-origin` and `.pulse path`'s `stroke-width` are SVG user units tied to
+  each element's own fixed, unchanged `viewBox` — not CSS pixels — so scaling them
+  would have thrown off the ring's rotation center and the pulse line's proportions
+  relative to their own artwork; only their outer HTML-attribute/inline-style
+  render size needed to shrink (the SVG scales its internal geometry to fit
+  automatically). If sizes ever look "off" again relative to what was designed on
+  screen, this 80% history is why — not a regression.
 
 ## How this file came to be
 

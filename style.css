@@ -185,6 +185,10 @@
   /* ---------- Dashboard ---------- */
   .dash-main{ flex:1; padding: 26px; max-width:880px; margin:0 auto; width:100%; }
   .dash-main-wide{ max-width:1440px; }
+  /* On an actual phone the fixed 26px side padding was eating a noticeable slice
+     of an already-narrow screen — trims it down just for genuinely narrow
+     viewports, leaving the desktop/tablet padding above untouched. */
+  @media (max-width: 600px){ .dash-main{ padding: 16px; } }
   .dash-grid{
     display:grid; grid-template-columns: 336px minmax(0, 560px) minmax(256px, 1fr);
     grid-template-areas: "sidebar center right"; gap:19px; align-items:start;
@@ -215,10 +219,23 @@
     /* Single column now — put the calendar right after the health card rather than
        after all four record tiles, for the same reason as the 1180px tier above. */
     .dash-grid{ grid-template-columns: 1fr; grid-template-areas: "sidebar" "right" "center"; }
-    /* This column can now be the full viewport width, which would blow up the
-       7-column day grid (aspect-ratio 1/1 per cell) the same way the old
-       "right right" row did — cap it and center it, same fix as before. */
-    .dash-grid .right-col{ max-width:288px; width:100%; margin:0 auto; }
+    /* right-col now matches center-col's full width instead of being capped
+       narrower — a bare width cap on the whole column made the "Upcoming
+       appointments" panel (and, for the doctor, the day-grid) visibly narrower
+       than the record list sitting right below it. Only the patient's month
+       calendar actually needs a cap (its 7 equal aspect-ratio:1/1 columns would
+       blow up into oversized cells at this column's now-full width) — scoped to
+       .calendar-panel alone so it doesn't drag the rest of the column down with
+       it. */
+    .calendar-panel{ max-width:320px; margin-left:auto; margin-right:auto; }
+  }
+  /* On an actual phone (as opposed to a tablet-width single column, which is
+     what the cap above is really guarding against) the column itself is
+     already narrow enough that letting the calendar go full-width too keeps
+     its 7 columns at a perfectly reasonable cell size — and matches every
+     other panel in this layout, rather than sitting oddly narrower than them. */
+  @media (max-width: 480px){
+    .calendar-panel{ max-width:none; margin-left:0; margin-right:0; }
   }
 
   /* Patient dashboard: left-aligned rather than centered, and the right column's
@@ -296,8 +313,12 @@
   .empty-state{ color: var(--muted); font-size:0.72rem; padding: 14px 0; }
   .not-found{ color: var(--red); font-size:0.72rem; padding: 8px 0; }
 
+  /* margin-top is small on purpose — it sits directly under .copy-note, which
+     already reserves its own height+margin as a fixed-size flash-message slot
+     (see .copy-note below); stacking a second full margin on top of that made
+     for a noticeably empty-looking gap before this text actually starts. */
   .privacy-note{
-    font-size:0.64rem; color: var(--muted); background: var(--bg); border-radius:6px; padding:10px 11px; line-height:1.5; margin-top:13px;
+    font-size:0.64rem; color: var(--muted); background: var(--bg); border-radius:6px; padding:10px 11px; line-height:1.5; margin-top:4px;
   }
 
   /* ---------- Email verification banner ---------- */
@@ -473,14 +494,18 @@
     fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round;
     transform: rotate(-90deg); transform-origin: 23px 23px; transition: stroke-dashoffset 1s linear;
   }
-  @media (max-width: 480px){
+  @media (max-width: 600px){
     /* The card's fixed 1.586:1 aspect-ratio is fine down to tablet width, but on a
        phone the same ratio forces a much shorter box (height = width/1.586) while
        the avatar circle and fonts stayed full-size — the code row (live code +
        Reset button) ended up taller than the card itself and got sliced off by
        .health-card's overflow:hidden. Auto height lets the card grow to fit its
        real content instead of clipping it; the smaller avatar/fonts below keep it
-       from looking oversized now that nothing forces a fixed short height. */
+       from looking oversized now that nothing forces a fixed short height.
+       480px was the original cutoff for this override; widened to 600px since
+       real phones were still reporting a squeezed card at their actual logical
+       widths — this stays well clear of the 860px point where the dashboard's
+       own layout (not just the card) already switches to single-column. */
     .health-card{ aspect-ratio:auto; padding:14px 14px 13px; }
     .avatar-btn-lg{ width:58px; height:58px; }
     .avatar-btn-lg .avatar-fallback{ font-size:1.2rem; }

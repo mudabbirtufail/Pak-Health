@@ -873,6 +873,41 @@ and "Auth." What's still not built, matching the doc's own scope and deferred li
   render size needed to shrink (the SVG scales its internal geometry to fit
   automatically). If sizes ever look "off" again relative to what was designed on
   screen, this 80% history is why — not a regression.
+- **Mobile-only dashboard polish** (verified on a real phone, 2026-09-11 —
+  everything above only exercised at emulated widths before this): three fixes,
+  all scoped to narrow breakpoints so nothing above them changed.
+  - **The health card's `aspect-ratio:auto` mobile override widened from
+    `max-width:480px` to `600px`.** The card was still rendering squeezed on an
+    actual phone even though it measured fine in emulation at 375–428px —
+    480px should already cover every real phone's logical width, but 600px
+    gives real headroom without coming anywhere near the 860px point where the
+    dashboard's own single-column layout kicks in, so it stays "mobile-only" in
+    effect either way.
+  - **`.dash-main`'s side padding drops from 26px to 16px under 600px** — on an
+    actual phone that fixed 26px-per-side was eating a real chunk of an
+    already-narrow screen; every panel and the health card now sit a bit wider,
+    as asked, without touching the 26px desktop/tablet padding above 600px.
+  - **The appointments/calendar column (`.right-col`) now matches the record
+    list's width in single-column mode (≤860px), instead of being capped to a
+    fixed 288px** — that old cap made the "Upcoming appointments" panel (and,
+    for the doctor, the day-grid) visibly narrower than the record-list panels
+    beside them. The only thing that still needs *some* cap is the patient's
+    month calendar specifically, since its 7 equal `aspect-ratio:1/1` columns
+    would blow up into oversized cells at a tablet-width (600–860px)
+    single-column's now-much-wider column — that's scoped to `.calendar-panel`
+    alone (`max-width:320px`, centered) so it doesn't drag the appointments-list
+    panel narrower too. On a genuine phone (≤480px) even that cap is lifted
+    again (`.calendar-panel{ max-width:none; }`) since at true phone widths the
+    resulting cells are still a perfectly normal size and matching every other
+    panel's width reads better than a lone narrower one.
+  - Separately (not mobile-specific — a general layout fix): the patient
+    sidebar's `.privacy-note` text sat under `.copy-note` (a normally-empty,
+    fixed-height slot reserved for the "Copied!" flash message so the layout
+    doesn't jump when it appears) — the two elements' margins were stacking
+    into a visibly empty gap before the privacy text actually started.
+    `.privacy-note`'s `margin-top` dropped from 13px to 4px to close that up;
+    `.copy-note`'s own reserved height/margin were left alone since those are
+    load-bearing for the flash-message layout-stability trick.
 
 ## How this file came to be
 

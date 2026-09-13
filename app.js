@@ -54,6 +54,11 @@
     // back/forward) re-pulls this doctor's appointments so a patient's new booking
     // shows up without needing a full reload — see refreshDoctorAppointments().
     if (id === 'view-doctor-dash') refreshDoctorAppointments();
+    // The family-context banner ("Viewing X's record") only makes sense on a
+    // patient *sub*-page — the main dashboard already says who's active via the
+    // family switcher itself, no need to say it twice.
+    if (id !== 'view-patient-dash' && PATIENT_ONLY_VIEWS.indexOf(id) !== -1) updateFamilyContextBanner();
+    else $('family-context-banner').classList.add('hidden');
     if (suppressHistoryPush) return;
     if (!history.state){
       history.replaceState({ view: id }, '', '#' + id);
@@ -125,7 +130,8 @@
       id: row.id, code: row.code, name: row.name || '', dob: row.dob || '', gender: row.gender || '',
       phone: row.phone || '', photoUrl: row.photo_url || '', bloodType: row.blood_type || '',
       emergencyContact: row.emergency_contact || '', allergies: row.allergies || '',
-      conditions: row.conditions || '', medications: row.medications || ''
+      conditions: row.conditions || '', medications: row.medications || '',
+      isDependent: !!row.is_dependent
     };
   }
   // Clinics used to be plain name strings; now each is {name, address}. Existing
@@ -227,6 +233,30 @@
     if (/code_expired/.test(msg)) return 'That code has expired — ask your patient to generate a new one.';
     if (/code_redeemed/.test(msg)) return 'That code has already been used — ask your patient for a new one.';
     return 'No active code found. Double-check it with your patient.';
+  }
+  // ---- Guardian-link code (family) — same shape as redeemAccessCode()/
+  // mapRedeemErrorText() above, just for join_as_guardian() instead. ----
+  async function joinAsGuardian(code){
+    var res = await supabaseClient.rpc('join_as_guardian', { p_code: code });
+    if (res.error) return { ok:false, error: res.error };
+    var row = res.data && res.data[0];
+    if (!row) return { ok:false, error: null };
+    return { ok:true, dependentId: row.dependent_id, dependentName: row.dependent_name };
+  }
+  function mapGuardianLinkErrorText(error){
+    var msg = (error && error.message) || '';
+    if (/code_expired/.test(msg)) return 'That code has expired — ask them to generate a new one.';
+    if (/code_redeemed/.test(msg)) return 'That code has already been used — ask them for a new one.';
+    return 'No active code found. Double-check it with them.';
+  }
+  async function createGuardianLinkCode(dependentId){
+    var row = { dependent_id: dependentId, code: randomDigits(6), expires_at: new Date(Date.now() + 60*1000).toISOString() };
+    var res = await supabaseClient.from('guardian_link_codes').insert(row).select().maybeSingle();
+    return res.data || null;
+  }
+  async function loadDependentsForGuardian(guardianId){
+    var res = await supabaseClient.from('dependent_guardians').select('*, patients(*)').eq('guardian_id', guardianId);
+    return (res.data || []).filter(function(r){ return r.patients; }).map(function(r){ return mapPatientRow(r.patients); });
   }
   async function revokeGrant(grantId){
     await supabaseClient.from('access_grants').update({ revoked_at: new Date().toISOString() }).eq('id', grantId);
@@ -544,6 +574,13 @@
   // ================= PATIENT DASHBOARD =================
   var currentPatientData = null;
   var calViewDate = new Date();
+  // Which patients.id the dashboard is currently showing — normally the signed-in
+  // guardian's own id, but the family switcher can point this at a dependent's id
+  // instead. Every patient-context write (live code, trust grants, appointments,
+  // profile/settings saves) reads this instead of session.id directly, so the same
+  // dashboard/functions work unmodified regardless of which profile is active.
+  // session.id itself never changes here — it's still the real signed-in account.
+  var activePatientId = null;
 
   function getInitials(name){
     if (!name || !name.trim()) return '?';
@@ -568,13 +605,20 @@
     var data = await loadPatientProfile(id);
     if (!data){
       // profile row missing is unexpected (the signup trigger should have created
-      // it) — bail out to landing rather than show a broken dashboard.
+      // it) — bail out to landing rather than show a broken dashboard. (This can't
+      // happen for a dependent lookup gone wrong — see the switcher/guard below —
+      // only for the guardian's own row.)
       session = { type:null, id:null };
       showView('view-landing');
       return;
     }
+    activePatientId = id;
     var authUser = await getAuthUser();
-    data.email = authUser.email;
+    // A dependent has no login/email of their own — only attach the real signed-in
+    // email when we're actually looking at that same account's own row, so Account
+    // settings never shows (or, worse, lets someone edit-and-save) the guardian's
+    // own login email while viewing a dependent's profile.
+    data.email = (id === session.id) ? authUser.email : '';
     var visitsRes = await supabaseClient.from('visits').select('*').eq('patient_id', id).order('date', { ascending:false });
     var testsRes = await supabaseClient.from('tests').select('*').eq('patient_id', id).order('date', { ascending:false });
     var eyesRes = await supabaseClient.from('eye_entries').select('*').eq('patient_id', id).order('date', { ascending:false });
@@ -585,6 +629,8 @@
     data.appointments = (apptsRes.data || []).map(mapAppointmentRow);
     currentPatientData = data;
     renderHealthCard(data);
+    // Still about the real signed-in account's own email, unrelated to which
+    // profile is currently active — stays keyed to authUser regardless.
     renderVerifyBanner('pat', authUser.email, !!authUser.email_confirmed_at);
     renderVisitsList(data.visits);
     renderTestsList(data.tests);
@@ -600,9 +646,11 @@
     closeEyeRxPrevModal();
     closePatAccessModal();
     closePatApptDetailModal();
+    closePatFamilyModal();
     closePatAcctDropdown();
     patHowItWorks.close();
     await regenerateLiveCode();
+    await renderFamilySwitcher();
     showView('view-patient-dash');
     syncStickyColumnHeights();
   }
@@ -646,7 +694,7 @@
     if (liveCodeGenerating) return;
     liveCodeGenerating = true;
     try{
-      var row = await createAccessCode(session.id);
+      var row = await createAccessCode(activePatientId);
       renderLiveCodeState(row);
     }finally{
       liveCodeGenerating = false;
@@ -683,7 +731,7 @@
   async function renderTrustedList(){
     var listEl = $('pat-trusted-list');
     var emptyEl = $('pat-trusted-empty');
-    var entries = await listTrustedDoctorsForPatient(session.id);
+    var entries = await listTrustedDoctorsForPatient(activePatientId);
     if (!entries.length){
       listEl.innerHTML = '';
       emptyEl.classList.remove('hidden');
@@ -702,7 +750,7 @@
   async function renderAdhocList(){
     var listEl = $('pat-adhoc-list');
     var emptyEl = $('pat-adhoc-empty');
-    var entries = await listActiveAdhocGrantsForPatient(session.id);
+    var entries = await listActiveAdhocGrantsForPatient(activePatientId);
     if (!entries.length){
       listEl.innerHTML = '';
       emptyEl.classList.remove('hidden');
@@ -736,7 +784,7 @@
     }
     $('pat-trust-add-btn').disabled = true;
     try{
-      await createTrustGrant(session.id, docRes.data.id);
+      await createTrustGrant(activePatientId, docRes.data.id);
       $('pat-trust-input').value = '';
       renderTrustedList();
     }finally{
@@ -744,7 +792,266 @@
     }
   });
 
+  // ---- Family (dependent profiles) ----
+  // "Viewing: X" switcher (topbar) — only unhidden when the signed-in patient
+  // actually has >=1 dependent. Selecting a name re-runs enterPatientDash()
+  // against that patients.id; every patient-context function already reads
+  // activePatientId (set at the top of enterPatientDash), so the rest of the
+  // dashboard just follows along unmodified.
+  function closeFamilySwitcher(){
+    $('pat-family-switcher-menu').classList.add('hidden');
+    $('pat-family-switcher-trigger').setAttribute('aria-expanded', 'false');
+  }
+  $('pat-family-switcher-trigger').addEventListener('click', function(e){
+    e.stopPropagation();
+    var menu = $('pat-family-switcher-menu');
+    var opening = menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', !opening);
+    this.setAttribute('aria-expanded', String(opening));
+  });
+  document.addEventListener('click', function(e){
+    if (!$('pat-family-switcher-menu').classList.contains('hidden') && !e.target.closest('#pat-family-switcher-wrap')){
+      closeFamilySwitcher();
+    }
+  });
+  async function renderFamilySwitcher(){
+    var dependents = await loadDependentsForGuardian(session.id);
+    var wrap = $('pat-family-switcher-wrap');
+    if (!dependents.length){
+      wrap.classList.add('hidden');
+      return;
+    }
+    wrap.classList.remove('hidden');
+    // currentPatientData already holds the guardian's own name if that's what's
+    // active right now — only worth a fresh fetch when a dependent is active.
+    var ownName;
+    if (activePatientId === session.id){
+      ownName = (currentPatientData && currentPatientData.name) || 'You';
+    } else {
+      var ownData = await loadPatientProfile(session.id);
+      ownName = (ownData && ownData.name) || 'You';
+    }
+    var activeDependent = dependents.find(function(d){ return d.id === activePatientId; });
+    var activeName = (activePatientId === session.id) ? ownName : ((activeDependent && activeDependent.name) || '—');
+    $('pat-family-switcher-label').textContent = 'Viewing: ' + activeName;
+    var rows = [{ id: session.id, name: ownName }].concat(dependents);
+    $('pat-family-switcher-menu').innerHTML = rows.map(function(p){
+      return '<button type="button" class="family-switch-btn" data-id="' + p.id + '">' + escapeHtml(p.name || 'Unnamed') + '</button>';
+    }).join('');
+    $('pat-family-switcher-menu').querySelectorAll('.family-switch-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        closeFamilySwitcher();
+        var id = btn.getAttribute('data-id');
+        if (id !== activePatientId) enterPatientDash(id);
+      });
+    });
+  }
+  function updateFamilyContextBanner(){
+    var isFamily = session.type === 'patient' && activePatientId && session.id && activePatientId !== session.id;
+    if (isFamily && currentPatientData){
+      $('family-context-banner-name').textContent = currentPatientData.name || 'this profile';
+      $('family-context-banner').classList.remove('hidden');
+    } else {
+      $('family-context-banner').classList.add('hidden');
+    }
+  }
+
+  // ---- "Manage family" (top-level: list + add + join-by-code) ----
+  function closePatFamilyModal(){ $('pat-family-modal').classList.add('hidden'); }
+  async function renderFamilyList(){
+    var dependents = await loadDependentsForGuardian(session.id);
+    var listEl = $('pat-family-list');
+    var emptyEl = $('pat-family-empty');
+    if (!dependents.length){
+      listEl.innerHTML = '';
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = dependents.map(function(d){
+      return '<div class="list-item" style="cursor:default;">'
+        + '<div><div class="li-title">' + escapeHtml(d.name || 'Unnamed') + '</div></div>'
+        + '<button class="btn btn-secondary btn-sm family-manage-btn" data-id="' + d.id + '" type="button">Manage</button>'
+        + '</div>';
+    }).join('');
+    listEl.querySelectorAll('.family-manage-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-id');
+        openFamilyDetailModal(id, dependents.find(function(d){ return d.id === id; }));
+      });
+    });
+  }
+  async function openPatFamilyModal(){
+    closePatAcctDropdown();
+    clearError($('pat-family-join-error'));
+    $('pat-family-join-input').value = '';
+    await renderFamilyList();
+    $('pat-family-modal').classList.remove('hidden');
+  }
+  $('pat-family-manage-btn').addEventListener('click', openPatFamilyModal);
+  $('pat-family-close').addEventListener('click', closePatFamilyModal);
+  $('pat-family-modal').addEventListener('click', function(e){ if (e.target === $('pat-family-modal')) closePatFamilyModal(); });
+
+  $('pat-family-join-btn').addEventListener('click', async function(){
+    var raw = $('pat-family-join-input').value.trim().replace(/[^0-9]/g, '');
+    clearError($('pat-family-join-error'));
+    if (raw.length !== 6){
+      showError($('pat-family-join-error'), 'Enter the 6-digit code shown on their screen.');
+      return;
+    }
+    $('pat-family-join-btn').disabled = true;
+    try{
+      var result = await joinAsGuardian(raw);
+      if (!result.ok){
+        showError($('pat-family-join-error'), mapGuardianLinkErrorText(result.error));
+        return;
+      }
+      $('pat-family-join-input').value = '';
+      await renderFamilyList();
+      await renderFamilySwitcher();
+    }finally{
+      $('pat-family-join-btn').disabled = false;
+    }
+  });
+
+  // ---- "Add family member" ----
+  function closeAddFamilyModal(){ $('pat-add-family-modal').classList.add('hidden'); }
+  $('pat-family-add-open-btn').addEventListener('click', function(){
+    closePatFamilyModal();
+    $('family-add-name').value = '';
+    $('family-add-dob').value = '';
+    $('family-add-gender').value = '';
+    clearError($('family-add-error'));
+    $('pat-add-family-modal').classList.remove('hidden');
+  });
+  $('pat-add-family-close').addEventListener('click', closeAddFamilyModal);
+  $('family-add-cancel').addEventListener('click', closeAddFamilyModal);
+  $('pat-add-family-modal').addEventListener('click', function(e){ if (e.target === $('pat-add-family-modal')) closeAddFamilyModal(); });
+  $('family-add-save').addEventListener('click', async function(){
+    var name = $('family-add-name').value.trim();
+    var dob = $('family-add-dob').value;
+    var gender = $('family-add-gender').value;
+    clearError($('family-add-error'));
+    if (!name){
+      showError($('family-add-error'), 'Please enter a name.');
+      return;
+    }
+    $('family-add-save').disabled = true;
+    try{
+      var res = await supabaseClient.rpc('create_dependent', { p_name: name, p_dob: dob || null, p_gender: gender });
+      if (res.error || !res.data || !res.data[0]){
+        showError($('family-add-error'), 'Something went wrong adding this family member. Please try again.');
+        return;
+      }
+      var newId = res.data[0].id;
+      closeAddFamilyModal();
+      await enterPatientDash(newId);
+    }catch(e){
+      showError($('family-add-error'), 'Something went wrong adding this family member. Please try again.');
+    }finally{
+      $('family-add-save').disabled = false;
+    }
+  });
+
+  // ---- Family member detail (per-dependent: guardians, generate a link code,
+  // remove) — same "list -> Manage -> nested detail modal" pattern as doctor
+  // clinics already use. ----
+  var familyDetailDependent = null;
+  var familyDetailCodeTimer = null;
+  function stopFamilyDetailCodeTimer(){
+    if (familyDetailCodeTimer){ clearInterval(familyDetailCodeTimer); familyDetailCodeTimer = null; }
+  }
+  async function renderFamilyDetailGuardians(dependentId){
+    var linksRes = await supabaseClient.from('dependent_guardians').select('guardian_id').eq('dependent_id', dependentId);
+    var guardianIds = (linksRes.data || []).map(function(r){ return r.guardian_id; });
+    var listEl = $('pat-family-detail-guardians');
+    if (!guardianIds.length){ listEl.innerHTML = ''; return 0; }
+    var patRes = await supabaseClient.from('patients').select('id, name').in('id', guardianIds);
+    var byId = {};
+    (patRes.data || []).forEach(function(p){ byId[p.id] = p.name; });
+    listEl.innerHTML = guardianIds.map(function(gid){
+      var name = byId[gid] || 'Unknown';
+      return '<div class="list-item" style="cursor:default;"><div><div class="li-title">' + escapeHtml(name) + (gid === session.id ? ' (you)' : '') + '</div></div></div>';
+    }).join('');
+    return guardianIds.length;
+  }
+  function updateFamilyDetailRemoveLabel(guardianCount){
+    $('pat-family-detail-remove-label').textContent = (guardianCount <= 1)
+      ? "Hold to permanently delete — you're the only guardian"
+      : 'Hold to remove from your family';
+  }
+  function renderFamilyDetailCode(row){
+    stopFamilyDetailCodeTimer();
+    $('pat-family-detail-code-wrap').classList.remove('hidden');
+    $('pat-family-detail-code').textContent = row.code.slice(0, 3) + ' ' + row.code.slice(3);
+    var qrEl = $('pat-family-detail-qr');
+    qrEl.innerHTML = '';
+    var qr = qrcode(0, 'M');
+    qr.addData(row.code);
+    qr.make();
+    qrEl.innerHTML = qr.createImgTag(4, 4);
+    function tick(){
+      var msLeft = new Date(row.expires_at).getTime() - Date.now();
+      if (msLeft <= 0){
+        stopFamilyDetailCodeTimer();
+        $('pat-family-detail-code-wrap').classList.add('hidden');
+        return;
+      }
+      $('pat-family-detail-code-expiry').textContent = 'Expires in ' + Math.ceil(msLeft / 1000) + 's';
+    }
+    tick();
+    familyDetailCodeTimer = setInterval(tick, 1000);
+  }
+  function closeFamilyDetailModal(){
+    stopFamilyDetailCodeTimer();
+    $('pat-family-detail-modal').classList.add('hidden');
+  }
+  async function openFamilyDetailModal(id, dependent){
+    familyDetailDependent = dependent || { id: id, name: '' };
+    $('pat-family-detail-name').textContent = familyDetailDependent.name || '—';
+    $('pat-family-detail-code-wrap').classList.add('hidden');
+    stopFamilyDetailCodeTimer();
+    var guardianCount = await renderFamilyDetailGuardians(id);
+    updateFamilyDetailRemoveLabel(guardianCount);
+    $('pat-family-detail-modal').classList.remove('hidden');
+  }
+  $('pat-family-detail-close').addEventListener('click', closeFamilyDetailModal);
+  $('pat-family-detail-modal').addEventListener('click', function(e){ if (e.target === $('pat-family-detail-modal')) closeFamilyDetailModal(); });
+  $('pat-family-detail-generate-btn').addEventListener('click', async function(){
+    if (!familyDetailDependent) return;
+    var btn = $('pat-family-detail-generate-btn');
+    btn.disabled = true;
+    try{
+      var row = await createGuardianLinkCode(familyDetailDependent.id);
+      if (row) renderFamilyDetailCode(row);
+    }finally{
+      btn.disabled = false;
+    }
+  });
+  makeHoldButton($('pat-family-detail-remove-btn'), 2000, async function(){
+    if (!familyDetailDependent) return;
+    var removedId = familyDetailDependent.id;
+    try{
+      await supabaseClient.rpc('remove_dependent', { p_dependent_id: removedId });
+    }catch(e){}
+    closeFamilyDetailModal();
+    closePatFamilyModal();
+    if (removedId === activePatientId){
+      // Viewing the profile that just got removed/unlinked — fall back to the
+      // guardian's own dashboard rather than one that may no longer be reachable.
+      await enterPatientDash(session.id);
+    } else {
+      await renderFamilySwitcher();
+    }
+  });
+
   function openPatAccountSettingsPage(){
+    var isDependent = !!(currentPatientData && currentPatientData.isDependent);
+    // A dependent has no login of their own — hide the email field entirely
+    // rather than show it blank-but-editable, which could otherwise be typed
+    // into and saved as a change to the *guardian's own* login email (see the
+    // guard in the save handler below).
+    $('pat-email-field').classList.toggle('hidden', isDependent);
     $('pat-email').value = (currentPatientData && currentPatientData.email) || '';
     $('pat-phone').value = (currentPatientData && currentPatientData.phone) || '';
     closePatAcctDropdown();
@@ -761,7 +1068,7 @@
 
   $('pat-profile-save-btn').addEventListener('click', async function(){
     var name = $('pat-name').value.trim();
-    await supabaseClient.from('patients').update({ name: name }).eq('id', session.id);
+    await supabaseClient.from('patients').update({ name: name }).eq('id', activePatientId);
     currentPatientData.name = name;
     renderHealthCard(currentPatientData);
     var note = $('pat-profile-save-note');
@@ -772,19 +1079,24 @@
   $('pat-save-btn').addEventListener('click', async function(){
     var email = $('pat-email').value.trim();
     var phone = $('pat-phone').value.trim();
+    var isDependent = !!(currentPatientData && currentPatientData.isDependent);
     $('pat-save-btn').disabled = true;
     try{
       var authUser = await getAuthUser();
-      if (email && email !== authUser.email){
+      // The email field is hidden entirely for a dependent (see
+      // openPatAccountSettingsPage) — this guard is the actual safety backstop,
+      // since a dependent has no login of its own and this must never end up
+      // changing the *guardian's* real signed-in email by accident.
+      if (!isDependent && email && email !== authUser.email){
         await supabaseClient.auth.updateUser({ email: email });
         // Supabase confirms the new address before auth.users.email actually
         // changes — the verify banner naturally reappears until that happens,
         // no separate "reset the flag" step needed.
       }
-      await supabaseClient.from('patients').update({ phone: phone }).eq('id', session.id);
+      await supabaseClient.from('patients').update({ phone: phone }).eq('id', activePatientId);
       currentPatientData.phone = phone;
       authUser = await getAuthUser();
-      currentPatientData.email = authUser.email;
+      if (!isDependent) currentPatientData.email = authUser.email;
       renderVerifyBanner('pat', authUser.email, !!authUser.email_confirmed_at);
       var note = $('pat-save-note');
       note.classList.add('show');
@@ -887,7 +1199,7 @@
       $('pat-avatar-img').classList.remove('hidden');
       $('pat-avatar-fallback').classList.add('hidden');
       currentPatientData.photoUrl = dataUrl;
-      try{ await supabaseClient.from('patients').update({ photo_url: dataUrl }).eq('id', session.id); }catch(err){}
+      try{ await supabaseClient.from('patients').update({ photo_url: dataUrl }).eq('id', activePatientId); }catch(err){}
     };
     reader.readAsDataURL(file);
   });
@@ -895,6 +1207,7 @@
     stopLiveCodeTimer();
     await supabaseClient.auth.signOut();
     session = { type:null, id:null };
+    activePatientId = null;
     showView('view-landing');
   });
 
@@ -1434,7 +1747,7 @@
     label.textContent = 'Booking...';
     try{
       var row = {
-        patient_id: session.id,
+        patient_id: activePatientId,
         doctor_id: d.id,
         doctor_name: doctorDisplayName(d),
         clinic_name: bookApptSelectedSlot.clinicName,
@@ -1452,7 +1765,7 @@
         await renderBookApptSlots();
         return;
       }
-      await createTrustGrant(session.id, d.id);
+      await createTrustGrant(activePatientId, d.id);
       currentPatientData.appointments = [mapAppointmentRow(res.data)].concat(currentPatientData.appointments || []);
       renderAppointmentsList(currentPatientData.appointments);
       renderAppointmentsCalendar(currentPatientData.appointments);
@@ -1727,7 +2040,7 @@
     }
     clearError($('add-eye-error'));
     var row = {
-      patient_id: session.id,
+      patient_id: activePatientId,
       date: date,
       sph_l: $('eye-sph-l').value.trim(),
       cyl_l: $('eye-cyl-l').value.trim(),
@@ -2474,7 +2787,7 @@
   $('doc-howitworks-btn').addEventListener('click', docHowItWorks.open);
 
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape'){ closeVisitModal(); closeTestModal(); closePrescriptionModal(); collapseAddVisitFields(); closeDocVisitModal(); closeDocTestModal(); collapseAddTestFields(); closeAddEyeModal(); closeEyeRxPrevModal(); closePatAccessModal(); closePatApptDetailModal(); closeBookApptConfirmModal(); closeManageBookingsModal(); closeDeleteClinicModal(); closePatAcctDropdown(); patHowItWorks.close(); closeDocAcctDropdown(); docHowItWorks.close(); }
+    if (e.key === 'Escape'){ closeVisitModal(); closeTestModal(); closePrescriptionModal(); collapseAddVisitFields(); closeDocVisitModal(); closeDocTestModal(); collapseAddTestFields(); closeAddEyeModal(); closeEyeRxPrevModal(); closePatAccessModal(); closePatApptDetailModal(); closeBookApptConfirmModal(); closeManageBookingsModal(); closeDeleteClinicModal(); closePatFamilyModal(); closeFamilyDetailModal(); closeAddFamilyModal(); closeFamilySwitcher(); closePatAcctDropdown(); patHowItWorks.close(); closeDocAcctDropdown(); docHowItWorks.close(); }
   });
 
   function escapeHtml(s){

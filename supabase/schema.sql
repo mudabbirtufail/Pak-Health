@@ -409,8 +409,16 @@ begin
   end if;
 
   -- only the most recently issued code for that patient is ever valid
-  select * into v_latest from public.access_codes
-    where patient_id = v_row.patient_id order by created_at desc limit 1;
+  -- (ac.patient_id qualified — this function's own `returns table(patient_id
+  -- uuid, ...)` makes bare `patient_id` ambiguous between that output
+  -- parameter and the table column: Postgres error 42702, "column reference
+  -- ... is ambiguous ... could refer to either a PL/pgSQL variable or a table
+  -- column." A real, previously-undetected bug — every past redemption test
+  -- that reached this line would have hit it; alias-qualifying is the minimal
+  -- fix, since renaming the output parameter would change the shape the
+  -- client already destructures.)
+  select * into v_latest from public.access_codes ac
+    where ac.patient_id = v_row.patient_id order by created_at desc limit 1;
   if v_latest.id is distinct from v_row.id then
     raise exception 'code_not_found';
   end if;
@@ -425,9 +433,12 @@ begin
   update public.access_codes set redeemed_at = now(), redeemed_by_doctor_id = v_doctor_id
     where id = v_row.id;
 
-  select * into v_existing_grant from public.access_grants
-    where patient_id = v_row.patient_id and doctor_id = v_doctor_id
-      and granted_via = 'trust' and revoked_at is null;
+  -- ag.patient_id qualified — same ambiguity risk as above (though
+  -- access_grants isn't this function's own return-shape table, patient_id
+  -- still collides with the returns table(patient_id, ...) output parameter).
+  select * into v_existing_grant from public.access_grants ag
+    where ag.patient_id = v_row.patient_id and ag.doctor_id = v_doctor_id
+      and ag.granted_via = 'trust' and ag.revoked_at is null;
 
   if v_existing_grant.id is not null then
     -- a trusted doctor redeeming a code is pure navigation — don't shadow the
@@ -446,3 +457,262 @@ end;
 $$;
 
 grant execute on function public.redeem_access_code(text) to authenticated;
+
+-- ============================================================================
+-- Migration: family member (dependent) profiles
+-- ============================================================================
+-- Everything below was added after the initial schema above — it's a migration
+-- against the *existing* live project (hence alter table / drop policy + create
+-- policy rather than rewriting the original create table statements), not part
+-- of a from-scratch run. See CLAUDE.md's "Family member (dependent) profiles"
+-- section for the full design.
+--
+-- A "dependent" is a patients row for someone who will never run their own
+-- account — a child, or an adult (an elderly parent, say) who simply won't
+-- manage a login/trust-grant flow themselves. Deliberately not age-gated: the
+-- mechanism is identical either way. A dependent is fully owned/managed by one
+-- or more "guardians" (real patient accounts) via dependent_guardians below;
+-- doctor-side access (visits/tests/access_grants/has_active_grant()) needs zero
+-- changes, since once a grant exists a dependent's row is indistinguishable
+-- from any other patient's.
+
+-- A dependent has no auth.users row, so the original hard FK can't hold for
+-- every row any more. Tradeoff: deleting an auth.users row (e.g. from the
+-- Supabase dashboard) no longer cascade-deletes that patient row on its own —
+-- acceptable at this pilot's scale, flagged here and in CLAUDE.md rather than
+-- silently dropped.
+alter table public.patients drop constraint if exists patients_id_fkey;
+alter table public.patients add column if not exists is_dependent boolean not null default false;
+
+-- Multiple guardians per dependent (both parents, etc.) — a join table, not a
+-- single managed_by column. No insert/delete policy: both go exclusively
+-- through create_dependent()/remove_dependent() below, same reasoning as
+-- everywhere else in this file that a security-definer function's fixed,
+-- audited logic is safer than a broad table grant.
+create table if not exists public.dependent_guardians (
+  dependent_id uuid not null references public.patients(id) on delete cascade,
+  guardian_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (dependent_id, guardian_id)
+);
+create index if not exists dependent_guardians_guardian_idx on public.dependent_guardians(guardian_id);
+
+-- Unlike has_active_grant() (deliberately NOT security definer, since
+-- access_grants_select's own policy never calls it back), this one DOES need
+-- security definer: dependent_guardians_select's policy (below) calls
+-- is_guardian_of() to decide what's visible, and if this function weren't
+-- security definer it would evaluate its own internal query against
+-- dependent_guardians *under that same RLS policy* — which calls
+-- is_guardian_of() again to check *that* row, which checks again... infinite
+-- recursion, surfaced live as Postgres error 54001 "stack depth limit
+-- exceeded" the first time this was tried without security definer here.
+-- security definer breaks the cycle by letting this function's own internal
+-- select bypass dependent_guardians' RLS, the same way redeem_access_code()
+-- bypasses access_codes' RLS for a different reason (there, no doctor-facing
+-- select policy exists at all; here, the select policy exists but would
+-- recurse into itself). Defined here, before any policy references it —
+-- Postgres resolves function references in a CREATE POLICY ... USING (...)
+-- clause immediately, not lazily, so this has to exist first.
+create or replace function public.is_guardian_of(p_dependent_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.dependent_guardians dg
+    where dg.dependent_id = p_dependent_id and dg.guardian_id = auth.uid()
+  );
+$$;
+
+alter table public.dependent_guardians enable row level security;
+drop policy if exists "dependent_guardians_select" on public.dependent_guardians;
+create policy "dependent_guardians_select" on public.dependent_guardians
+  for select using (public.is_guardian_of(dependent_id));
+
+-- Extend every existing "is this the patient themselves" policy with "...or
+-- their guardian." Doctor-facing policies (doctors_select_authenticated,
+-- visits_insert, tests_insert, appointments_select_doctor) are untouched.
+drop policy if exists "patients_select" on public.patients;
+create policy "patients_select" on public.patients
+  for select using (auth.uid() = id or public.has_active_grant(id, auth.uid()) or public.is_guardian_of(id));
+drop policy if exists "patients_update_own" on public.patients;
+create policy "patients_update_own" on public.patients
+  for update using (auth.uid() = id or public.is_guardian_of(id)) with check (auth.uid() = id or public.is_guardian_of(id));
+
+drop policy if exists "visits_select" on public.visits;
+create policy "visits_select" on public.visits
+  for select using (auth.uid() = patient_id or public.has_active_grant(patient_id, auth.uid()) or public.is_guardian_of(patient_id));
+
+drop policy if exists "tests_select" on public.tests;
+create policy "tests_select" on public.tests
+  for select using (auth.uid() = patient_id or public.has_active_grant(patient_id, auth.uid()) or public.is_guardian_of(patient_id));
+
+drop policy if exists "eye_entries_own" on public.eye_entries;
+create policy "eye_entries_own" on public.eye_entries
+  for all using (auth.uid() = patient_id or public.is_guardian_of(patient_id)) with check (auth.uid() = patient_id or public.is_guardian_of(patient_id));
+
+drop policy if exists "appointments_own" on public.appointments;
+create policy "appointments_own" on public.appointments
+  for all using (auth.uid() = patient_id or public.is_guardian_of(patient_id)) with check (auth.uid() = patient_id or public.is_guardian_of(patient_id));
+
+drop policy if exists "access_codes_patient_own" on public.access_codes;
+create policy "access_codes_patient_own" on public.access_codes
+  for all using (auth.uid() = patient_id or public.is_guardian_of(patient_id)) with check (auth.uid() = patient_id or public.is_guardian_of(patient_id));
+
+drop policy if exists "access_grants_select" on public.access_grants;
+create policy "access_grants_select" on public.access_grants
+  for select using (auth.uid() = patient_id or auth.uid() = doctor_id or public.is_guardian_of(patient_id));
+drop policy if exists "access_grants_patient_insert_trust" on public.access_grants;
+create policy "access_grants_patient_insert_trust" on public.access_grants
+  for insert with check ((auth.uid() = patient_id or public.is_guardian_of(patient_id)) and granted_via = 'trust');
+drop policy if exists "access_grants_patient_revoke" on public.access_grants;
+create policy "access_grants_patient_revoke" on public.access_grants
+  for update using (auth.uid() = patient_id or public.is_guardian_of(patient_id)) with check (auth.uid() = patient_id or public.is_guardian_of(patient_id));
+
+-- Creating a dependent: security definer for the same reason handle_new_user()
+-- is — there's still no plain client-side insert policy on patients, by
+-- design, so this is the only way a new patients row (with no matching
+-- auth.users row at all, in this case) ever gets created.
+create or replace function public.create_dependent(p_name text, p_dob date, p_gender text)
+returns table(id uuid, code text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id uuid := gen_random_uuid();
+  v_code text := public.generate_unique_patient_code();
+  v_guardian uuid := auth.uid();
+begin
+  if v_guardian is null then
+    raise exception 'not_authenticated';
+  end if;
+
+  insert into public.patients (id, code, name, dob, gender, is_dependent)
+    values (v_id, v_code, coalesce(p_name, ''), p_dob, coalesce(p_gender, ''), true);
+  insert into public.dependent_guardians (dependent_id, guardian_id) values (v_id, v_guardian);
+
+  return query select v_id, v_code;
+end;
+$$;
+
+grant execute on function public.create_dependent(text, date, text) to authenticated;
+
+-- The ephemeral, 1-minute code a second guardian redeems to link themselves to
+-- an existing dependent — same shape as access_codes, kept as a separate table
+-- since the redemption semantics differ (creates a guardian link, not an
+-- access grant). Generation is a plain RLS insert (an existing guardian
+-- creating a code for a dependent they already control — a same-user
+-- operation, no RPC needed, same reasoning as access_codes_patient_own);
+-- only *redemption* needs security definer, below, since the redeeming user
+-- has no rights to that dependent yet.
+create table if not exists public.guardian_link_codes (
+  id uuid primary key default gen_random_uuid(),
+  dependent_id uuid not null references public.patients(id) on delete cascade,
+  code text not null,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  redeemed_at timestamptz,
+  redeemed_by uuid references auth.users(id)
+);
+create index if not exists guardian_link_codes_dependent_idx on public.guardian_link_codes(dependent_id, created_at desc);
+
+alter table public.guardian_link_codes enable row level security;
+drop policy if exists "guardian_link_codes_own" on public.guardian_link_codes;
+create policy "guardian_link_codes_own" on public.guardian_link_codes
+  for all using (public.is_guardian_of(dependent_id)) with check (public.is_guardian_of(dependent_id));
+
+-- Redeeming a guardian-link code: structurally identical to
+-- redeem_access_code() above (find the latest code for its dependent, confirm
+-- it's still the current/unexpired/unredeemed one, mark it redeemed, insert
+-- the link) — see that function's comment for the full rationale.
+create or replace function public.join_as_guardian(p_code text)
+returns table(dependent_id uuid, dependent_name text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_row public.guardian_link_codes%rowtype;
+  v_latest public.guardian_link_codes%rowtype;
+  v_guardian uuid := auth.uid();
+begin
+  if v_guardian is null then
+    raise exception 'not_authenticated';
+  end if;
+
+  select * into v_row from public.guardian_link_codes
+    where code = p_code order by created_at desc limit 1;
+  if v_row.id is null then
+    raise exception 'code_not_found';
+  end if;
+
+  -- glc.dependent_id qualified — same ambiguity bug as redeem_access_code()
+  -- above (this function's own `returns table(dependent_id uuid, ...)` makes
+  -- bare `dependent_id` ambiguous with the table column otherwise).
+  select * into v_latest from public.guardian_link_codes glc
+    where glc.dependent_id = v_row.dependent_id order by created_at desc limit 1;
+  if v_latest.id is distinct from v_row.id then
+    raise exception 'code_not_found';
+  end if;
+
+  if v_row.redeemed_at is not null then
+    raise exception 'code_redeemed';
+  end if;
+  if v_row.expires_at <= now() then
+    raise exception 'code_expired';
+  end if;
+
+  update public.guardian_link_codes set redeemed_at = now(), redeemed_by = v_guardian
+    where id = v_row.id;
+
+  insert into public.dependent_guardians (dependent_id, guardian_id)
+    values (v_row.dependent_id, v_guardian)
+    on conflict do nothing;
+
+  return query select v_row.dependent_id, p.name
+    from public.patients p where p.id = v_row.dependent_id;
+end;
+$$;
+
+grant execute on function public.join_as_guardian(text) to authenticated;
+
+-- Removing a dependent: "same button, smarter behavior." Normally just unlinks
+-- the calling guardian — the profile and all its history stay intact for any
+-- remaining guardian. If they're the *last* guardian, the same call cascades
+-- into a full, permanent delete (nothing and no one could ever reach that row
+-- again otherwise). Security definer because the conditional cascade needs to
+-- delete a patients row, which guardians have no generic delete rights to.
+create or replace function public.remove_dependent(p_dependent_id uuid)
+returns boolean -- true if this call fully deleted the dependent, false if it just unlinked the caller
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_caller uuid := auth.uid();
+  v_remaining int;
+begin
+  if not public.is_guardian_of(p_dependent_id) then
+    raise exception 'not_a_guardian';
+  end if;
+
+  delete from public.dependent_guardians
+    where dependent_id = p_dependent_id and guardian_id = v_caller;
+
+  select count(*) into v_remaining from public.dependent_guardians where dependent_id = p_dependent_id;
+
+  if v_remaining = 0 then
+    -- cascades to visits/tests/eye_entries/appointments/access_codes/
+    -- access_grants/guardian_link_codes via their own on-delete-cascade FKs
+    delete from public.patients where id = p_dependent_id;
+    return true;
+  end if;
+
+  return false;
+end;
+$$;
+
+grant execute on function public.remove_dependent(uuid) to authenticated;

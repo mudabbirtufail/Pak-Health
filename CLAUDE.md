@@ -698,6 +698,99 @@ verified, which would defeat the point of having the tag at all.
   (`loadDoctorVisitLog()`) run fresh on every dashboard load — there's no stored
   `visitLog` field anymore now that visits are real rows; this replaced the old
   demo's `doctor.visitLog` JSON array that got appended to on every visit save.
+- **Family member (dependent) profiles**: a patient can add and fully manage a
+  record for someone who'll never run their own account — a child, or an adult
+  (an elderly parent, say) who simply won't manage a login/trust-grant flow
+  themselves. Deliberately **not age-gated** — the mechanism is identical
+  either way, and nothing in the schema/RLS/app logic encodes an age
+  restriction anywhere. This is a distinct feature from (and doesn't share
+  machinery with) a still-deferred "adult-to-adult delegated access" idea
+  (e.g. two capable adult spouses sharing visibility by choice, or an adult
+  handing over an *existing* independent account) — that would extend the
+  doctor-style `access_grants` (a revocable grant between two independent
+  accounts) rather than the ownership relationship built here; see the full
+  design/rationale in the plan this was built from if reviving that later.
+  - **Schema**: a "dependent" is just an ordinary `patients` row
+    (`is_dependent=true`) with no matching `auth.users` row — `patients.id`'s
+    FK to `auth.users(id)` had to be dropped for this (tradeoff: deleting an
+    `auth.users` row from the Supabase dashboard no longer auto-cascades to
+    the matching patient row; acceptable at pilot scale). A `dependent_guardians`
+    join table (not a single `managed_by` column) lets multiple guardians share
+    one dependent — both parents, say. Every existing "is this the patient
+    themselves" RLS policy (`patients`, `visits`/`tests` select,
+    `eye_entries`/`appointments` full CRUD, `access_codes`, `access_grants`)
+    got one added clause: `or public.is_guardian_of(patient_id)`. **Doctor-side
+    RLS needed zero changes** — once a grant exists on a dependent's row, it's
+    indistinguishable from any other patient's to every doctor-facing check,
+    verified directly (redeeming a dependent's live code produces a normal
+    one-hour `granted_via='code'` grant exactly like any patient's).
+  - **`is_guardian_of(p_dependent_id)` is `security definer`** — unlike
+    `has_active_grant()` (deliberately *not* security definer, since
+    `access_grants_select`'s own policy never calls it back), this one has to
+    be: `dependent_guardians`'s own select policy calls `is_guardian_of()` to
+    decide visibility, so if the function weren't security definer its
+    internal query against `dependent_guardians` would be evaluated under
+    that *same* policy — which calls `is_guardian_of()` again — infinite
+    recursion, hit live as Postgres error `54001` ("stack depth limit
+    exceeded") the first time this was tried without security definer here.
+    Security definer breaks the cycle by letting the function's own internal
+    select bypass `dependent_guardians`'s RLS.
+  - **Two `security definer` RPCs, mirroring `redeem_access_code()`'s shape
+    exactly**: `create_dependent(name, dob, gender)` (atomically inserts the
+    `patients` row and the first `dependent_guardians` link — no plain
+    client-side insert policy exists on `patients`, by original design, so
+    this is the only path) and `join_as_guardian(code)` (a second guardian
+    linking themselves via a **1-minute rotating code**, shown as both a QR
+    image — generated client-side via the `qrcode-generator` CDN library,
+    scanning itself is a future native-app feature, not built here — and
+    plain digits, same underlying `guardian_link_codes` table/expiry pattern
+    as the doctor live-code, just a separate table since the redemption
+    semantics differ). **A real, previously-undetected bug in
+    `redeem_access_code()` itself was found while building and testing this**
+    (not introduced by it): both functions' `returns table(patient_id uuid,
+    ...)` / `returns table(dependent_id uuid, ...)` declarations make that
+    column name an implicit PL/pgSQL variable throughout the function body,
+    and a bare (unqualified) `where patient_id = ...` / `where dependent_id =
+    ...` inside is genuinely ambiguous to Postgres between that variable and
+    the table column (error `42702`) — meaning **every past live-code
+    redemption that reached those lines would have failed**. Fixed by
+    qualifying with a table alias (`ac.patient_id`, `ag.patient_id`,
+    `glc.dependent_id`) rather than renaming the output columns, since the
+    client already destructures the RPC response by those names.
+  - **Removing a dependent is "same button, smarter behavior"** —
+    `remove_dependent(id)` normally just unlinks the calling guardian (the
+    profile and its whole history stay intact for any remaining guardian,
+    verified directly: unlinking one of two guardians leaves the dependent
+    fully visible and unchanged to the other); if they're the *last*
+    guardian, the same call cascades into a full, permanent delete
+    (`patients` row + everything FK'd to it), since nothing and no one could
+    ever reach an orphaned zero-guardian row again anyway. The confirm
+    button's label adapts ahead of time ("Hold to remove from your family" vs.
+    "Hold to permanently delete — you're the only guardian") based on a fresh
+    guardian count fetched when the detail modal opens, not a static label.
+  - **App side**: a "Viewing: X ▾" dropdown in the patient topbar (only
+    rendered at all when `loadDependentsForGuardian(session.id)` returns
+    ≥1 row — a patient with no dependents sees zero visual change) re-points
+    the *entire* existing dashboard at a different `patients.id` by calling
+    `enterPatientDash(id)` again — every patient-context function
+    (`regenerateLiveCode`, the trust-grant list/add, profile/settings saves,
+    avatar upload, appointment booking, eye-entry add) now reads a module-level
+    `activePatientId` instead of hardcoding `session.id`, set at the top of
+    `enterPatientDash()`. `session.id` itself is untouched by any of this — it
+    always stays the real signed-in identity. A dependent has no email, so
+    Account settings hides the email field entirely when viewing one
+    (`isDependent` on the mapped patient row), and the save handler has its
+    own belt-and-suspenders guard skipping `auth.updateUser()` in that case —
+    defense in depth against ever changing the *guardian's own* login email
+    while looking at a dependent's settings page. A shared
+    `#family-context-banner` element (outside any one `.view`, toggled by
+    `showView()` itself) shows a small "Viewing X's record" pill on patient
+    sub-pages (not the main dashboard, where the switcher already says so) so
+    it's never ambiguous whose record is on screen. "Manage family"
+    (guardian list, generate/redeem a link code, remove) follows the same
+    "list → Manage → nested detail modal" pattern doctor clinics already use,
+    and its "Remove" button reuses the existing `makeHoldButton()`
+    press-and-hold pattern.
 
 ## Known limitations (the honest list)
 
@@ -822,6 +915,17 @@ and "Auth." What's still not built, matching the doc's own scope and deferred li
    auto-grants access, no doctor review step by deliberate scope choice. A real
    pending/confirm flow and appointment cancellation are the natural follow-ups if a
    pilot doctor asks for review-before-booking.
+9. **RESOLVED — family member (dependent) profiles.** A patient can add and fully
+   manage a profile for a child or an adult who won't run their own account (see
+   "Family member (dependent) profiles" above). Deferred, deliberately separate work:
+   an adult *converting* an existing independent account over to guardian-managed
+   (real weight — a one-way "take over someone's login access" action, not designed
+   yet), and lightweight adult-to-adult sharing between two still-capable accounts
+   (would extend `access_grants` with a new `granted_via`, closer to doctor trust
+   than to guardianship).
+10. **QR *scanning*** for the family guardian-link code — generation is built (see
+    above), scanning is intentionally left for a future native mobile app, where a
+    camera-permission flow makes more sense than in a web app.
 
 ## Design system (for consistency if extending the UI)
 

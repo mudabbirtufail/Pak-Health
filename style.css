@@ -685,3 +685,15 @@
   }
   .record-row-title{ font-family:'Spectral', serif; font-weight:600; font-size:1.12rem; color: var(--ink); }
   .record-row-sub{ font-size:0.66rem; color: var(--muted); margin-top:2px; }
+
+  /* ---------- Family (dependent profiles) ---------- */
+  /* Fixed rather than living inside any one .view, since it needs to show up on
+     every patient sub-page regardless of that page's own topbar — see showView()
+     in app.js for when this actually gets shown/hidden. */
+  #family-context-banner{
+    position:fixed; top:11px; right:11px; z-index:40;
+    background: var(--teal-wash); color: var(--teal-dark); font-size:0.62rem; font-weight:600;
+    padding:5px 10px; border-radius:999px; box-shadow: var(--shadow);
+  }
+  #family-context-banner-name{ font-weight:700; }
+  #pat-family-detail-qr img{ display:block; }

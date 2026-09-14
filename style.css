@@ -44,7 +44,7 @@
   .wordmark svg{ flex-shrink:0; }
   .topbar-right{ display:flex; align-items:center; gap:11px; }
   .role-chip{
-    font-size:0.58rem; text-transform:uppercase; letter-spacing:0.08em;
+    font-size:0.58rem; text-transform:uppercase; letter-spacing:0.08em; white-space:nowrap;
     color: var(--muted); border:1px solid var(--line); border-radius:999px; padding:3px 8px;
   }
   .link-btn{
@@ -687,13 +687,24 @@
   .record-row-sub{ font-size:0.66rem; color: var(--muted); margin-top:2px; }
 
   /* ---------- Family (dependent profiles) ---------- */
-  /* Fixed rather than living inside any one .view, since it needs to show up on
-     every patient sub-page regardless of that page's own topbar — see showView()
-     in app.js for when this actually gets shown/hidden. */
-  #family-context-banner{
-    position:fixed; top:11px; right:11px; z-index:40;
-    background: var(--teal-wash); color: var(--teal-dark); font-size:0.62rem; font-weight:600;
-    padding:5px 10px; border-radius:999px; box-shadow: var(--shadow);
+  /* Lives once in the DOM (outside every .view) and gets physically moved into
+     whichever patient page's own .topbar-right is current — see
+     placeFamilyIndicator() in app.js. Sized up noticeably from the base
+     .role-chip (which the doctor-side "Doctor account" chip still uses
+     unscaled) since this is the one thing telling a patient whose record
+     they're looking at on every page, not just the dashboard — it needs to
+     read at a glance, not be squinted at. */
+  #pat-family-indicator{ display:flex; align-items:center; }
+  #pat-family-indicator .role-chip{
+    font-size:0.85rem; padding:7px 16px; letter-spacing:0.04em;
   }
-  #family-context-banner-name{ font-weight:700; }
+  #pat-family-indicator .dropdown-menu button{ font-size:0.8rem; padding:11px 16px; }
+  /* The topbar itself never wraps to a second row (.topbar-right has no
+     flex-wrap), so on a narrow phone width the wordmark + this bigger chip +
+     Account + Sign out can get tight — scale the chip back down a bit rather
+     than let it crowd or clip its neighbors; still plainly bigger than the
+     0.58rem base .role-chip everywhere above this breakpoint. */
+  @media (max-width: 480px){
+    #pat-family-indicator .role-chip{ font-size:0.68rem; padding:5px 11px; }
+  }
   #pat-family-detail-qr img{ display:block; }

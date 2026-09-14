@@ -11,15 +11,27 @@
      "Manage family" in CLAUDE.md. Pinned version, dependency-free, defines a
      single global `qrcode()` factory. -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<link rel="stylesheet" href="style.css?v=30">
+<link rel="stylesheet" href="style.css?v=32">
 </head>
 <body>
 
-<!-- Shown/hidden by showView() itself — not inside any one .view — whenever a
-     patient sub-page is entered while viewing a family member's profile rather
-     than the signed-in account's own, so it's never ambiguous whose record is
-     on screen. See "family-context-banner" handling in showView(). -->
-<div class="hidden" id="family-context-banner">Viewing <span id="family-context-banner-name">—</span>'s record</div>
+<!-- Lives outside any one .view, not inside the patient dashboard's own topbar,
+     since it needs to show up on every patient page, not just the dashboard —
+     showView() moves this single element into whichever view's .topbar-right
+     is currently active (see placeFamilyIndicator() in app.js) rather than
+     duplicating it into every patient sub-page's markup. Whichever of the two
+     children is relevant stays toggled by renderFamilySwitcher() exactly as
+     before; this wrapper only changed where the pair physically lives. -->
+<div class="topbar-family-indicator hidden" id="pat-family-indicator">
+  <span class="role-chip" id="pat-role-chip">Individual account</span>
+  <div class="dropdown-wrap hidden" id="pat-family-switcher-wrap">
+    <button class="role-chip dropdown-trigger" id="pat-family-switcher-trigger" type="button" aria-haspopup="true" aria-expanded="false">
+      <span id="pat-family-switcher-label">Viewing: —</span>
+      <svg width="8" height="5" viewBox="0 0 10 6"><path d="M1,1 L5,5 L9,1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="dropdown-menu hidden" id="pat-family-switcher-menu"></div>
+  </div>
+</div>
 
 <!-- ============ LANDING ============ -->
 <div id="view-landing" class="view">
@@ -201,17 +213,6 @@
   <header class="topbar">
     <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
     <div class="topbar-right">
-      <span class="role-chip">Individual account</span>
-      <!-- Only unhidden when the signed-in patient actually has >=1 dependent
-           linked (see renderFamilySwitcher() in app.js) — a patient with no
-           family members sees no visual change here at all. -->
-      <div class="dropdown-wrap hidden" id="pat-family-switcher-wrap">
-        <button class="btn btn-secondary btn-sm dropdown-trigger" id="pat-family-switcher-trigger" type="button" aria-haspopup="true" aria-expanded="false">
-          <span id="pat-family-switcher-label">Viewing: —</span>
-          <svg width="8" height="5" viewBox="0 0 10 6"><path d="M1,1 L5,5 L9,1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <div class="dropdown-menu hidden" id="pat-family-switcher-menu"></div>
-      </div>
       <div class="dropdown-wrap" id="pat-account-dropdown-wrap">
         <button class="btn btn-secondary btn-sm dropdown-trigger" id="pat-account-dropdown-trigger" type="button" aria-haspopup="true" aria-expanded="false">
           Account
@@ -1221,6 +1222,6 @@
   </main>
 </div>
 
-<script src="app.js?v=47"></script>
+<script src="app.js?v=50"></script>
 </body>
 </html>

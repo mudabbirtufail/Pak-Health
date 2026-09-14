@@ -54,11 +54,9 @@
     // back/forward) re-pulls this doctor's appointments so a patient's new booking
     // shows up without needing a full reload — see refreshDoctorAppointments().
     if (id === 'view-doctor-dash') refreshDoctorAppointments();
-    // The family-context banner ("Viewing X's record") only makes sense on a
-    // patient *sub*-page — the main dashboard already says who's active via the
-    // family switcher itself, no need to say it twice.
-    if (id !== 'view-patient-dash' && PATIENT_ONLY_VIEWS.indexOf(id) !== -1) updateFamilyContextBanner();
-    else $('family-context-banner').classList.add('hidden');
+    // Keep the "Individual account"/"Viewing: X" indicator on screen across
+    // every patient page, not just the dashboard — see placeFamilyIndicator().
+    if (session && session.type === 'patient' && PATIENT_ONLY_VIEWS.indexOf(id) !== -1) placeFamilyIndicator(id);
     if (suppressHistoryPush) return;
     if (!history.state){
       history.replaceState({ view: id }, '', '#' + id);
@@ -614,6 +612,17 @@
     }
     activePatientId = id;
     var authUser = await getAuthUser();
+    // getAuthUser() can transiently come back null (seen in testing after a 403
+    // from Supabase's auth endpoint under rapid repeated calls) — one retry covers
+    // that without ever leaving authUser.email/email_confirmed_at reads below to
+    // throw and strand the dashboard mid-switch on the previous profile.
+    if (!authUser){
+      authUser = await getAuthUser();
+    }
+    if (!authUser){
+      console.warn('enterPatientDash: getAuthUser() returned null twice, proceeding without it');
+      authUser = { email: null, email_confirmed_at: null };
+    }
     // A dependent has no login/email of their own — only attach the real signed-in
     // email when we're actually looking at that same account's own row, so Account
     // settings never shows (or, worse, lets someone edit-and-save) the guardian's
@@ -819,8 +828,12 @@
     var wrap = $('pat-family-switcher-wrap');
     if (!dependents.length){
       wrap.classList.add('hidden');
+      $('pat-role-chip').classList.remove('hidden');
       return;
     }
+    // Takes over the role-chip's own spot rather than sitting next to it —
+    // "Viewing: X" already implies "individual account", no need to say both.
+    $('pat-role-chip').classList.add('hidden');
     wrap.classList.remove('hidden');
     // currentPatientData already holds the guardian's own name if that's what's
     // active right now — only worth a fresh fetch when a dependent is active.
@@ -846,14 +859,18 @@
       });
     });
   }
-  function updateFamilyContextBanner(){
-    var isFamily = session.type === 'patient' && activePatientId && session.id && activePatientId !== session.id;
-    if (isFamily && currentPatientData){
-      $('family-context-banner-name').textContent = currentPatientData.name || 'this profile';
-      $('family-context-banner').classList.remove('hidden');
-    } else {
-      $('family-context-banner').classList.add('hidden');
-    }
+  // #pat-family-indicator lives once in the DOM, outside every .view — this
+  // physically moves it into whichever patient view is now on screen (as the
+  // first item in that view's .topbar-right, ahead of the back link/Account
+  // dropdown) so it reads on every patient page, not just the dashboard. A
+  // no-op if it's already there. Called from showView() below.
+  function placeFamilyIndicator(viewId){
+    var indicator = $('pat-family-indicator');
+    var right = $(viewId) && $(viewId).querySelector('.topbar-right');
+    if (!right) return;
+    indicator.classList.remove('hidden');
+    if (right.firstChild === indicator) return;
+    right.insertBefore(indicator, right.firstChild);
   }
 
   // ---- "Manage family" (top-level: list + add + join-by-code) ----

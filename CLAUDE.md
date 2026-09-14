@@ -770,7 +770,14 @@ verified, which would defeat the point of having the tag at all.
     guardian count fetched when the detail modal opens, not a static label.
   - **App side**: a "Viewing: X ▾" dropdown in the patient topbar (only
     rendered at all when `loadDependentsForGuardian(session.id)` returns
-    ≥1 row — a patient with no dependents sees zero visual change) re-points
+    ≥1 row — a patient with no dependents sees zero visual change). It takes
+    over the `.role-chip` "Individual account" pill's own spot rather than
+    sitting next to it as a separate button-styled element — same `role-chip`
+    class (so it's visually identical: the small uppercase muted pill, not a
+    `.btn`), toggled with it 1:1 in `renderFamilySwitcher()`
+    (`#pat-role-chip`/`#pat-family-switcher-wrap` never both visible at once).
+    Reasoning: "Viewing: X" already implies "individual account," so showing
+    both would be redundant, not additive. Selecting a name re-points
     the *entire* existing dashboard at a different `patients.id` by calling
     `enterPatientDash(id)` again — every patient-context function
     (`regenerateLiveCode`, the trust-grant list/add, profile/settings saves,
@@ -791,6 +798,46 @@ verified, which would defeat the point of having the tag at all.
     "list → Manage → nested detail modal" pattern doctor clinics already use,
     and its "Remove" button reuses the existing `makeHoldButton()`
     press-and-hold pattern.
+  - **The "Individual account"/"Viewing: X" indicator now lives on every
+    patient page, not just the dashboard, and reads noticeably bigger.**
+    `#pat-family-indicator` (the `#pat-role-chip`/`#pat-family-switcher-wrap`
+    pair, now wrapped together under that one id) moved out of the
+    dashboard's own topbar markup into a single top-level element sitting
+    outside every `.view` — `showView()` calls the new
+    `placeFamilyIndicator(viewId)`, which physically re-parents that one
+    element into whichever patient page's `.topbar-right` is now current (as
+    its first child, ahead of the back link/Account dropdown), rather than
+    duplicating the dropdown's markup (and its unique ids) into all eight
+    patient sub-pages. It starts `hidden` in the HTML so it doesn't flash
+    unstyled at the very top of `<body>` before the first `showView()` call
+    un-hides it. Sized up via `#pat-family-indicator .role-chip` (a
+    descendant selector, so the doctor-side "Doctor account" chip — a
+    separate, plain `.role-chip` span elsewhere in the DOM — stays at its
+    original small size) — 0.85rem/7px 16px versus the base 0.58rem/3px 8px,
+    scaled back down slightly under 480px so it doesn't crowd the wordmark/
+    Account/Sign out on a real phone. `.role-chip` also gained
+    `white-space:nowrap` (inherited by the switcher's label span), since the
+    bigger size otherwise wrapped "Viewing: Ayesha Khan" across two lines
+    inside the pill on a narrow width — a plain badge should never do that.
+    This replaced the separate `#family-context-banner` ("Viewing X's
+    record") that used to `position:fixed; top:11px; right:11px` on every
+    patient *sub*-page — a second, static indicator with the exact same
+    purpose, which visibly sat on top of that page's own "← Back to
+    dashboard" link at that fixed position. One always-current, interactive
+    indicator (still a real dropdown everywhere it now appears, not just a
+    label) replaced both the dashboard-only version and that overlapping
+    static one.
+  - **`enterPatientDash()` hardened against a transient `getAuthUser()` null**
+    (discovered while manually stress-testing the switcher: rapid guardian↔
+    dependent switching occasionally drew a 403 from Supabase's auth endpoint,
+    leaving `supabaseClient.auth.getUser()` resolve with no user and crashing
+    the switch — `authUser.email`/`authUser.email_confirmed_at` reads threw on
+    a null `authUser`, stranding the dashboard on the profile it was
+    switching *from*). Now retries `getAuthUser()` once, and if it's still
+    null falls back to a `{email:null, email_confirmed_at:null}` stand-in
+    (logged via `console.warn`) rather than throwing — the switch always
+    completes, worst case with the verify-banner/email fields simply blank
+    for that one render.
 
 ## Known limitations (the honest list)
 

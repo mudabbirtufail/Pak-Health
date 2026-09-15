@@ -37,6 +37,18 @@
 
   .hidden{ display:none !important; }
   .view{ min-height: 100%; display:flex; flex-direction:column; }
+  /* Every view (screen) transition fades the incoming view in rather than
+     the instant hide/show cut this used to be everywhere — see
+     fadeInView()/showView() in app.js, which toggles these two classes on
+     whichever view was just un-hidden. Both are no-ops outside the
+     no-preference branch below (same prefers-reduced-motion convention the
+     pulse-divider draw-in animation already uses), so nothing animates for
+     anyone who's asked for reduced motion — the view is simply already at
+     its resting opacity:1. */
+  @media (prefers-reduced-motion: no-preference){
+    .view.view-fade{ opacity:0; }
+    .view.view-fade-in{ opacity:1; transition: opacity 180ms ease; }
+  }
 
   /* ---------- Topbar ---------- */
   .topbar{

@@ -46,9 +46,33 @@
   // bounces to the landing page if the target needs a session that no longer exists
   // (e.g. back after signing out).
   var suppressHistoryPush = false;
+  // Fades the just-unhidden view in from opacity 0 rather than the instant
+  // hide/show cut every other view transition used to be. The "add .hidden
+  // to everything, un-hide the target" swap itself stays exactly as instant
+  // as before (so nothing that reads the DOM right after showView() returns
+  // sees a mid-transition state) — this only animates the target's opacity
+  // afterward. Both classes are no-ops (see .view-fade/.view-fade-in in
+  // style.css) unless the browser is under the no-preference branch of
+  // prefers-reduced-motion, same convention the pulse-divider draw-in
+  // animation already uses elsewhere in this file. Needs a forced reflow
+  // (void el.offsetWidth) between adding the opacity:0 starting class and
+  // the opacity:1 transitioning class, in its own animation frame — setting
+  // both in the same tick lets the browser coalesce them into one frame with
+  // nothing to transition from, so it'd just snap straight to visible.
+  function fadeInView(el){
+    el.classList.add('view-fade');
+    el.classList.remove('view-fade-in');
+    void el.offsetWidth;
+    requestAnimationFrame(function(){
+      el.classList.add('view-fade-in');
+      el.classList.remove('view-fade');
+    });
+  }
   function showView(id){
     document.querySelectorAll('.view').forEach(function(v){ v.classList.add('hidden'); });
-    $(id).classList.remove('hidden');
+    var targetView = $(id);
+    targetView.classList.remove('hidden');
+    fadeInView(targetView);
     window.scrollTo(0,0);
     // Landing back on the doctor dashboard (from a patient record, or via browser
     // back/forward) re-pulls this doctor's appointments so a patient's new booking

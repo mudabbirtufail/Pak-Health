@@ -225,7 +225,16 @@
   .tearoff .eyebrow{ margin-bottom:6px; }
   .tearoff .code{ font-family:'IBM Plex Mono', monospace; font-size:1.6rem; letter-spacing:0.06em; font-weight:600; color: var(--ink); }
   .tearoff .code-actions{ margin-top:11px; display:flex; gap:8px; justify-content:center; }
-  .copy-note{ font-size:0.62rem; color: var(--teal-dark); margin-top:6px; height:13px; }
+  /* No reserved height/margin any more (was a fixed 13px + 6px slot, kept
+     permanently even empty, so nothing shifts when this text appears) — that
+     reserved space was most of the visible gap between the patient/doctor
+     health card and the text right after it (.privacy-note on the patient
+     side). Collapsing to 0 when empty removes that gap; the rare moment this
+     does hold a message (an oversized-avatar error, "Copied") now nudges the
+     text below down slightly instead — an acceptable trade for not showing
+     a permanent empty gap on every single page view. */
+  .copy-note{ font-size:0.62rem; color: var(--teal-dark); }
+  .copy-note:not(:empty){ margin-top:6px; }
 
   /* ---------- Dashboard ---------- */
   .dash-main{ flex:1; padding: 26px; max-width:880px; margin:0 auto; width:100%; }
@@ -358,10 +367,10 @@
   .empty-state{ color: var(--muted); font-size:0.72rem; padding: 14px 0; }
   .not-found{ color: var(--red); font-size:0.72rem; padding: 8px 0; }
 
-  /* margin-top is small on purpose — it sits directly under .copy-note, which
-     already reserves its own height+margin as a fixed-size flash-message slot
-     (see .copy-note below); stacking a second full margin on top of that made
-     for a noticeably empty-looking gap before this text actually starts. */
+  /* margin-top stays small on purpose — .copy-note right above this (empty
+     most of the time, see its own rule) no longer reserves a permanent slot,
+     so this just needs its own small gap under the health card, not extra
+     room for a reserved-but-usually-empty element on top of that. */
   .privacy-note{
     font-size:0.64rem; color: var(--muted); background: var(--bg); border-radius:6px; padding:10px 11px; line-height:1.5; margin-top:4px;
   }
@@ -491,7 +500,7 @@
      wrapper, no white card box behind the teal one. This margin replaces the
      spacing .panel's own margin-bottom used to provide, scoped per-view since
      .health-card is a shared class with no wrapper of its own to hang it on. */
-  #view-patient-dash .health-card, #view-doctor-dash .health-card{ margin-bottom:16px; }
+  #view-patient-dash .health-card, #view-doctor-dash .health-card{ margin-bottom:8px; }
   .health-card{
     position:relative; overflow:hidden; border-radius:11px; padding:16px 18px 14px;
     background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%); color:#fff;
@@ -550,13 +559,21 @@
        480px was the original cutoff for this override; widened to 600px since
        real phones were still reporting a squeezed card at their actual logical
        widths — this stays well clear of the 860px point where the dashboard's
-       own layout (not just the card) already switches to single-column. */
-    .health-card{ aspect-ratio:auto; padding:14px 14px 13px; }
-    .avatar-btn-lg{ width:58px; height:58px; }
-    .avatar-btn-lg .avatar-fallback{ font-size:1.2rem; }
-    .health-card-body-centered{ gap:10px; }
-    .health-card-name{ font-size:0.84rem; }
-    .health-card-code{ font-size:0.92rem; }
+       own layout (not just the card) already switches to single-column.
+       Padding/avatar/fonts below were originally shrunk down from desktop's
+       sizing on top of the auto-height fix — real-phone feedback was that the
+       result still read as a thin, squeezed strip rather than a proper card,
+       so these were bumped back up (avatar/fonts closer to desktop size, more
+       padding all round, more breathing room above the code row) to actually
+       give the card some real height/presence on a phone instead of just
+       "not clipped." */
+    .health-card{ aspect-ratio:auto; padding:20px 18px 18px; }
+    .avatar-btn-lg{ width:66px; height:66px; }
+    .avatar-btn-lg .avatar-fallback{ font-size:1.35rem; }
+    .health-card-body-centered{ gap:13px; }
+    .health-card-name{ font-size:0.92rem; }
+    .health-card-code{ font-size:1rem; }
+    .health-card-code-row{ padding-top:18px; margin-top:2px; }
   }
 
   /* ---------- Clinic chips ---------- */

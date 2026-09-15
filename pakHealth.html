@@ -4,13 +4,36 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pak Health</title>
-<!-- Reuses the exact wordmark pulse-icon path (see .wordmark svg below) as an
-     inline SVG data URI rather than a separate image file, consistent with
-     this app staying single-file wherever that's still reasonable — no new
-     asset/HTTP request just for a tab icon. Stroke bumped to 3 (from the
-     wordmark's 2) since it renders much smaller here and needs to stay
-     legible at 16x16. -->
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2022%2022'%3E%3Cpath%20d='M1,11%20L6,11%20L8,4%20L11,18%20L13,11%20L21,11'%20fill='none'%20stroke='%23A22D3B'%20stroke-width='3'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E">
+<!-- A crescent (as on Pakistan's flag) cradling a heart in place of the
+     flag's star — a small nod to national identity plus this being a health
+     app, rather than the wordmark's own pulse-line icon. Inline SVG data URI
+     (no separate image file), same reasoning as before: this app stays
+     single-file wherever that's still reasonable, no new asset/HTTP request
+     just for a tab icon. The crescent is two full circles (each the standard
+     "two semicircle arcs" construction) in one path with fill-rule="evenodd"
+     — the overlap cancels out, leaving the crescent sliver — rather than a
+     single path built from two arcs sharing start/end points: that version
+     needed the sweep-flags picked just right for the two circles' relative
+     position/radii, got it wrong on a first attempt (produced a blob, not a
+     crescent) when thinning the sliver, and evenodd's overlap-cancels-out
+     behavior is correct for any circle/radius combination without needing
+     sweep-flag math at all. **The inner (cutout) circle must stay fully
+     contained inside the outer one** — distance-between-centers + inner
+     radius ≤ outer radius — a first thinner attempt violated this (inner
+     circle poked outside the outer one on the far side), and the part
+     poking out became its own separate crescent-shaped sliver: two visible
+     crescents instead of one, not caught until it actually shipped. Centers
+     here sit exactly at that containment boundary (internally tangent),
+     which is also what gives the crescent's horn its clean point rather than
+     a blunt tip. The heart is deliberately drawn bold/chunky rather than
+     delicately curved, since a real favicon is a die-hard place for detail —
+     verified by literally rasterizing candidate paths (both the heart and,
+     across a couple of rounds, several crescent thicknesses) to a real
+     16x16 canvas, not just viewing the crisp vector; thinner than this
+     either broke up into a dotted ring at real favicon size or, per direct
+     feedback on an earlier too-thin attempt, just didn't read as a solid
+     crescent any more. -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20fill-rule='evenodd'%20d='M2,12%20A9,9%200%201,0%2020,12%20A9,9%200%201,0%202,12%20Z%20M5.41,10.59%20A7,7%200%201,0%2019.41,10.59%20A7,7%200%201,0%205.41,10.59%20Z'%20fill='%231F6F63'/%3E%3Cpath%20d='M19,8.3%20C18,7.3%2016.3,7.3%2015.3,8.3%20L15,8.6%20L14.7,8.3%20C13.7,7.3%2012,7.3%2011,8.3%20C10,9.3%2010,11%2011,12%20L15,16%20L19,12%20C20,11%2020,9.3%2019,8.3%20Z'%20fill='%23A22D3B'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -18,7 +41,7 @@
      "Manage family" in CLAUDE.md. Pinned version, dependency-free, defines a
      single global `qrcode()` factory. -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<link rel="stylesheet" href="style.css?v=36">
+<link rel="stylesheet" href="style.css?v=37">
 </head>
 <body>
 

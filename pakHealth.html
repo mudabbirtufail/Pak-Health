@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pak Health</title>
+<!-- Reuses the exact wordmark pulse-icon path (see .wordmark svg below) as an
+     inline SVG data URI rather than a separate image file, consistent with
+     this app staying single-file wherever that's still reasonable — no new
+     asset/HTTP request just for a tab icon. Stroke bumped to 3 (from the
+     wordmark's 2) since it renders much smaller here and needs to stay
+     legible at 16x16. -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2022%2022'%3E%3Cpath%20d='M1,11%20L6,11%20L8,4%20L11,18%20L13,11%20L21,11'%20fill='none'%20stroke='%23A22D3B'%20stroke-width='3'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>

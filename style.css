@@ -761,24 +761,45 @@
   .record-row-sub{ font-size:0.66rem; color: var(--muted); margin-top:2px; }
 
   /* ---------- Family (dependent profiles) ---------- */
-  /* Lives once in the DOM (outside every .view) and gets physically moved into
-     whichever patient page's own .topbar-right is current — see
-     placeFamilyIndicator() in app.js. Sized up noticeably from the base
-     .role-chip (which the doctor-side "Doctor account" chip still uses
-     unscaled) since this is the one thing telling a patient whose record
-     they're looking at on every page, not just the dashboard — it needs to
-     read at a glance, not be squinted at. */
+  /* #pat-family-indicator (topbar) lives once in the DOM (outside every
+     .view) and gets physically moved into whichever patient page's own
+     .topbar-right is current — see placeFamilyIndicator() in app.js. It's
+     plain text now (#pat-active-profile-name), not a dropdown — carries
+     .btn.btn-secondary.btn-sm (the exact classes #pat-account-dropdown-
+     trigger next to it uses) purely for shape/size consistency with the
+     Account button beside it on every page, not because it's interactive.
+     Sharing those classes means any future change to .btn/.btn-sm styling
+     keeps both in sync automatically instead of needing a parallel override
+     maintained here. It doesn't carry .role-chip (the small uppercase pill
+     the doctor-side "Doctor account" tag still uses), so it needs its own
+     white-space:nowrap — .btn has no opinion on wrapping, and a longer name
+     ("Ayesha Khan") wrapped across two lines inside the button without it. */
   #pat-family-indicator{ display:flex; align-items:center; }
-  #pat-family-indicator .role-chip{
-    font-size:0.85rem; padding:7px 16px; letter-spacing:0.04em;
+  #pat-family-indicator .btn{ white-space:nowrap; }
+  /* Actual switching lives on the health card instead of the topbar — a
+     "Change person" button pinned to the card's own top-right corner
+     (.health-card already has position:relative for the watermark SVG's
+     own absolute positioning), not woven into the name display itself —
+     an earlier version made the name+chevron together the trigger, and it
+     didn't read as a button at all sitting inline with plain text. */
+  .health-card-switch-wrap{ position:absolute; top:14px; right:16px; z-index:2; }
+  /* Solid white pill rather than .btn-secondary's usual translucent-white-
+     on-teal treatment (see "Reset" below, unaffected) — an id selector so
+     it wins over .btn-secondary's class rule regardless of source order. */
+  #pat-card-switcher-trigger{
+    background:#fff; color: var(--teal-dark); border-color:#fff; border-radius:999px;
   }
-  #pat-family-indicator .dropdown-menu button{ font-size:0.8rem; padding:11px 16px; }
-  /* The topbar itself never wraps to a second row (.topbar-right has no
-     flex-wrap), so on a narrow phone width the wordmark + this bigger chip +
-     Account + Sign out can get tight — scale the chip back down a bit rather
-     than let it crowd or clip its neighbors; still plainly bigger than the
-     0.58rem base .role-chip everywhere above this breakpoint. */
-  @media (max-width: 480px){
-    #pat-family-indicator .role-chip{ font-size:0.68rem; padding:5px 11px; }
-  }
+  #pat-card-switcher-trigger:hover{ background:#fff; border-color:#fff; opacity:0.9; }
+  /* position:fixed, not the ordinary .dropdown-menu position:absolute —
+     .health-card has overflow:hidden (load-bearing elsewhere: it's what
+     clips the corner watermark SVG to the card's own rounded corners), so
+     an absolutely-positioned menu would get clipped the instant it tried to
+     extend past the card's bottom edge. Fixed positioning escapes that
+     ancestor clip entirely; its top/right are set from the trigger's own
+     getBoundingClientRect() when it opens (see the click handler in
+     app.js) — right-aligned to the button's own right edge (not left-
+     aligned) since the button now sits at the card's right edge, and a
+     left-aligned menu would run off narrow viewports. "top:100%" only means
+     something in a normal positioning context, hence computing it by hand. */
+  #pat-card-switcher-menu{ position:fixed; }
   #pat-family-detail-qr img{ display:block; }

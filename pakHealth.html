@@ -6,10 +6,15 @@
 <title>Pak Health</title>
 <!-- A crescent (as on Pakistan's flag) cradling a heart in place of the
      flag's star — a small nod to national identity plus this being a health
-     app, rather than the wordmark's own pulse-line icon. Inline SVG data URI
-     (no separate image file), same reasoning as before: this app stays
-     single-file wherever that's still reasonable, no new asset/HTTP request
-     just for a tab icon. The crescent is two full circles (each the standard
+     app. This exact same path pair (see the wordmark <svg> just below, the
+     loading screen's, the landing footer's, and every other view's topbar)
+     is now the app's one icon everywhere — it replaced the old separate
+     pulse-line wordmark icon on every single one of those, not just here on
+     the tab favicon, so the tab icon and the in-page brand mark always match.
+     Inline SVG (data URI for the favicon link, plain inline <svg> everywhere
+     else) rather than a separate image file, same reasoning as before: this
+     app stays single-file wherever that's still reasonable, no new asset/
+     HTTP request just for an icon. The crescent is two full circles (each the standard
      "two semicircle arcs" construction) in one path with fill-rule="evenodd"
      — the overlap cancels out, leaving the crescent sliver — rather than a
      single path built from two arcs sharing start/end points: that version
@@ -41,7 +46,7 @@
      "Manage family" in CLAUDE.md. Pinned version, dependency-free, defines a
      single global `qrcode()` factory. -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<link rel="stylesheet" href="style.css?v=38">
+<link rel="stylesheet" href="style.css?v=43">
 </head>
 <body>
 
@@ -49,18 +54,14 @@
      since it needs to show up on every patient page, not just the dashboard —
      showView() moves this single element into whichever view's .topbar-right
      is currently active (see placeFamilyIndicator() in app.js) rather than
-     duplicating it into every patient sub-page's markup. Whichever of the two
-     children is relevant stays toggled by renderFamilySwitcher() exactly as
-     before; this wrapper only changed where the pair physically lives. -->
+     duplicating it into every patient sub-page's markup. Plain, non-clickable
+     text now — just the active profile's name, always, whether or not there
+     are other family profiles to switch to. Switching itself lives on the
+     health card instead (see #pat-card-switcher-wrap in the dashboard view
+     below) — this box only ever answers "whose record is this," it doesn't
+     also try to be the control that changes it. -->
 <div class="topbar-family-indicator hidden" id="pat-family-indicator">
-  <span class="role-chip" id="pat-role-chip">Individual account</span>
-  <div class="dropdown-wrap hidden" id="pat-family-switcher-wrap">
-    <button class="role-chip dropdown-trigger" id="pat-family-switcher-trigger" type="button" aria-haspopup="true" aria-expanded="false">
-      <span id="pat-family-switcher-label">Viewing: —</span>
-      <svg width="8" height="5" viewBox="0 0 10 6"><path d="M1,1 L5,5 L9,1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-    <div class="dropdown-menu hidden" id="pat-family-switcher-menu"></div>
-  </div>
+  <span class="btn btn-secondary btn-sm" id="pat-active-profile-name">—</span>
 </div>
 
 <!-- ============ INITIAL LOADING ============ -->
@@ -76,7 +77,7 @@
      and never gets a history entry. -->
 <div id="view-loading" class="view">
   <div class="loading-mark">
-    <svg width="34" height="34" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <svg width="34" height="34" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>
     <span>Pak Health</span>
   </div>
 </div>
@@ -85,7 +86,7 @@
 <div id="view-landing" class="view hidden">
   <header class="topbar">
     <div class="wordmark">
-      <svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>
       Pak Health
     </div>
   </header>
@@ -126,7 +127,7 @@
 
   <footer class="landing-footer">
     <div class="landing-footer-brand">
-      <svg width="14" height="14" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg width="14" height="14" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>
       Pak Health
     </div>
     <p>Prototype — records live in this app's shared storage, not a clinical system. Don't use it for real medical data.</p>
@@ -137,7 +138,7 @@
 <!-- ============ DOCTOR AUTH ============ -->
 <div id="view-doctor-auth" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
   </header>
   <div class="auth-wrap">
     <div class="auth-card">
@@ -201,7 +202,7 @@
 <!-- ============ PATIENT AUTH ============ -->
 <div id="view-patient-auth" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
   </header>
   <div class="auth-wrap">
     <div class="auth-card">
@@ -264,7 +265,7 @@
 <!-- ============ PATIENT DASHBOARD ============ -->
 <div id="view-patient-dash" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
     <div class="topbar-right">
       <div class="dropdown-wrap" id="pat-account-dropdown-wrap">
         <button class="btn btn-secondary btn-sm dropdown-trigger" id="pat-account-dropdown-trigger" type="button" aria-haspopup="true" aria-expanded="false">
@@ -293,6 +294,19 @@
        <div class="sticky-inner">
         <div class="health-card">
           <svg class="health-card-watermark" viewBox="0 0 220 60" preserveAspectRatio="none"><path d="M0,30 L50,30 L58,14 L66,46 L74,30 L120,30 L128,18 L136,30 L180,30 L188,12 L196,48 L204,30 L220,30" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <!-- Only unhidden when the signed-in patient actually has >=1
+               dependent (see renderFamilySwitcher() in app.js) — a patient
+               with no family members sees zero visual change on the card at
+               all, not a dead-looking button. The current person is left out
+               of the menu's own rows (there's no point offering "switch to
+               who you're already viewing") — see renderFamilySwitcher(). -->
+          <div class="dropdown-wrap health-card-switch-wrap hidden" id="pat-card-switcher-wrap">
+            <button class="btn btn-secondary btn-sm dropdown-trigger" id="pat-card-switcher-trigger" type="button" aria-haspopup="true" aria-expanded="false">
+              Change person
+              <svg width="8" height="5" viewBox="0 0 10 6"><path d="M1,1 L5,5 L9,1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="dropdown-menu hidden" id="pat-card-switcher-menu"></div>
+          </div>
           <div class="health-card-body health-card-body-centered">
             <button class="avatar-btn avatar-btn-lg" id="pat-avatar-btn" type="button" title="Add a profile picture">
               <img id="pat-avatar-img" class="avatar-img hidden" alt="">
@@ -413,7 +427,7 @@
 
   <div id="view-pat-book-appt" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -622,7 +636,7 @@
 
   <div id="view-record-visits" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -640,7 +654,7 @@
 
   <div id="view-record-tests" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -658,7 +672,7 @@
 
   <div id="view-record-prescriptions" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -686,7 +700,7 @@
 
   <div id="view-patient-eyes" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -795,7 +809,7 @@
 
   <div id="view-pat-profile" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -816,7 +830,7 @@
 
   <div id="view-pat-account-settings" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -838,7 +852,7 @@
 
   <div id="view-pat-stats" class="view hidden">
     <header class="topbar">
-      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+      <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
       <div class="topbar-right">
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
@@ -857,7 +871,7 @@
 <!-- ============ DOCTOR DASHBOARD ============ -->
 <div id="view-doctor-dash" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
     <div class="topbar-right">
       <span class="role-chip">Doctor account</span>
       <div class="dropdown-wrap" id="doc-account-dropdown-wrap">
@@ -1003,7 +1017,7 @@
 
 <div id="view-doctor-record" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
     <div class="topbar-right">
       <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
     </div>
@@ -1112,7 +1126,7 @@
 
 <div id="view-doc-profile" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
     <div class="topbar-right">
       <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
     </div>
@@ -1136,7 +1150,7 @@
 
 <div id="view-doc-account-settings" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
     <div class="topbar-right">
       <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
     </div>
@@ -1163,7 +1177,7 @@
 
 <div id="view-doc-clinics" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
     <div class="topbar-right">
       <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
     </div>
@@ -1255,7 +1269,7 @@
 
 <div id="view-doc-stats" class="view hidden">
   <header class="topbar">
-    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pak Health</div>
+    <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
     <div class="topbar-right">
       <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
     </div>
@@ -1275,6 +1289,6 @@
   </main>
 </div>
 
-<script src="app.js?v=51"></script>
+<script src="app.js?v=53"></script>
 </body>
 </html>

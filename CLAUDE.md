@@ -771,11 +771,11 @@ verified, which would defeat the point of having the tag at all.
   - **App side**: a "Viewing: X ▾" dropdown in the patient topbar (only
     rendered at all when `loadDependentsForGuardian(session.id)` returns
     ≥1 row — a patient with no dependents sees zero visual change). It takes
-    over the `.role-chip` "Individual account" pill's own spot rather than
-    sitting next to it as a separate button-styled element — same `role-chip`
-    class (so it's visually identical: the small uppercase muted pill, not a
-    `.btn`), toggled with it 1:1 in `renderFamilySwitcher()`
-    (`#pat-role-chip`/`#pat-family-switcher-wrap` never both visible at once).
+    over the "Individual account" chip's own spot rather than sitting next
+    to it as a separate element, toggled 1:1 with it in
+    `renderFamilySwitcher()` (`#pat-role-chip`/`#pat-family-switcher-wrap`
+    never both visible at once) — see further down for what the two of them
+    actually look like now (that changed twice after this was first built).
     Reasoning: "Viewing: X" already implies "individual account," so showing
     both would be redundant, not additive. Selecting a name re-points
     the *entire* existing dashboard at a different `patients.id` by calling
@@ -810,16 +810,15 @@ verified, which would defeat the point of having the tag at all.
     duplicating the dropdown's markup (and its unique ids) into all eight
     patient sub-pages. It starts `hidden` in the HTML so it doesn't flash
     unstyled at the very top of `<body>` before the first `showView()` call
-    un-hides it. Sized up via `#pat-family-indicator .role-chip` (a
-    descendant selector, so the doctor-side "Doctor account" chip — a
-    separate, plain `.role-chip` span elsewhere in the DOM — stays at its
-    original small size) — 0.85rem/7px 16px versus the base 0.58rem/3px 8px,
-    scaled back down slightly under 480px so it doesn't crowd the wordmark/
-    Account/Sign out on a real phone. `.role-chip` also gained
-    `white-space:nowrap` (inherited by the switcher's label span), since the
-    bigger size otherwise wrapped "Viewing: Ayesha Khan" across two lines
-    inside the pill on a narrow width — a plain badge should never do that.
-    This replaced the separate `#family-context-banner` ("Viewing X's
+    un-hides it. First sized up via a `#pat-family-indicator .role-chip`
+    descendant-selector override (0.85rem/7px 16px versus the base
+    0.58rem/3px 8px `.role-chip`, scaled back down slightly under 480px) —
+    since superseded, see the next bullet for the current styling.
+    `white-space:nowrap` on the shared `.role-chip` rule is a leftover from
+    that override worth keeping regardless: the bigger size wrapped "Viewing:
+    Ayesha Khan" across two lines inside the pill on a narrow width, and a
+    plain badge should never do that. This replaced the separate
+    `#family-context-banner` ("Viewing X's
     record") that used to `position:fixed; top:11px; right:11px` on every
     patient *sub*-page — a second, static indicator with the exact same
     purpose, which visibly sat on top of that page's own "← Back to
@@ -827,6 +826,63 @@ verified, which would defeat the point of having the tag at all.
     indicator (still a real dropdown everywhere it now appears, not just a
     label) replaced both the dashboard-only version and that overlapping
     static one.
+  - **`#pat-role-chip`/`#pat-family-switcher-trigger` now carry
+    `.btn.btn-secondary.btn-sm` — the exact same classes as
+    `#pat-account-dropdown-trigger` right next to them — instead of the
+    small uppercase `.role-chip` pill the previous two bullets describe.**
+    Direct feedback once the bigger sizing above actually shipped: it now
+    sat right beside the Account button on every page, and a muted-gray
+    uppercase pill next to a bold bordered rectangle read as two different
+    UI languages in the same topbar row, not a matched pair — worse than
+    the plain `.role-chip` had looked back when nothing bigger sat next to
+    it for comparison. Sharing Account's own classes (rather than a
+    parallel `#pat-family-indicator .role-chip` override matching its
+    numbers by hand) fixes size, shape, and text case/weight/color in one
+    move, and keeps the two in sync automatically if `.btn`/`.btn-sm` ever
+    change. The doctor-side "Doctor account" tag is unaffected — it's a
+    separate, plain `.role-chip` span elsewhere in the DOM, never inside
+    `#pat-family-indicator`.
+  - **The switcher itself moved off the topbar entirely, onto the health
+    card as its own "Change person" button — the previous several bullets
+    describe two designs this superseded.** First move (topbar → card):
+    direct feedback once the shape-matched topbar version shipped — a
+    patient with no dependents saw a bare "Individual account" label and
+    reasonably read that as "nothing to switch," and separately, a control
+    that lives in the topbar but changes what the *health card* displays
+    was one more indirection than just making the switch control part of
+    the card. Second move (name+chevron → a dedicated button): the first
+    on-card attempt made `#card-name` itself the dropdown trigger (name +
+    chevron inline) — direct feedback again, it "still didn't look good,"
+    a name that's sometimes secretly a button reads worse than a plain name
+    next to an actual, obviously-a-button control. `#pat-family-indicator`/
+    `#pat-active-profile-name` (topbar, unchanged location — still moved
+    into whichever page's `.topbar-right` is current, still
+    `.btn.btn-secondary.btn-sm`-styled) is plain, non-interactive text —
+    "Viewing: X", always, patient or dependent, no dropdown of its own.
+    `#card-name` is back to being just a name with no wrapper at all.
+    Switching lives in `#pat-card-switcher-wrap`, a `position:absolute`
+    "Change person ▾" button pinned to the card's own top-right corner
+    (`.health-card` already has `position:relative` for the watermark
+    SVG's own absolute positioning) + `#pat-card-switcher-menu` — same rows,
+    same `enterPatientDash(id)` on selection, **minus the person currently
+    being viewed**, filtered out of the menu's own rows (no point offering
+    "switch to who you're already viewing"). The whole wrap stays `hidden`
+    for a patient with zero dependents, exactly like the original topbar
+    version did — not a `disabled` button (that was the previous attempt;
+    dropped once the button moved out of the name and needed to actually
+    not exist for a solo patient, not just look inert). `#pat-card-switcher-
+    menu` is `position:fixed`, not the ordinary `.dropdown-menu`
+    `position:absolute` — `.health-card` has `overflow:hidden` (load-
+    bearing: it's what clips the corner watermark SVG to the card's rounded
+    corners), so an absolutely-positioned menu would get clipped extending
+    past the card's own bottom edge. Fixed positioning escapes that
+    ancestor clip; its `top`/`right` are computed from the trigger's own
+    `getBoundingClientRect()` in the click handler each time it opens —
+    **right-aligned to the button's own right edge**, not left-aligned,
+    since the button now sits at the card's right edge and a left-aligned
+    menu would run off narrow viewports; a fixed-position element's
+    placement isn't relative to its DOM parent the way absolute
+    positioning's `top:100%` is, hence computing it by hand either way.
   - **`enterPatientDash()` hardened against a transient `getAuthUser()` null**
     (discovered while manually stress-testing the switcher: rapid guardian↔
     dependent switching occasionally drew a 403 from Supabase's auth endpoint,

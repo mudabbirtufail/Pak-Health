@@ -826,39 +826,48 @@
   });
 
   // ---- Family (dependent profiles) ----
-  // "Viewing: X" switcher (topbar) — only unhidden when the signed-in patient
-  // actually has >=1 dependent. Selecting a name re-runs enterPatientDash()
-  // against that patients.id; every patient-context function already reads
-  // activePatientId (set at the top of enterPatientDash), so the rest of the
-  // dashboard just follows along unmodified.
-  function closeFamilySwitcher(){
-    $('pat-family-switcher-menu').classList.add('hidden');
-    $('pat-family-switcher-trigger').setAttribute('aria-expanded', 'false');
+  // The switcher lives on the health card now — a "Change person" button
+  // pinned to the card's own top-right corner (#pat-card-switcher-wrap),
+  // not woven into the name display itself. The topbar's
+  // #pat-active-profile-name stays plain, non-interactive text (see the
+  // comment above its markup) — "Viewing: X" there, always, regardless of
+  // whether there's anyone else to switch to; only the card's button
+  // depends on dependents.length. #pat-card-switcher-menu is position:fixed
+  // (see style.css), not the ordinary .dropdown-menu position:absolute,
+  // since .health-card has overflow:hidden — an absolutely-positioned menu
+  // would get clipped the instant it tried to extend past the card's own
+  // bottom edge. Fixed positioning needs its coordinates set from the
+  // trigger's own getBoundingClientRect() on open (right-aligned to the
+  // button's own right edge, since the button sits at the card's right
+  // edge and a left-aligned menu would run off narrow viewports), since
+  // "top:100%" only means something relative to a normal positioning
+  // context. Selecting a name re-runs enterPatientDash() against that
+  // patients.id; every patient-context function already reads
+  // activePatientId (set at the top of enterPatientDash), so the rest of
+  // the dashboard just follows along unmodified.
+  function closeCardSwitcher(){
+    $('pat-card-switcher-menu').classList.add('hidden');
+    $('pat-card-switcher-trigger').setAttribute('aria-expanded', 'false');
   }
-  $('pat-family-switcher-trigger').addEventListener('click', function(e){
+  $('pat-card-switcher-trigger').addEventListener('click', function(e){
     e.stopPropagation();
-    var menu = $('pat-family-switcher-menu');
+    var menu = $('pat-card-switcher-menu');
     var opening = menu.classList.contains('hidden');
+    if (opening){
+      var r = this.getBoundingClientRect();
+      menu.style.top = (r.bottom + 6) + 'px';
+      menu.style.right = (window.innerWidth - r.right) + 'px';
+    }
     menu.classList.toggle('hidden', !opening);
     this.setAttribute('aria-expanded', String(opening));
   });
   document.addEventListener('click', function(e){
-    if (!$('pat-family-switcher-menu').classList.contains('hidden') && !e.target.closest('#pat-family-switcher-wrap')){
-      closeFamilySwitcher();
+    if (!$('pat-card-switcher-menu').classList.contains('hidden') && !e.target.closest('#pat-card-switcher-wrap')){
+      closeCardSwitcher();
     }
   });
   async function renderFamilySwitcher(){
     var dependents = await loadDependentsForGuardian(session.id);
-    var wrap = $('pat-family-switcher-wrap');
-    if (!dependents.length){
-      wrap.classList.add('hidden');
-      $('pat-role-chip').classList.remove('hidden');
-      return;
-    }
-    // Takes over the role-chip's own spot rather than sitting next to it —
-    // "Viewing: X" already implies "individual account", no need to say both.
-    $('pat-role-chip').classList.add('hidden');
-    wrap.classList.remove('hidden');
     // currentPatientData already holds the guardian's own name if that's what's
     // active right now — only worth a fresh fetch when a dependent is active.
     var ownName;
@@ -870,14 +879,24 @@
     }
     var activeDependent = dependents.find(function(d){ return d.id === activePatientId; });
     var activeName = (activePatientId === session.id) ? ownName : ((activeDependent && activeDependent.name) || '—');
-    $('pat-family-switcher-label').textContent = 'Viewing: ' + activeName;
-    var rows = [{ id: session.id, name: ownName }].concat(dependents);
-    $('pat-family-switcher-menu').innerHTML = rows.map(function(p){
+    $('pat-active-profile-name').textContent = 'Viewing: ' + activeName;
+    var wrap = $('pat-card-switcher-wrap');
+    if (!dependents.length){
+      wrap.classList.add('hidden');
+      closeCardSwitcher();
+      return;
+    }
+    wrap.classList.remove('hidden');
+    // The person you're already viewing has no business in a "switch to
+    // who?" list — only the others are worth offering.
+    var rows = [{ id: session.id, name: ownName }].concat(dependents)
+      .filter(function(p){ return p.id !== activePatientId; });
+    $('pat-card-switcher-menu').innerHTML = rows.map(function(p){
       return '<button type="button" class="family-switch-btn" data-id="' + p.id + '">' + escapeHtml(p.name || 'Unnamed') + '</button>';
     }).join('');
-    $('pat-family-switcher-menu').querySelectorAll('.family-switch-btn').forEach(function(btn){
+    $('pat-card-switcher-menu').querySelectorAll('.family-switch-btn').forEach(function(btn){
       btn.addEventListener('click', function(){
-        closeFamilySwitcher();
+        closeCardSwitcher();
         var id = btn.getAttribute('data-id');
         if (id !== activePatientId) enterPatientDash(id);
       });

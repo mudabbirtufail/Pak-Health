@@ -18,7 +18,7 @@
      "Manage family" in CLAUDE.md. Pinned version, dependency-free, defines a
      single global `qrcode()` factory. -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<link rel="stylesheet" href="style.css?v=32">
+<link rel="stylesheet" href="style.css?v=36">
 </head>
 <body>
 
@@ -40,8 +40,26 @@
   </div>
 </div>
 
+<!-- ============ INITIAL LOADING ============ -->
+<!-- The only .view with no "hidden" class in this raw HTML, so it's what
+     actually paints first — before bootstrap() (bottom of app.js) has even
+     had a chance to check whether there's a real Supabase session. Without
+     this, a signed-in patient reloading the page would briefly see the
+     landing page (the old default) flash before bootstrap() redirects them
+     to their dashboard. Every path through bootstrap() ends by calling
+     showView() for the real target, which hides this along with every other
+     .view exactly like any other transition — nothing else has to change.
+     Never itself a showView() target, so it's not reachable via back/forward
+     and never gets a history entry. -->
+<div id="view-loading" class="view">
+  <div class="loading-mark">
+    <svg width="34" height="34" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>Pak Health</span>
+  </div>
+</div>
+
 <!-- ============ LANDING ============ -->
-<div id="view-landing" class="view">
+<div id="view-landing" class="view hidden">
   <header class="topbar">
     <div class="wordmark">
       <svg width="18" height="18" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -83,9 +101,14 @@
     </div>
   </main>
 
-  <div class="landing-footer">
-    Prototype — records live in this app's shared storage, not a clinical system. Don't use it for real medical data.
-  </div>
+  <footer class="landing-footer">
+    <div class="landing-footer-brand">
+      <svg width="14" height="14" viewBox="0 0 22 22"><path d="M1,11 L6,11 L8,4 L11,18 L13,11 L21,11" fill="none" stroke="#A22D3B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Pak Health
+    </div>
+    <p>Prototype — records live in this app's shared storage, not a clinical system. Don't use it for real medical data.</p>
+    <p class="landing-footer-copy">&copy; 2026 Pak Health.</p>
+  </footer>
 </div>
 
 <!-- ============ DOCTOR AUTH ============ -->

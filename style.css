@@ -16,13 +16,17 @@
     --shadow: 0 1px 2px rgba(23,36,46,0.06), 0 6px 19px rgba(23,36,46,0.06);
   }
   *{ box-sizing: border-box; }
-  html,body{ margin:0; padding:0; }
+  /* height:100% (not 100vh) on the html/body chain, and min-height:100% (not
+     100vh) on .view below — 100vh has known cross-browser quirks under
+     page-zoom, and a percentage chain rooted at html sidesteps that while
+     still sizing to the full viewport. (This alone did not fix the
+     landing-page card-growth issue below — see #view-landing.) */
+  html,body{ margin:0; padding:0; height:100%; }
   body{
     background: var(--bg);
     color: var(--ink);
     font-family: 'IBM Plex Sans', sans-serif;
     -webkit-font-smoothing: antialiased;
-    min-height: 100vh;
   }
   h1,h2,h3{ font-family: 'Spectral', serif; margin: 0; color: var(--ink); }
   .mono{ font-family: 'IBM Plex Mono', monospace; }
@@ -32,7 +36,7 @@
   :focus-visible{ outline: 2px solid var(--teal); outline-offset: 2px; }
 
   .hidden{ display:none !important; }
-  .view{ min-height: 100vh; display:flex; flex-direction:column; }
+  .view{ min-height: 100%; display:flex; flex-direction:column; }
 
   /* ---------- Topbar ---------- */
   .topbar{
@@ -72,7 +76,42 @@
   }
   @keyframes draw{ to{ stroke-dashoffset: 0; } }
 
+  /* ---------- Initial loading splash ---------- */
+  /* #view-loading is the one .view visible by default in the raw HTML (see
+     the comment above its markup) — just a centered brand mark while
+     bootstrap() resolves the session, not an interactive screen, so no
+     topbar/content styling applies here. */
+  #view-loading{ align-items:center; justify-content:center; }
+  .loading-mark{
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+    font-family:'Spectral', serif; font-weight:600; font-size:1.1rem; color: var(--ink);
+  }
+  @media (prefers-reduced-motion: no-preference){
+    .loading-mark svg{ animation: loading-pulse 1.3s ease-in-out infinite; }
+  }
+  @keyframes loading-pulse{ 0%,100%{ opacity:1; } 50%{ opacity:0.35; } }
+
   /* ---------- Landing ---------- */
+  /* The actual cause of the reported "choice cards keep growing" bug: .view's
+     shared min-height:100% (needed so short pages like auth forms still
+     cover the screen) forces #view-landing to always be exactly the full
+     viewport height. The topbar/pulse/.hero above the cards are fixed-px
+     height regardless of viewport size, so .landing-main/.choices (flex:1)
+     absorb 100% of whatever's left over — and that leftover grows faster
+     than the viewport itself as the viewport gets taller (fixed overhead is
+     a shrinking share of a growing total), which is exactly what happens to
+     the CSS-pixel viewport size as you zoom out. Verified directly: at
+     innerHeight 700 a .choice card measured ~303px tall; at 1400 (2x) it
+     measured ~1003px (3.3x) while .hero stayed flat at ~201px both times.
+     Overriding back to min-height:auto here (more specific than .view's
+     rule) lets the landing page size to its own content instead — the cards
+     settle at their padding + the .choice min-height floor below, not "all
+     remaining viewport space," so nothing about their size is tied to
+     viewport height/zoom at all any more. On a tall screen this can leave
+     the page shorter than the viewport (page background shows below the
+     footer) — normal on most content-sized landing pages, and the tradeoff
+     for the cards no longer visibly growing with zoom. */
+  #view-landing{ min-height: auto; }
   .landing-main{ flex:1; display:flex; flex-direction:column; }
   .hero{ padding: 45px 26px 22px; max-width: 720px; }
   .eyebrow{
@@ -101,9 +140,15 @@
   .choice-icon{ position:absolute; top:32px; right:32px; opacity:0.9; }
 
   .landing-footer{
-    padding: 14px 26px; border-top:1px solid var(--line); background: var(--paper);
-    font-size:0.62rem; color: var(--muted); line-height:1.5;
+    padding: 22px 26px; border-top:1px solid var(--line); background: var(--paper);
+    display:flex; flex-direction:column; gap:9px;
   }
+  .landing-footer-brand{
+    display:flex; align-items:center; gap:6px;
+    font-family:'Spectral', serif; font-weight:600; font-size:0.78rem; color: var(--ink-soft);
+  }
+  .landing-footer p{ font-size:0.62rem; color: var(--muted); line-height:1.5; margin:0; max-width:520px; }
+  .landing-footer-copy{ font-family:'IBM Plex Mono', monospace; letter-spacing:0.02em; }
 
   /* ---------- Auth ---------- */
   .auth-wrap{ flex:1; display:flex; align-items:flex-start; justify-content:center; padding: 38px 16px; }

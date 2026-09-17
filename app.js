@@ -1118,6 +1118,9 @@
 
   function openPatProfilePage(){
     $('pat-name').value = (currentPatientData && currentPatientData.name) || '';
+    $('pat-emergency-contact').value = (currentPatientData && currentPatientData.emergencyContact) || '';
+    $('pat-allergies').value = (currentPatientData && currentPatientData.allergies) || '';
+    $('pat-conditions').value = (currentPatientData && currentPatientData.conditions) || '';
     closePatAcctDropdown();
     showView('view-pat-profile');
   }
@@ -1125,8 +1128,16 @@
 
   $('pat-profile-save-btn').addEventListener('click', async function(){
     var name = $('pat-name').value.trim();
-    await supabaseClient.from('patients').update({ name: name }).eq('id', activePatientId);
+    var emergencyContact = $('pat-emergency-contact').value.trim();
+    var allergies = $('pat-allergies').value.trim();
+    var conditions = $('pat-conditions').value.trim();
+    await supabaseClient.from('patients').update({
+      name: name, emergency_contact: emergencyContact, allergies: allergies, conditions: conditions
+    }).eq('id', activePatientId);
     currentPatientData.name = name;
+    currentPatientData.emergencyContact = emergencyContact;
+    currentPatientData.allergies = allergies;
+    currentPatientData.conditions = conditions;
     renderHealthCard(currentPatientData);
     var note = $('pat-profile-save-note');
     note.classList.add('show');
@@ -1341,17 +1352,28 @@
   }
   var chevronSvg = '<svg class="chevron" width="11" height="7" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
 
-  function renderVisitsList(visits){
+  function renderVisitsList(visits, opts){
+    opts = opts || {};
     var listEl = $('pat-visits-list');
     var emptyEl = $('pat-visits-empty');
+    var searchEmptyEl = $('pat-visits-search-empty');
+    if (!opts.isSearch) $('pat-visits-search').value = '';
+    var hasAnyVisits = !!(currentPatientData && currentPatientData.visits && currentPatientData.visits.length);
     if (!visits || !visits.length){
       listEl.innerHTML = '';
-      emptyEl.classList.remove('hidden');
+      if (opts.isSearch && hasAnyVisits){
+        emptyEl.classList.add('hidden');
+        searchEmptyEl.classList.remove('hidden');
+      } else {
+        searchEmptyEl.classList.add('hidden');
+        emptyEl.classList.remove('hidden');
+      }
       $('pat-visit-detail-empty').classList.remove('hidden');
       $('pat-visit-detail').classList.add('hidden');
       return;
     }
     emptyEl.classList.add('hidden');
+    searchEmptyEl.classList.add('hidden');
     listEl.innerHTML = visits.map(function(v, i){
       return '<div class="list-item" data-idx="'+i+'">'
         + '<div>'
@@ -1370,6 +1392,14 @@
     markActiveListItem(listEl, items[0]);
     renderVisitDetail(visits[parseInt(items[0].getAttribute('data-idx'), 10)]);
   }
+  $('pat-visits-search').addEventListener('input', function(){
+    var q = this.value.trim().toLowerCase();
+    var all = (currentPatientData && currentPatientData.visits) || [];
+    var filtered = q ? all.filter(function(v){
+      return (v.doctorName || '').toLowerCase().indexOf(q) !== -1;
+    }) : all;
+    renderVisitsList(filtered, { isSearch: true });
+  });
   function renderTestsList(tests){
     var listEl = $('pat-tests-list');
     var emptyEl = $('pat-tests-empty');
@@ -2977,6 +3007,10 @@
     currentLookupData = data;
     currentLookupGrant = grant || null;
     $('res-name').textContent = data.name || 'Unnamed patient';
+    $('doc-pt-allergy-banner').classList.toggle('hidden', !data.allergies);
+    $('doc-pt-allergy-text').textContent = data.allergies || '';
+    $('doc-pt-emergency-contact-text').textContent = data.emergencyContact || 'Not recorded';
+    $('doc-pt-conditions-text').textContent = data.conditions || 'Not recorded';
     collapseAddVisitFields();
     collapseAddTestFields();
     renderDoctorVisitsList(data.visits || []);

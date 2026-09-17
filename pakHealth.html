@@ -46,7 +46,7 @@
      "Manage family" in CLAUDE.md. Pinned version, dependency-free, defines a
      single global `qrcode()` factory. -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<link rel="stylesheet" href="style.css?v=44">
+<link rel="stylesheet" href="style.css?v=47">
 </head>
 <body>
 
@@ -274,10 +274,13 @@
         </button>
         <div class="dropdown-menu hidden" id="pat-account-dropdown-menu">
           <button type="button" id="pat-howitworks-btn">How it works</button>
+          <div class="dropdown-divider"></div>
           <button type="button" id="pat-myprofile-btn">My profile</button>
           <button type="button" id="pat-account-settings-btn">Account settings</button>
+          <div class="dropdown-divider"></div>
           <button type="button" id="pat-access-manage-btn">Manage access</button>
           <button type="button" id="pat-family-manage-btn">Manage family</button>
+          <div class="dropdown-divider"></div>
           <button type="button" id="pat-stats-btn">My statistics</button>
         </div>
       </div>
@@ -641,13 +644,17 @@
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
     </header>
-    <main class="dash-main">
+    <main class="dash-main dash-main-wide">
       <div class="record-split">
         <div class="panel">
           <span class="eyebrow">Records</span>
           <h3 style="margin-top:5px;">Visits</h3>
           <p class="panel-sub" style="margin-top:6px;">Every visit a doctor has logged for you.</p>
+          <div class="lookup-row" style="margin-top:11px; margin-bottom:11px;">
+            <input type="text" id="pat-visits-search" placeholder="Search by doctor name...">
+          </div>
           <div id="pat-visits-list"></div>
+          <div class="empty-state hidden" id="pat-visits-search-empty">No visits match that doctor name.</div>
           <div class="empty-state" id="pat-visits-empty">No visits recorded yet. Your visit history will appear here after a doctor sees you.</div>
         </div>
         <div class="sticky-inner">
@@ -677,7 +684,7 @@
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
     </header>
-    <main class="dash-main">
+    <main class="dash-main dash-main-wide">
       <div class="record-split">
         <div class="panel">
           <span class="eyebrow">Records</span>
@@ -710,7 +717,7 @@
         <button class="link-btn" data-goto="view-patient-dash">← Back to dashboard</button>
       </div>
     </header>
-    <main class="dash-main">
+    <main class="dash-main dash-main-wide">
       <div class="record-split">
         <div class="panel">
           <span class="eyebrow">Records</span>
@@ -830,6 +837,13 @@
         <h3 style="margin-top:5px;">My profile</h3>
         <p class="panel-sub" style="margin-top:6px;">Your name, as doctors will see it on your visits.</p>
         <div class="field"><label for="pat-name">Full name</label><input type="text" id="pat-name" placeholder="Ayesha Khan"></div>
+
+        <h4 class="subhead">Medical info</h4>
+        <p class="panel-sub" style="margin-bottom:10px;">Worth having on hand in an emergency, or for a doctor mid-visit.</p>
+        <div class="field"><label for="pat-emergency-contact">Emergency contact</label><input type="text" id="pat-emergency-contact" placeholder="Name and phone number"></div>
+        <div class="field"><label for="pat-allergies">Allergies</label><textarea id="pat-allergies" placeholder="e.g. Penicillin, peanuts"></textarea></div>
+        <div class="field"><label for="pat-conditions">Existing conditions</label><textarea id="pat-conditions" placeholder="e.g. Diabetes, hypertension"></textarea></div>
+
         <div class="save-row">
           <button class="btn btn-primary btn-block" id="pat-profile-save-btn">Save changes</button>
         </div>
@@ -891,9 +905,12 @@
         </button>
         <div class="dropdown-menu hidden" id="doc-account-dropdown-menu">
           <button type="button" id="doc-howitworks-btn">How it works</button>
+          <div class="dropdown-divider"></div>
           <button type="button" id="doc-myprofile-btn">My profile</button>
           <button type="button" id="doc-account-settings-btn">Account settings</button>
+          <div class="dropdown-divider"></div>
           <button type="button" id="doc-clinics-btn">Manage clinics</button>
+          <div class="dropdown-divider"></div>
           <button type="button" id="doc-stats-btn">My statistics</button>
         </div>
       </div>
@@ -1032,12 +1049,22 @@
       <button class="link-btn" data-goto="view-doctor-dash">← Back to dashboard</button>
     </div>
   </header>
-  <main class="dash-main">
+  <main class="dash-main dash-main-wide">
     <div class="record-split">
       <div class="panel">
         <div class="name-row">
           <h3 id="res-name">—</h3>
         </div>
+
+        <div class="allergy-banner hidden" id="doc-pt-allergy-banner">
+          <span><strong>Allergies:</strong> <span id="doc-pt-allergy-text"></span></span>
+        </div>
+
+        <dl class="kv" id="doc-pt-medical-info" style="margin-bottom:13px;">
+          <dt>Emergency contact</dt><dd id="doc-pt-emergency-contact-text">Not recorded</dd>
+          <dt>Existing conditions</dt><dd class="block" id="doc-pt-conditions-text">Not recorded</dd>
+        </dl>
+
         <button class="link-btn" id="lookup-change-btn" style="margin-bottom:13px;">Search a different patient</button>
 
         <div id="doc-pt-add-visit-section">
@@ -1301,6 +1328,6 @@
   </main>
 </div>
 
-<script src="app.js?v=54"></script>
+<script src="app.js?v=57"></script>
 </body>
 </html>

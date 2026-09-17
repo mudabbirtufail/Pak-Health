@@ -337,6 +337,17 @@
     display:grid; grid-template-columns: 336px minmax(0, 1fr); gap:19px; align-items:start;
   }
   @media (max-width: 760px){ .record-split{ grid-template-columns: 1fr; } }
+  /* These four pages use dash-main-wide (the same 1440px-cap class the main
+     dashboard's 3-column grid already uses, rather than a new arbitrary
+     number) so the 336px list column sits flush against the page's left
+     edge and the detail column expands into the freed-up width on the
+     right, instead of the whole two-column layout centering in dash-main's
+     normal 880px strip — same left-align override .dash-main-wide already
+     gets on the patient dashboard itself, just scoped to these views too. */
+  #view-record-visits .dash-main-wide,
+  #view-record-tests .dash-main-wide,
+  #view-record-prescriptions .dash-main-wide,
+  #view-doctor-record .dash-main-wide{ margin-left: 0; margin-right: auto; }
   /* Shown only while the active list is genuinely empty — once there's at
      least one row, the first one auto-selects, so in practice this is rare
      (an empty Visits/Lab/Prescriptions list), not a normal first-load state. */
@@ -416,6 +427,15 @@
   .verify-banner span{ line-height:1.4; }
   .verify-banner .btn{ flex-shrink:0; }
 
+  /* Only shown when a looked-up patient actually has an allergy on file —
+     deliberately louder than the plain .kv rows below it (red, not the
+     .verify-banner's amber) since a missed drug allergy is the one piece of
+     "medical info" worth a doctor never having to go looking for. */
+  .allergy-banner{
+    background: var(--red-wash); color: var(--red); border:1px solid var(--red);
+    border-radius: var(--radius); padding:10px 14px; margin-bottom:13px; font-size:0.7rem; line-height:1.4;
+  }
+
   /* ---------- Account dropdown ---------- */
   .dropdown-wrap{ position:relative; }
   .dropdown-trigger{
@@ -435,6 +455,12 @@
   .dropdown-menu button:hover{ background: var(--bg); }
   .dropdown-menu button.danger:hover{ color: var(--red); }
   .dropdown-menu button + button{ border-top:1px solid var(--line); }
+  /* A stronger break than the plain hairline between every button above —
+     groups related items (e.g. My profile + Account settings) so the menu
+     reads as a few clusters instead of one undifferentiated stack of six-odd
+     rows. Not a <button>, so the adjacent-sibling hairline rule above simply
+     doesn't match on either side of it. */
+  .dropdown-menu .dropdown-divider{ height:1px; background: var(--line); margin:5px 0; }
 
   /* ---------- Modal ---------- */
   .modal-overlay{

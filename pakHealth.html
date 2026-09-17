@@ -46,7 +46,7 @@
      "Manage family" in CLAUDE.md. Pinned version, dependency-free, defines a
      single global `qrcode()` factory. -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<link rel="stylesheet" href="style.css?v=43">
+<link rel="stylesheet" href="style.css?v=44">
 </head>
 <body>
 
@@ -642,12 +642,30 @@
       </div>
     </header>
     <main class="dash-main">
-      <div class="panel">
-        <span class="eyebrow">Records</span>
-        <h3 style="margin-top:5px;">Visits</h3>
-        <p class="panel-sub" style="margin-top:6px;">Every visit a doctor has logged for you.</p>
-        <div id="pat-visits-list"></div>
-        <div class="empty-state" id="pat-visits-empty">No visits recorded yet. Your visit history will appear here after a doctor sees you.</div>
+      <div class="record-split">
+        <div class="panel">
+          <span class="eyebrow">Records</span>
+          <h3 style="margin-top:5px;">Visits</h3>
+          <p class="panel-sub" style="margin-top:6px;">Every visit a doctor has logged for you.</p>
+          <div id="pat-visits-list"></div>
+          <div class="empty-state" id="pat-visits-empty">No visits recorded yet. Your visit history will appear here after a doctor sees you.</div>
+        </div>
+        <div class="sticky-inner">
+          <div class="panel">
+            <div class="record-detail-empty" id="pat-visit-detail-empty">Select a visit to see its details.</div>
+            <div class="hidden" id="pat-visit-detail">
+              <span class="eyebrow" id="visit-detail-date">—</span>
+              <h3 id="visit-detail-doctor" style="margin-top:5px;">—</h3>
+              <dl class="kv" style="margin-top:14px;">
+                <dt>Clinic</dt><dd id="visit-detail-clinic">—</dd>
+                <dt>Symptoms</dt><dd class="block" id="visit-detail-symptoms">—</dd>
+                <dt>Diagnosis</dt><dd class="block" id="visit-detail-diagnosis">—</dd>
+                <dt>Prescription</dt><dd class="block" id="visit-detail-prescription">—</dd>
+                <dt>Notes</dt><dd class="block" id="visit-detail-notes">—</dd>
+              </dl>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
   </div>
@@ -660,12 +678,27 @@
       </div>
     </header>
     <main class="dash-main">
-      <div class="panel">
-        <span class="eyebrow">Records</span>
-        <h3 style="margin-top:5px;">Lab Results</h3>
-        <p class="panel-sub" style="margin-top:6px;">Tests and reports on file.</p>
-        <div id="pat-tests-list"></div>
-        <div class="empty-state" id="pat-tests-empty">No tests on file yet.</div>
+      <div class="record-split">
+        <div class="panel">
+          <span class="eyebrow">Records</span>
+          <h3 style="margin-top:5px;">Lab Results</h3>
+          <p class="panel-sub" style="margin-top:6px;">Tests and reports on file.</p>
+          <div id="pat-tests-list"></div>
+          <div class="empty-state" id="pat-tests-empty">No tests on file yet.</div>
+        </div>
+        <div class="sticky-inner">
+          <div class="panel">
+            <div class="record-detail-empty" id="pat-test-detail-empty">Select a test to see its details.</div>
+            <div class="hidden" id="pat-test-detail">
+              <span class="eyebrow" id="test-detail-date">—</span>
+              <h3 id="test-detail-name" style="margin-top:5px;">—</h3>
+              <dl class="kv" style="margin-top:13px;">
+                <dt>Ordered by</dt><dd id="test-detail-doctor">—</dd>
+                <dt>Result summary</dt><dd class="block" id="test-detail-result">—</dd>
+              </dl>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
   </div>
@@ -678,24 +711,27 @@
       </div>
     </header>
     <main class="dash-main">
-      <div class="panel">
-        <span class="eyebrow">Records</span>
-        <h3 style="margin-top:5px;">My Prescriptions</h3>
-        <p class="panel-sub" style="margin-top:6px;">Pulled from visit notes where a doctor recorded one.</p>
-        <div id="pat-prescriptions-list"></div>
-        <div class="empty-state" id="pat-prescriptions-empty">No prescriptions on file yet.</div>
+      <div class="record-split">
+        <div class="panel">
+          <span class="eyebrow">Records</span>
+          <h3 style="margin-top:5px;">My Prescriptions</h3>
+          <p class="panel-sub" style="margin-top:6px;">Pulled from visit notes where a doctor recorded one.</p>
+          <div id="pat-prescriptions-list"></div>
+          <div class="empty-state" id="pat-prescriptions-empty">No prescriptions on file yet.</div>
+        </div>
+        <div class="sticky-inner">
+          <div class="panel">
+            <div class="record-detail-empty" id="pat-prescription-detail-empty">Select a prescription to see its details.</div>
+            <div class="hidden" id="pat-prescription-detail">
+              <span class="eyebrow" id="prescription-detail-date">—</span>
+              <h3 id="prescription-detail-doctor" style="margin-top:5px;">—</h3>
+              <h4 class="subhead" style="margin-top:14px;">Medicine</h4>
+              <ul class="rx-medicine-list" id="prescription-detail-list"></ul>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
-
-    <div class="modal-overlay hidden" id="pat-prescription-modal">
-      <div class="modal-card">
-        <button class="modal-close" id="pat-prescription-modal-close" aria-label="Close">&times;</button>
-        <span class="eyebrow" id="prescription-modal-date">—</span>
-        <h3 id="prescription-modal-doctor" style="margin-top:5px;">—</h3>
-        <h4 class="subhead" style="margin-top:14px;">Medicine</h4>
-        <ul class="rx-medicine-list" id="prescription-modal-list"></ul>
-      </div>
-    </div>
   </div>
 
   <div id="view-patient-eyes" class="view hidden">
@@ -780,32 +816,6 @@
   </div>
   </div>
 
-  <div class="modal-overlay hidden" id="pat-visit-modal">
-    <div class="modal-card">
-      <button class="modal-close" id="pat-visit-modal-close" aria-label="Close">&times;</button>
-      <span class="eyebrow" id="visit-modal-date">—</span>
-      <h3 id="visit-modal-doctor" style="margin-top:5px;">—</h3>
-      <dl class="kv" style="margin-top:14px;">
-        <dt>Clinic</dt><dd id="visit-modal-clinic">—</dd>
-        <dt>Symptoms</dt><dd class="block" id="visit-modal-symptoms">—</dd>
-        <dt>Diagnosis</dt><dd class="block" id="visit-modal-diagnosis">—</dd>
-        <dt>Prescription</dt><dd class="block" id="visit-modal-prescription">—</dd>
-        <dt>Notes</dt><dd class="block" id="visit-modal-notes">—</dd>
-      </dl>
-    </div>
-  </div>
-
-  <div class="modal-overlay hidden" id="pat-test-modal">
-    <div class="modal-card">
-      <button class="modal-close" id="pat-test-modal-close" aria-label="Close">&times;</button>
-      <span class="eyebrow" id="test-modal-date">—</span>
-      <h3 id="test-modal-name" style="margin-top:5px;">—</h3>
-      <dl class="kv" style="margin-top:13px;">
-        <dt>Ordered by</dt><dd id="test-modal-doctor">—</dd>
-        <dt>Result summary</dt><dd class="block" id="test-modal-result">—</dd>
-      </dl>
-    </div>
-  </div>
 
   <div id="view-pat-profile" class="view hidden">
     <header class="topbar">
@@ -1023,105 +1033,107 @@
     </div>
   </header>
   <main class="dash-main">
-    <div class="panel">
-      <div class="name-row">
-        <h3 id="res-name">—</h3>
-      </div>
-      <button class="link-btn" id="lookup-change-btn" style="margin-bottom:13px;">Search a different patient</button>
+    <div class="record-split">
+      <div class="panel">
+        <div class="name-row">
+          <h3 id="res-name">—</h3>
+        </div>
+        <button class="link-btn" id="lookup-change-btn" style="margin-bottom:13px;">Search a different patient</button>
 
-      <div id="doc-pt-add-visit-section">
-        <button class="btn btn-primary btn-block" id="add-visit-btn" type="button">Add visit note</button>
-        <div id="add-visit-fields" class="hidden" style="margin-top:11px;">
-          <div class="field"><label for="visit-symptoms">Symptoms</label><textarea id="visit-symptoms" placeholder="What the patient reported"></textarea></div>
-          <div class="field"><label for="visit-diagnosis">Diagnosis</label><textarea id="visit-diagnosis" placeholder="Your assessment"></textarea></div>
-          <div class="field"><label for="visit-prescription">Prescription</label><textarea id="visit-prescription" placeholder="Medication, dose, duration — or 'None'"></textarea></div>
-          <div class="field"><label for="visit-notes">Notes</label><textarea id="visit-notes" placeholder="Anything else worth recording"></textarea></div>
-          <div class="error-text" id="add-visit-error"></div>
-          <div class="save-row">
-            <button class="btn btn-primary" id="add-visit-save">Save visit note</button>
-            <button class="btn btn-secondary" id="add-visit-cancel">Cancel</button>
+        <div id="doc-pt-add-visit-section">
+          <button class="btn btn-primary btn-block" id="add-visit-btn" type="button">Add visit note</button>
+          <div id="add-visit-fields" class="hidden" style="margin-top:11px;">
+            <div class="field"><label for="visit-symptoms">Symptoms</label><textarea id="visit-symptoms" placeholder="What the patient reported"></textarea></div>
+            <div class="field"><label for="visit-diagnosis">Diagnosis</label><textarea id="visit-diagnosis" placeholder="Your assessment"></textarea></div>
+            <div class="field"><label for="visit-prescription">Prescription</label><textarea id="visit-prescription" placeholder="Medication, dose, duration — or 'None'"></textarea></div>
+            <div class="field"><label for="visit-notes">Notes</label><textarea id="visit-notes" placeholder="Anything else worth recording"></textarea></div>
+            <div class="error-text" id="add-visit-error"></div>
+            <div class="save-row">
+              <button class="btn btn-primary" id="add-visit-save">Save visit note</button>
+              <button class="btn btn-secondary" id="add-visit-cancel">Cancel</button>
+            </div>
+          </div>
+          <span class="save-note" id="add-visit-note" style="display:block; text-align:center; margin:6px 0 5px;">Visit added</span>
+        </div>
+
+        <div id="doc-pt-add-test-section" class="hidden">
+          <button class="btn btn-primary btn-block" id="add-test-btn" type="button">Add test / report</button>
+          <div id="add-test-fields" class="hidden" style="margin-top:11px;">
+            <div class="form-grid">
+              <div class="field span-2"><label for="test-name">Test name</label><input type="text" id="test-name" placeholder="e.g. Complete Blood Count (CBC)"></div>
+              <div class="field span-2"><label for="test-date">Date</label><input type="date" id="test-date"></div>
+            </div>
+            <div class="field"><label for="test-result">Result summary</label><textarea id="test-result" placeholder="Key findings, values, or 'Pending' if results aren't back yet"></textarea></div>
+            <div class="error-text" id="add-test-error"></div>
+            <div class="save-row">
+              <button class="btn btn-primary" id="add-test-save">Save test</button>
+              <button class="btn btn-secondary" id="add-test-cancel">Cancel</button>
+            </div>
+          </div>
+          <span class="save-note" id="add-test-note" style="display:block; text-align:center; margin:6px 0 5px;">Test added</span>
+        </div>
+
+        <div class="tabs" style="margin-top:13px;">
+          <button class="tab active" id="doc-pt-tab-visits" type="button">Visits</button>
+          <button class="tab" id="doc-pt-tab-lab" type="button">Lab results</button>
+          <button class="tab" id="doc-pt-tab-rx" type="button">Prescriptions</button>
+        </div>
+
+        <div id="doc-pt-pane-visits" style="margin-top:13px;">
+          <div id="doc-visits-list"></div>
+          <div class="empty-state" id="doc-visits-empty">No visits recorded yet.</div>
+        </div>
+
+        <div id="doc-pt-pane-lab" class="hidden" style="margin-top:13px;">
+          <div id="doc-tests-list"></div>
+          <div class="empty-state" id="doc-tests-empty">No tests on file yet.</div>
+        </div>
+
+        <div id="doc-pt-pane-rx" class="hidden" style="margin-top:13px;">
+          <p class="panel-sub">Pulled from visit notes where a prescription was recorded.</p>
+          <div id="doc-prescriptions-list"></div>
+          <div class="empty-state" id="doc-prescriptions-empty">No prescriptions on file yet.</div>
+        </div>
+      </div>
+
+      <!-- One shared detail panel — only one of the three content blocks
+           below is ever unhidden at once, matching whichever tab pane on
+           the left is currently active (see switchPatientResultTab() and
+           the render*/select* functions in app.js). -->
+      <div class="sticky-inner">
+        <div class="panel">
+          <div class="record-detail-empty" id="doc-visit-detail-empty">Select a visit to see its details.</div>
+          <div class="hidden" id="doc-visit-detail">
+            <span class="eyebrow" id="doc-visit-detail-date">—</span>
+            <h3 id="doc-visit-detail-doctor" style="margin-top:5px;">—</h3>
+            <dl class="kv" style="margin-top:14px;">
+              <dt>Clinic</dt><dd id="doc-visit-detail-clinic">—</dd>
+              <dt>Symptoms</dt><dd class="block" id="doc-visit-detail-symptoms">—</dd>
+              <dt>Diagnosis</dt><dd class="block" id="doc-visit-detail-diagnosis">—</dd>
+              <dt>Prescription</dt><dd class="block" id="doc-visit-detail-prescription">—</dd>
+              <dt>Notes</dt><dd class="block" id="doc-visit-detail-notes">—</dd>
+            </dl>
+          </div>
+          <div class="record-detail-empty hidden" id="doc-test-detail-empty">Select a test to see its details.</div>
+          <div class="hidden" id="doc-test-detail">
+            <span class="eyebrow" id="doc-test-detail-date">—</span>
+            <h3 id="doc-test-detail-name" style="margin-top:5px;">—</h3>
+            <dl class="kv" style="margin-top:13px;">
+              <dt>Ordered by</dt><dd id="doc-test-detail-doctor">—</dd>
+              <dt>Result summary</dt><dd class="block" id="doc-test-detail-result">—</dd>
+            </dl>
+          </div>
+          <div class="record-detail-empty hidden" id="doc-prescription-detail-empty">Select a prescription to see its details.</div>
+          <div class="hidden" id="doc-prescription-detail">
+            <span class="eyebrow" id="doc-prescription-detail-date">—</span>
+            <h3 id="doc-prescription-detail-doctor" style="margin-top:5px;">—</h3>
+            <h4 class="subhead" style="margin-top:14px;">Medicine</h4>
+            <ul class="rx-medicine-list" id="doc-prescription-detail-list"></ul>
           </div>
         </div>
-        <span class="save-note" id="add-visit-note" style="display:block; text-align:center; margin:6px 0 5px;">Visit added</span>
-      </div>
-
-      <div id="doc-pt-add-test-section" class="hidden">
-        <button class="btn btn-primary btn-block" id="add-test-btn" type="button">Add test / report</button>
-        <div id="add-test-fields" class="hidden" style="margin-top:11px;">
-          <div class="form-grid">
-            <div class="field span-2"><label for="test-name">Test name</label><input type="text" id="test-name" placeholder="e.g. Complete Blood Count (CBC)"></div>
-            <div class="field span-2"><label for="test-date">Date</label><input type="date" id="test-date"></div>
-          </div>
-          <div class="field"><label for="test-result">Result summary</label><textarea id="test-result" placeholder="Key findings, values, or 'Pending' if results aren't back yet"></textarea></div>
-          <div class="error-text" id="add-test-error"></div>
-          <div class="save-row">
-            <button class="btn btn-primary" id="add-test-save">Save test</button>
-            <button class="btn btn-secondary" id="add-test-cancel">Cancel</button>
-          </div>
-        </div>
-        <span class="save-note" id="add-test-note" style="display:block; text-align:center; margin:6px 0 5px;">Test added</span>
-      </div>
-
-      <div class="tabs" style="margin-top:13px;">
-        <button class="tab active" id="doc-pt-tab-visits" type="button">Visits</button>
-        <button class="tab" id="doc-pt-tab-lab" type="button">Lab results</button>
-        <button class="tab" id="doc-pt-tab-rx" type="button">Prescriptions</button>
-      </div>
-
-      <div id="doc-pt-pane-visits" style="margin-top:13px;">
-        <div id="doc-visits-list"></div>
-        <div class="empty-state" id="doc-visits-empty">No visits recorded yet.</div>
-      </div>
-
-      <div id="doc-pt-pane-lab" class="hidden" style="margin-top:13px;">
-        <div id="doc-tests-list"></div>
-        <div class="empty-state" id="doc-tests-empty">No tests on file yet.</div>
-      </div>
-
-      <div id="doc-pt-pane-rx" class="hidden" style="margin-top:13px;">
-        <p class="panel-sub">Pulled from visit notes where a prescription was recorded.</p>
-        <div id="doc-prescriptions-list"></div>
-        <div class="empty-state" id="doc-prescriptions-empty">No prescriptions on file yet.</div>
       </div>
     </div>
   </main>
-
-  <div class="modal-overlay hidden" id="doc-prescription-modal">
-    <div class="modal-card">
-      <button class="modal-close" id="doc-prescription-modal-close" aria-label="Close">&times;</button>
-      <span class="eyebrow" id="doc-prescription-modal-date">—</span>
-      <h3 id="doc-prescription-modal-doctor" style="margin-top:5px;">—</h3>
-      <h4 class="subhead" style="margin-top:14px;">Medicine</h4>
-      <ul class="rx-medicine-list" id="doc-prescription-modal-list"></ul>
-    </div>
-  </div>
-
-  <div class="modal-overlay hidden" id="doc-test-modal">
-    <div class="modal-card">
-      <button class="modal-close" id="doc-test-modal-close" aria-label="Close">&times;</button>
-      <span class="eyebrow" id="doc-test-modal-date">—</span>
-      <h3 id="doc-test-modal-name" style="margin-top:5px;">—</h3>
-      <dl class="kv" style="margin-top:13px;">
-        <dt>Ordered by</dt><dd id="doc-test-modal-doctor">—</dd>
-        <dt>Result summary</dt><dd class="block" id="doc-test-modal-result">—</dd>
-      </dl>
-    </div>
-  </div>
-
-  <div class="modal-overlay hidden" id="doc-visit-modal">
-    <div class="modal-card">
-      <button class="modal-close" id="doc-visit-modal-close" aria-label="Close">&times;</button>
-      <span class="eyebrow" id="doc-visit-modal-date">—</span>
-      <h3 id="doc-visit-modal-doctor" style="margin-top:5px;">—</h3>
-      <dl class="kv" style="margin-top:14px;">
-        <dt>Clinic</dt><dd id="doc-visit-modal-clinic">—</dd>
-        <dt>Symptoms</dt><dd class="block" id="doc-visit-modal-symptoms">—</dd>
-        <dt>Diagnosis</dt><dd class="block" id="doc-visit-modal-diagnosis">—</dd>
-        <dt>Prescription</dt><dd class="block" id="doc-visit-modal-prescription">—</dd>
-        <dt>Notes</dt><dd class="block" id="doc-visit-modal-notes">—</dd>
-      </dl>
-    </div>
-  </div>
 </div>
 
 <div id="view-doc-profile" class="view hidden">
@@ -1289,6 +1301,6 @@
   </main>
 </div>
 
-<script src="app.js?v=53"></script>
+<script src="app.js?v=54"></script>
 </body>
 </html>

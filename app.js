@@ -672,9 +672,6 @@
     calViewDate = new Date();
     renderAppointmentsCalendar(data.appointments);
     renderAppointmentsList(data.appointments);
-    closeVisitModal();
-    closeTestModal();
-    closePrescriptionModal();
     closeAddEyeModal();
     closeEyeRxPrevModal();
     closePatAccessModal();
@@ -1281,6 +1278,18 @@
     var t = p.trim().toLowerCase();
     return t !== '' && t !== 'none' && t !== 'n/a' && t !== 'na' && t !== '-';
   }
+  // Shared by every master-detail list below (patient Visits/Lab/
+  // Prescriptions, doctor Visits/Lab/Prescriptions) — clears whichever row
+  // was previously marked selected in this particular list and marks the
+  // new one, purely a DOM concern with nothing list-specific about it.
+  function markActiveListItem(listEl, activeEl){
+    listEl.querySelectorAll('.list-item.active').forEach(function(el){ el.classList.remove('active'); });
+    if (activeEl) activeEl.classList.add('active');
+  }
+  // Master-detail: the list on the left, a persistent detail panel on the
+  // right (#pat-prescription-detail/-empty) instead of a modal popup — the
+  // first row auto-selects/renders whenever the list itself has data, and
+  // clicking a different row just re-renders the same panel in place.
   function renderPrescriptionsList(visits){
     var listEl = $('pat-prescriptions-list');
     var emptyEl = $('pat-prescriptions-empty');
@@ -1288,6 +1297,8 @@
     if (!entries.length){
       listEl.innerHTML = '';
       emptyEl.classList.remove('hidden');
+      $('pat-prescription-detail-empty').classList.remove('hidden');
+      $('pat-prescription-detail').classList.add('hidden');
       return;
     }
     emptyEl.classList.add('hidden');
@@ -1299,26 +1310,28 @@
         + '</div>'
         + chevronSvg + '</div>';
     }).join('');
-    listEl.querySelectorAll('.list-item').forEach(function(el){
+    var items = listEl.querySelectorAll('.list-item');
+    items.forEach(function(el){
       el.addEventListener('click', function(){
-        openPrescriptionModal(visits[parseInt(el.getAttribute('data-idx'), 10)]);
+        markActiveListItem(listEl, el);
+        renderPrescriptionDetail(visits[parseInt(el.getAttribute('data-idx'), 10)]);
       });
     });
+    markActiveListItem(listEl, items[0]);
+    renderPrescriptionDetail(visits[parseInt(items[0].getAttribute('data-idx'), 10)]);
   }
-  // A focused popup for just the medicine from one visit — the full
-  // symptoms/diagnosis/notes visit-detail modal is more than this page needs,
+  // A focused detail for just the medicine from one visit — the full
+  // symptoms/diagnosis/notes visit detail is more than this page needs,
   // since My Prescriptions is specifically about what was prescribed.
-  function openPrescriptionModal(v){
-    $('prescription-modal-date').textContent = formatDateDisplay(v.date);
-    $('prescription-modal-doctor').innerHTML = escapeHtml(v.doctorName || 'Doctor') + unverifiedTagHtml(v);
+  function renderPrescriptionDetail(v){
+    $('pat-prescription-detail-empty').classList.add('hidden');
+    $('pat-prescription-detail').classList.remove('hidden');
+    $('prescription-detail-date').textContent = formatDateDisplay(v.date);
+    $('prescription-detail-doctor').innerHTML = escapeHtml(v.doctorName || 'Doctor') + unverifiedTagHtml(v);
     var items = (v.prescription || '').split(/\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean);
     if (!items.length) items = ['Not recorded'];
-    $('prescription-modal-list').innerHTML = items.map(function(item){ return '<li>' + escapeHtml(item) + '</li>'; }).join('');
-    $('pat-prescription-modal').classList.remove('hidden');
+    $('prescription-detail-list').innerHTML = items.map(function(item){ return '<li>' + escapeHtml(item) + '</li>'; }).join('');
   }
-  function closePrescriptionModal(){ $('pat-prescription-modal').classList.add('hidden'); }
-  $('pat-prescription-modal-close').addEventListener('click', closePrescriptionModal);
-  $('pat-prescription-modal').addEventListener('click', function(e){ if (e.target === $('pat-prescription-modal')) closePrescriptionModal(); });
 
   function formatDateDisplay(dateStr){
     if (!dateStr) return '—';
@@ -1334,6 +1347,8 @@
     if (!visits || !visits.length){
       listEl.innerHTML = '';
       emptyEl.classList.remove('hidden');
+      $('pat-visit-detail-empty').classList.remove('hidden');
+      $('pat-visit-detail').classList.add('hidden');
       return;
     }
     emptyEl.classList.add('hidden');
@@ -1345,11 +1360,15 @@
         + '</div>'
         + chevronSvg + '</div>';
     }).join('');
-    listEl.querySelectorAll('.list-item').forEach(function(el){
+    var items = listEl.querySelectorAll('.list-item');
+    items.forEach(function(el){
       el.addEventListener('click', function(){
-        openVisitModal(visits[parseInt(el.getAttribute('data-idx'), 10)]);
+        markActiveListItem(listEl, el);
+        renderVisitDetail(visits[parseInt(el.getAttribute('data-idx'), 10)]);
       });
     });
+    markActiveListItem(listEl, items[0]);
+    renderVisitDetail(visits[parseInt(items[0].getAttribute('data-idx'), 10)]);
   }
   function renderTestsList(tests){
     var listEl = $('pat-tests-list');
@@ -1357,6 +1376,8 @@
     if (!tests || !tests.length){
       listEl.innerHTML = '';
       emptyEl.classList.remove('hidden');
+      $('pat-test-detail-empty').classList.remove('hidden');
+      $('pat-test-detail').classList.add('hidden');
       return;
     }
     emptyEl.classList.add('hidden');
@@ -1368,11 +1389,15 @@
         + '</div>'
         + chevronSvg + '</div>';
     }).join('');
-    listEl.querySelectorAll('.list-item').forEach(function(el){
+    var testItems = listEl.querySelectorAll('.list-item');
+    testItems.forEach(function(el){
       el.addEventListener('click', function(){
-        openTestModal(tests[parseInt(el.getAttribute('data-idx'), 10)]);
+        markActiveListItem(listEl, el);
+        renderTestDetail(tests[parseInt(el.getAttribute('data-idx'), 10)]);
       });
     });
+    markActiveListItem(listEl, testItems[0]);
+    renderTestDetail(tests[parseInt(testItems[0].getAttribute('data-idx'), 10)]);
   }
 
   // ---- Appointments calendar + upcoming list ----
@@ -1867,30 +1892,26 @@
     stickyResizeTimer = setTimeout(syncStickyColumnHeights, 150);
   });
 
-  function openVisitModal(v){
-    $('visit-modal-date').textContent = formatDateDisplay(v.date) + (v.time ? ' · ' + v.time : '');
-    $('visit-modal-doctor').innerHTML = escapeHtml(v.doctorName || 'Doctor') + unverifiedTagHtml(v);
-    $('visit-modal-clinic').textContent = v.clinicName || 'Not recorded';
-    $('visit-modal-symptoms').textContent = v.symptoms || 'Not recorded';
-    $('visit-modal-diagnosis').textContent = v.diagnosis || 'Not recorded';
-    $('visit-modal-prescription').textContent = v.prescription || 'Not recorded';
-    $('visit-modal-notes').textContent = v.notes || 'Not recorded';
-    $('pat-visit-modal').classList.remove('hidden');
+  function renderVisitDetail(v){
+    $('pat-visit-detail-empty').classList.add('hidden');
+    $('pat-visit-detail').classList.remove('hidden');
+    $('visit-detail-date').textContent = formatDateDisplay(v.date) + (v.time ? ' · ' + v.time : '');
+    $('visit-detail-doctor').innerHTML = escapeHtml(v.doctorName || 'Doctor') + unverifiedTagHtml(v);
+    $('visit-detail-clinic').textContent = v.clinicName || 'Not recorded';
+    $('visit-detail-symptoms').textContent = v.symptoms || 'Not recorded';
+    $('visit-detail-diagnosis').textContent = v.diagnosis || 'Not recorded';
+    $('visit-detail-prescription').textContent = v.prescription || 'Not recorded';
+    $('visit-detail-notes').textContent = v.notes || 'Not recorded';
   }
-  function closeVisitModal(){ $('pat-visit-modal').classList.add('hidden'); }
-  $('pat-visit-modal-close').addEventListener('click', closeVisitModal);
-  $('pat-visit-modal').addEventListener('click', function(e){ if (e.target === $('pat-visit-modal')) closeVisitModal(); });
 
-  function openTestModal(t){
-    $('test-modal-date').textContent = formatDateDisplay(t.date);
-    $('test-modal-name').innerHTML = escapeHtml(t.name || 'Test') + unverifiedTagHtml(t);
-    $('test-modal-doctor').textContent = t.doctorName || 'Not recorded';
-    $('test-modal-result').textContent = t.resultSummary || 'No result summary added yet.';
-    $('pat-test-modal').classList.remove('hidden');
+  function renderTestDetail(t){
+    $('pat-test-detail-empty').classList.add('hidden');
+    $('pat-test-detail').classList.remove('hidden');
+    $('test-detail-date').textContent = formatDateDisplay(t.date);
+    $('test-detail-name').innerHTML = escapeHtml(t.name || 'Test') + unverifiedTagHtml(t);
+    $('test-detail-doctor').textContent = t.doctorName || 'Not recorded';
+    $('test-detail-result').textContent = t.resultSummary || 'No result summary added yet.';
   }
-  function closeTestModal(){ $('pat-test-modal').classList.add('hidden'); }
-  $('pat-test-modal-close').addEventListener('click', closeTestModal);
-  $('pat-test-modal').addEventListener('click', function(e){ if (e.target === $('pat-test-modal')) closeTestModal(); });
 
   // ---- My Eyes ----
   // Clinical range per field, used both to position the number-line marker and
@@ -2347,9 +2368,7 @@
     switchFindTab('code');
     renderRoster();
     collapseAddVisitFields();
-    closeDocVisitModal();
     collapseAddTestFields();
-    closeDocTestModal();
     closeManageBookingsModal();
     closeDeleteClinicModal();
     closeDocAcctDropdown();
@@ -2847,7 +2866,7 @@
   $('doc-howitworks-btn').addEventListener('click', docHowItWorks.open);
 
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape'){ closeVisitModal(); closeTestModal(); closePrescriptionModal(); collapseAddVisitFields(); closeDocVisitModal(); closeDocTestModal(); collapseAddTestFields(); closeAddEyeModal(); closeEyeRxPrevModal(); closePatAccessModal(); closePatApptDetailModal(); closeBookApptConfirmModal(); closeManageBookingsModal(); closeDeleteClinicModal(); closePatFamilyModal(); closeFamilyDetailModal(); closeAddFamilyModal(); closeFamilySwitcher(); closePatAcctDropdown(); patHowItWorks.close(); closeDocAcctDropdown(); docHowItWorks.close(); }
+    if (e.key === 'Escape'){ collapseAddVisitFields(); collapseAddTestFields(); closeAddEyeModal(); closeEyeRxPrevModal(); closePatAccessModal(); closePatApptDetailModal(); closeBookApptConfirmModal(); closeManageBookingsModal(); closeDeleteClinicModal(); closePatFamilyModal(); closeFamilyDetailModal(); closeAddFamilyModal(); closeFamilySwitcher(); closePatAcctDropdown(); patHowItWorks.close(); closeDocAcctDropdown(); docHowItWorks.close(); }
   });
 
   function escapeHtml(s){
@@ -2862,12 +2881,26 @@
   var currentLookupData = null;
   var currentLookupGrant = null;
 
+  // The right-hand detail panel is shared across all three tabs (only one
+  // tab's list is ever visible at a time) — clearing every detail/empty
+  // pair before showing the one that's actually relevant is simpler than
+  // tracking which of the three was last shown.
+  function hideAllDocDetails(){
+    $('doc-visit-detail-empty').classList.add('hidden');
+    $('doc-visit-detail').classList.add('hidden');
+    $('doc-test-detail-empty').classList.add('hidden');
+    $('doc-test-detail').classList.add('hidden');
+    $('doc-prescription-detail-empty').classList.add('hidden');
+    $('doc-prescription-detail').classList.add('hidden');
+  }
   function renderDoctorVisitsList(visits){
     var listEl = $('doc-visits-list');
     var emptyEl = $('doc-visits-empty');
     if (!visits || !visits.length){
       listEl.innerHTML = '';
       emptyEl.classList.remove('hidden');
+      hideAllDocDetails();
+      $('doc-visit-detail-empty').classList.remove('hidden');
       return;
     }
     emptyEl.classList.add('hidden');
@@ -2879,25 +2912,27 @@
         + '</div>'
         + chevronSvg + '</div>';
     }).join('');
-    listEl.querySelectorAll('.list-item').forEach(function(el){
+    var items = listEl.querySelectorAll('.list-item');
+    items.forEach(function(el){
       el.addEventListener('click', function(){
-        openDocVisitModal(visits[parseInt(el.getAttribute('data-idx'), 10)]);
+        markActiveListItem(listEl, el);
+        renderDocVisitDetail(visits[parseInt(el.getAttribute('data-idx'), 10)]);
       });
     });
+    markActiveListItem(listEl, items[0]);
+    renderDocVisitDetail(visits[parseInt(items[0].getAttribute('data-idx'), 10)]);
   }
-  function openDocVisitModal(v){
-    $('doc-visit-modal-date').textContent = formatDateDisplay(v.date) + (v.time ? ' · ' + v.time : '');
-    $('doc-visit-modal-doctor').innerHTML = escapeHtml(v.doctorName || 'Doctor') + unverifiedTagHtml(v);
-    $('doc-visit-modal-clinic').textContent = v.clinicName || 'Not recorded';
-    $('doc-visit-modal-symptoms').textContent = v.symptoms || 'Not recorded';
-    $('doc-visit-modal-diagnosis').textContent = v.diagnosis || 'Not recorded';
-    $('doc-visit-modal-prescription').textContent = v.prescription || 'Not recorded';
-    $('doc-visit-modal-notes').textContent = v.notes || 'Not recorded';
-    $('doc-visit-modal').classList.remove('hidden');
+  function renderDocVisitDetail(v){
+    hideAllDocDetails();
+    $('doc-visit-detail').classList.remove('hidden');
+    $('doc-visit-detail-date').textContent = formatDateDisplay(v.date) + (v.time ? ' · ' + v.time : '');
+    $('doc-visit-detail-doctor').innerHTML = escapeHtml(v.doctorName || 'Doctor') + unverifiedTagHtml(v);
+    $('doc-visit-detail-clinic').textContent = v.clinicName || 'Not recorded';
+    $('doc-visit-detail-symptoms').textContent = v.symptoms || 'Not recorded';
+    $('doc-visit-detail-diagnosis').textContent = v.diagnosis || 'Not recorded';
+    $('doc-visit-detail-prescription').textContent = v.prescription || 'Not recorded';
+    $('doc-visit-detail-notes').textContent = v.notes || 'Not recorded';
   }
-  function closeDocVisitModal(){ $('doc-visit-modal').classList.add('hidden'); }
-  $('doc-visit-modal-close').addEventListener('click', closeDocVisitModal);
-  $('doc-visit-modal').addEventListener('click', function(e){ if (e.target === $('doc-visit-modal')) closeDocVisitModal(); });
 
   function renderDoctorTestsList(tests){
     var listEl = $('doc-tests-list');
@@ -2905,6 +2940,8 @@
     if (!tests || !tests.length){
       listEl.innerHTML = '';
       emptyEl.classList.remove('hidden');
+      hideAllDocDetails();
+      $('doc-test-detail-empty').classList.remove('hidden');
       return;
     }
     emptyEl.classList.add('hidden');
@@ -2916,22 +2953,24 @@
         + '</div>'
         + chevronSvg + '</div>';
     }).join('');
-    listEl.querySelectorAll('.list-item').forEach(function(el){
+    var testItems = listEl.querySelectorAll('.list-item');
+    testItems.forEach(function(el){
       el.addEventListener('click', function(){
-        openDocTestModal(tests[parseInt(el.getAttribute('data-idx'), 10)]);
+        markActiveListItem(listEl, el);
+        renderDocTestDetail(tests[parseInt(el.getAttribute('data-idx'), 10)]);
       });
     });
+    markActiveListItem(listEl, testItems[0]);
+    renderDocTestDetail(tests[parseInt(testItems[0].getAttribute('data-idx'), 10)]);
   }
-  function openDocTestModal(t){
-    $('doc-test-modal-date').textContent = formatDateDisplay(t.date);
-    $('doc-test-modal-name').innerHTML = escapeHtml(t.name || 'Test') + unverifiedTagHtml(t);
-    $('doc-test-modal-doctor').textContent = t.doctorName || 'Not recorded';
-    $('doc-test-modal-result').textContent = t.resultSummary || 'No result summary added yet.';
-    $('doc-test-modal').classList.remove('hidden');
+  function renderDocTestDetail(t){
+    hideAllDocDetails();
+    $('doc-test-detail').classList.remove('hidden');
+    $('doc-test-detail-date').textContent = formatDateDisplay(t.date);
+    $('doc-test-detail-name').innerHTML = escapeHtml(t.name || 'Test') + unverifiedTagHtml(t);
+    $('doc-test-detail-doctor').textContent = t.doctorName || 'Not recorded';
+    $('doc-test-detail-result').textContent = t.resultSummary || 'No result summary added yet.';
   }
-  function closeDocTestModal(){ $('doc-test-modal').classList.add('hidden'); }
-  $('doc-test-modal-close').addEventListener('click', closeDocTestModal);
-  $('doc-test-modal').addEventListener('click', function(e){ if (e.target === $('doc-test-modal')) closeDocTestModal(); });
 
   function showLookupResult(patientId, data, grant){
     currentLookupCode = patientId;
@@ -2961,6 +3000,15 @@
     $('doc-pt-pane-visits').classList.toggle('hidden', tab !== 'visits');
     $('doc-pt-pane-lab').classList.toggle('hidden', tab !== 'lab');
     $('doc-pt-pane-rx').classList.toggle('hidden', tab !== 'rx');
+    // The right-hand detail panel is shared across all three tabs — re-run
+    // whichever list just became visible so its first row (re-)selects and
+    // the panel always matches what's actually on screen, not whatever a
+    // previously active tab last left there. Each render*List function
+    // already fully handles both the empty and has-data cases.
+    if (!currentLookupData) return;
+    if (tab === 'visits') renderDoctorVisitsList(currentLookupData.visits || []);
+    else if (tab === 'lab') renderDoctorTestsList(currentLookupData.tests || []);
+    else renderDocPrescriptionsList(currentLookupData.visits || []);
   }
   $('doc-pt-tab-visits').addEventListener('click', function(){ switchPatientResultTab('visits'); });
   $('doc-pt-tab-lab').addEventListener('click', function(){ switchPatientResultTab('lab'); });
@@ -2973,6 +3021,8 @@
     if (!entries.length){
       listEl.innerHTML = '';
       emptyEl.classList.remove('hidden');
+      hideAllDocDetails();
+      $('doc-prescription-detail-empty').classList.remove('hidden');
       return;
     }
     emptyEl.classList.add('hidden');
@@ -2984,23 +3034,25 @@
         + '</div>'
         + chevronSvg + '</div>';
     }).join('');
-    listEl.querySelectorAll('.list-item').forEach(function(el){
+    var rxItems = listEl.querySelectorAll('.list-item');
+    rxItems.forEach(function(el){
       el.addEventListener('click', function(){
-        openDocPrescriptionModal(visits[parseInt(el.getAttribute('data-idx'), 10)]);
+        markActiveListItem(listEl, el);
+        renderDocPrescriptionDetail(visits[parseInt(el.getAttribute('data-idx'), 10)]);
       });
     });
+    markActiveListItem(listEl, rxItems[0]);
+    renderDocPrescriptionDetail(visits[parseInt(rxItems[0].getAttribute('data-idx'), 10)]);
   }
-  function openDocPrescriptionModal(v){
-    $('doc-prescription-modal-date').textContent = formatDateDisplay(v.date);
-    $('doc-prescription-modal-doctor').innerHTML = escapeHtml(v.doctorName || 'Doctor') + unverifiedTagHtml(v);
+  function renderDocPrescriptionDetail(v){
+    hideAllDocDetails();
+    $('doc-prescription-detail').classList.remove('hidden');
+    $('doc-prescription-detail-date').textContent = formatDateDisplay(v.date);
+    $('doc-prescription-detail-doctor').innerHTML = escapeHtml(v.doctorName || 'Doctor') + unverifiedTagHtml(v);
     var items = (v.prescription || '').split(/\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean);
     if (!items.length) items = ['Not recorded'];
-    $('doc-prescription-modal-list').innerHTML = items.map(function(s){ return '<li>'+escapeHtml(s)+'</li>'; }).join('');
-    $('doc-prescription-modal').classList.remove('hidden');
+    $('doc-prescription-detail-list').innerHTML = items.map(function(s){ return '<li>'+escapeHtml(s)+'</li>'; }).join('');
   }
-  function closeDocPrescriptionModal(){ $('doc-prescription-modal').classList.add('hidden'); }
-  $('doc-prescription-modal-close').addEventListener('click', closeDocPrescriptionModal);
-  $('doc-prescription-modal').addEventListener('click', function(e){ if (e.target === $('doc-prescription-modal')) closeDocPrescriptionModal(); });
   function resetLookup(){
     currentLookupCode = null;
     currentLookupData = null;

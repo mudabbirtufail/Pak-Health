@@ -322,6 +322,26 @@
      screen and visually cover the other scrolling up underneath it. */
   @media (max-width: 1180px){ .sticky-inner{ position: static; } }
 
+  /* ---------- Master-detail record pages ---------- */
+  /* Visits / Lab Results / Prescriptions (patient side, one .view each) and
+     the doctor's own Visits/Lab/Prescriptions tabs inside a patient lookup
+     — a narrow list on the left, detail for whichever row was clicked on
+     the right, replacing what used to be a single centered list + a modal
+     popup per row. 336px matches .dash-grid's own sidebar column above so
+     this reads as the same width language as the rest of the dashboard,
+     not an arbitrary new number. The right side reuses .sticky-inner
+     (already defined above) so it stays in view while a long list scrolls
+     past it on the left, on exactly the same terms (and the same >1180px
+     cutoff) as the dashboard's own sidebar/right-col already do. */
+  .record-split{
+    display:grid; grid-template-columns: 336px minmax(0, 1fr); gap:19px; align-items:start;
+  }
+  @media (max-width: 760px){ .record-split{ grid-template-columns: 1fr; } }
+  /* Shown only while the active list is genuinely empty — once there's at
+     least one row, the first one auto-selects, so in practice this is rare
+     (an empty Visits/Lab/Prescriptions list), not a normal first-load state. */
+  .record-detail-empty{ color: var(--muted); font-size:0.72rem; }
+
   .panel{
     background: var(--paper); border:1px solid var(--line); border-radius: var(--radius);
     padding: 19px; box-shadow: var(--shadow); margin-bottom:16px;
@@ -474,6 +494,16 @@
   .list-item .li-sub{ font-size:0.64rem; color: var(--muted); margin-top:2px; }
   .list-item .chevron{ color: var(--muted); flex-shrink:0; }
   .list-item.static{ cursor:default; }
+  /* Marks whichever row's detail is currently showing in a .record-split's
+     right-hand panel — see that layout below. Negative margin cancels out
+     .panel's own padding so the tinted background reaches the panel's edges
+     instead of leaving a thin untinted border around a smaller highlighted
+     rectangle; the row's own padding is bumped back up by the same amount so
+     its text doesn't shift when the highlight is added. */
+  .list-item.active{
+    background: var(--teal-wash); margin:0 -19px; padding:10px 19px; border-radius:6px;
+  }
+  .list-item.active:hover{ background: var(--teal-wash); }
 
   .rx-medicine-list{ margin:8px 0 0; padding-left:16px; }
   .rx-medicine-list li{ margin-bottom:6px; line-height:1.5; }

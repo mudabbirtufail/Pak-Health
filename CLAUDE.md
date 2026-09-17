@@ -229,9 +229,10 @@ verified, which would defeat the point of having the tag at all.
   patient's record, so the patient sees it immediately next time they sign in; a
   newly added visit's prescription also re-renders the Prescriptions pane
   immediately, not just the Visits pane, and the field section collapses back down
-  on a successful save. Clicking an existing row still opens the same detail modal as
-  before — only the category-level switch (Visits vs. Lab results vs. Prescriptions)
-  changed, not the individual entry view. Going back to the dashboard doesn't lose the
+  on a successful save. Clicking an existing row renders its detail into the
+  shared right-hand panel now, not a modal — see "Master-detail record pages"
+  further down for what replaced the old per-row popup, on both this page and
+  the patient's own three record pages. Going back to the dashboard doesn't lose the
   looked-up patient — nothing resets `currentLookupCode`/`currentLookupData`, so
   re-entering `view-doctor-record` (e.g. via a day-grid block click, see
   "Appointments" below) just shows the same patient again (defaulting back to the
@@ -242,6 +243,46 @@ verified, which would defeat the point of having the tag at all.
   `isDoctorVerified()`, which is unaffected; only the checklist's display was
   trimmed, matching the patient side no longer echoing its own email/phone back on
   the dashboard either).
+- **Master-detail record pages**: the patient's Visits / Lab Results / My
+  Prescriptions pages, and the doctor's own Visits/Lab results/Prescriptions
+  tabs inside a patient lookup, all used to be a single centered list —
+  clicking a row popped a `.modal-overlay` with that entry's detail, then
+  closed back to the list. Replaced with a two-column `.record-split` (a
+  new CSS grid, 336px list column + a `minmax(0,1fr)` detail column,
+  matching `.dash-grid`'s own sidebar width so it reads as the same layout
+  language rather than an arbitrary new number; collapses to one column
+  under ~760px like the rest of the app, and the right column reuses the
+  existing `.sticky-inner` so it stays in view while a long list scrolls
+  past it on the left) — clicking a row re-renders the right-hand panel in
+  place, no modal, no navigation away from the list. The **first row
+  auto-selects** the moment a list renders with data (both on first
+  entering the page and, on the doctor side, every time a tab is switched)
+  so the right panel is never empty when there's something to show — a
+  `.list-item.active` class (teal-wash highlight, negative-margined out to
+  the panel's own edges) marks whichever row that is. All six of the old
+  `open*Modal()`/`close*Modal()` pairs (`pat-visit-modal`, `pat-test-modal`,
+  `pat-prescription-modal`, and the doctor-side `doc-visit-modal`/
+  `doc-test-modal`/`doc-prescription-modal`) are gone — replaced by
+  `render*Detail()` functions that write straight into always-present
+  panel markup (the exact same fields the modals used to show, just static
+  divs with new `*-detail-*` ids instead of `*-modal-*` ones) instead of
+  toggling an overlay. On the doctor's page specifically, all three detail
+  types share **one** right-hand panel (only one tab's list is ever visible
+  at a time anyway) — `hideAllDocDetails()` clears all three detail/empty
+  pairs before whichever `render*Detail()` just fired shows the one that's
+  actually relevant, and `switchPatientResultTab()` re-runs that tab's
+  `render*List()` on every switch so the panel always matches the tab
+  that's actually on screen rather than whatever a previous tab left there.
+  The patient side didn't need that sharing — each of its three pages has
+  its own dedicated right-hand panel, since they're three separate `.view`s
+  rather than one page with tabs. `markActiveListItem()` (clear any
+  `.active` sibling in this list, mark the new one) is the one small piece
+  factored out into a shared helper, used by all six lists — everything
+  else deliberately stays six parallel, near-identical functions rather
+  than a new shared abstraction, matching how the patient/doctor sides of
+  this file were already written before this change (e.g.
+  `renderVisitsList`/`renderDoctorVisitsList` were already separate, not a
+  shared helper, long before master-detail existed).
 - Doctor dashboard layout: retrofitted into the same `.dash-grid` 3-column pattern the
   patient dashboard already used (`.sidebar` / `.center-col` / `.right-col`, each
   wrapped in `.sticky-inner`) rather than needing new CSS — the doctor dashboard's
@@ -331,9 +372,13 @@ verified, which would defeat the point of having the tag at all.
   same `showView()` top-level view-switching the rest of the app already uses, with a
   "← Back to dashboard" link in its topbar) rather than opening a modal — these were
   promoted to pages specifically because they're primary destinations now. Within
-  each page, clicking a row still opens the existing detail modal (visit/test/eye
-  entry) on top of the page — that stays a modal since it's an incidental detail
-  popup, not a destination of its own. "Manage access" is the same kind of incidental
+  the Visits and Lab Results pages, clicking a row renders its detail into a
+  right-hand panel now, not a modal — see "Master-detail record pages" above
+  for the two-column layout that replaced the old per-row popup on these two
+  pages (and My Prescriptions, and the doctor's equivalent). My Eyes is the
+  one record page that's unaffected — clicking an entry there still opens the
+  existing detail modal on top of the page, since eye-entry history was never
+  part of this change. "Manage access" is the same kind of incidental
   popup and also stays a modal. "Account settings" and "My statistics" *were*
   modals too but are now pages as well (see the Account dropdown menu, below) — the
   distinction that decides page vs. modal ended up being less about primary-vs-

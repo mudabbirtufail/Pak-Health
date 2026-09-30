@@ -187,12 +187,22 @@
   .field{ margin-bottom:13px; }
   .field label{ display:block; font-size:0.64rem; font-weight:600; color: var(--ink-soft); margin-bottom:5px; }
   .field .hint{ font-size:0.61rem; color:var(--muted); margin-top:4px; }
-  input[type=text], input[type=email], input[type=tel], input[type=date], input[type=password], input[type=number], select, textarea{
+  input[type=text], input[type=email], input[type=tel], input[type=date], input[type=time], input[type=password], input[type=number], select, textarea{
     width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:5px;
     font-family:'IBM Plex Sans', sans-serif; font-size:0.75rem; background: var(--paper); color: var(--ink);
   }
   input:focus, select:focus, textarea:focus{ border-color: var(--teal); }
   textarea{ resize: vertical; min-height:56px; line-height:1.5; }
+  /* The date/time picker icon Chrome/Edge/Safari draw inside these inputs is the
+     one bit of their native chrome that can't be restyled away — recoloring it to
+     the app's own muted gray (rather than leaving it pure black) is the closest a
+     border/radius/font match can get to making it read as part of this design
+     system instead of a bare OS control dropped into a custom form. Firefox has no
+     equivalent pseudo-element; its own picker icon is left as-is there. */
+  input[type=date]::-webkit-calendar-picker-indicator, input[type=time]::-webkit-calendar-picker-indicator{
+    filter: invert(46%) sepia(6%) saturate(383%) hue-rotate(182deg) brightness(94%) contrast(87%);
+    cursor:pointer;
+  }
 
   .btn{
     display:inline-flex; align-items:center; justify-content:center; gap:6px;
@@ -472,6 +482,16 @@
     max-width: 352px; width:100%; max-height: 80vh; overflow-y:auto; padding: 24px;
   }
   .modal-card-wide{ max-width: 512px; }
+  /* This is the one modal whose body list can grow past a screen's height on its
+     own (every registered specialty) while also having action buttons the user
+     needs — .modal-card's own default (the whole card scrolls as one block) left
+     Done/Clear stranded below the fold behind the list's own inner scroll,
+     needing a second scroll-past-the-list just to reach them. Turning the card
+     into a column with only the list itself scrolling keeps the footer always
+     on screen, the standard pattern for a scrollable dialog. */
+  #book-appt-filter-modal .modal-card{ display:flex; flex-direction:column; max-height:80vh; overflow:hidden; }
+  #book-appt-filter-options{ overflow-y:auto; flex:1 1 auto; min-height:0; }
+  #book-appt-filter-modal .save-row{ flex-shrink:0; padding-top:11px; }
   .modal-close{
     position:absolute; top:11px; right:11px; background:none; border:none; font-size:1.2rem;
     line-height:1; color: var(--muted); padding:3px;
@@ -652,6 +672,25 @@
   }
   .chip button{ background:none; border:none; color: var(--teal-dark); opacity:0.7; font-size:0.8rem; line-height:1; padding:0 2px; }
   .chip button:hover{ opacity:1; color: var(--red); }
+
+  /* Checkbox row in the booking specialty filter popup. */
+  .check-row{ display:flex; align-items:center; gap:10px; padding:10px 2px; border-bottom:1px solid var(--line); font-size:0.74rem; color: var(--ink); cursor:pointer; }
+  /* A hand-drawn checkmark (appearance:none + a CSS-only tick, same spirit as the
+     app's other custom controls like the dropdown chevron and hold-fill) instead
+     of the browser's own flat square — accent-color alone still leaves a sharp-
+     cornered native box that reads as unstyled next to the rest of this design's
+     rounded chips/badges/buttons. */
+  .check-row input[type=checkbox]{
+    appearance:none; -webkit-appearance:none; width:18px; height:18px; margin:0; flex-shrink:0;
+    border:1.5px solid var(--line); border-radius:4px; background: var(--paper); position:relative;
+    cursor:pointer; transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .check-row input[type=checkbox]:checked{ background: var(--teal); border-color: var(--teal); }
+  .check-row input[type=checkbox]:checked::after{
+    content:""; position:absolute; left:5px; top:1px; width:5px; height:9px;
+    border:solid white; border-width:0 2px 2px 0; transform:rotate(45deg);
+  }
+  .check-row input[type=checkbox]:focus-visible{ outline:2px solid var(--teal); outline-offset:2px; }
 
   /* ---------- Booking slot picker ---------- */
   .slot-grid{ display:flex; flex-wrap:wrap; gap:6px; }

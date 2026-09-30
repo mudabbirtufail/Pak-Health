@@ -127,6 +127,28 @@
     return;
   }
 
+  // Landing on this page from a password-reset email's link makes the client
+  // consume that link's token and establish a session automatically — this event
+  // is how Supabase distinguishes that from an ordinary sign-in, so it's the only
+  // reliable signal to show "Set a new password" instead of just dropping the
+  // visitor into their dashboard as if they'd signed in normally. Registered here,
+  // synchronously right after the client is created, so the subscription is in
+  // place before the client's own internal URL-token processing can fire it —
+  // bootstrap() below (which awaits getSession()) is guaranteed to run after this,
+  // since getSession() itself waits on that same internal initialization.
+  var awaitingPasswordRecovery = false;
+  supabaseClient.auth.onAuthStateChange(function(event){
+    if (event === 'PASSWORD_RECOVERY'){
+      awaitingPasswordRecovery = true;
+      $('set-new-password').value = '';
+      $('set-new-password-confirm').value = '';
+      clearError($('set-new-password-error'));
+      suppressHistoryPush = true;
+      showView('view-set-new-password');
+      suppressHistoryPush = false;
+    }
+  });
+
   function isDoctorVerified(d){ return !!(d && d.verified); }
   function maskPhone(phone){
     if (!phone) return 'No phone on file';
@@ -493,11 +515,40 @@
   $('doc-signin-password').addEventListener('keydown', function(e){
     if (e.key === 'Enter') $('doc-signin-btn').click();
   });
-  $('doc-forgot-btn').addEventListener('click', function(){ $('doc-forgot-modal').classList.remove('hidden'); });
+  $('doc-forgot-btn').addEventListener('click', function(){
+    $('doc-forgot-form').classList.remove('hidden');
+    $('doc-forgot-sent-note').classList.add('hidden');
+    $('doc-forgot-email').value = '';
+    clearError($('doc-forgot-error'));
+    $('doc-forgot-modal').classList.remove('hidden');
+  });
   function closeDocForgotModal(){ $('doc-forgot-modal').classList.add('hidden'); }
   $('doc-forgot-close').addEventListener('click', closeDocForgotModal);
   $('doc-forgot-ok').addEventListener('click', closeDocForgotModal);
   $('doc-forgot-modal').addEventListener('click', function(e){ if (e.target === $('doc-forgot-modal')) closeDocForgotModal(); });
+  $('doc-forgot-send-btn').addEventListener('click', async function(){
+    var email = $('doc-forgot-email').value.trim();
+    clearError($('doc-forgot-error'));
+    if (!EMAIL_RE.test(email)){ showError($('doc-forgot-error'), 'Enter a valid email address.'); return; }
+    $('doc-forgot-send-btn').disabled = true;
+    try{
+      var res = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname
+      });
+      if (res.error){
+        showError($('doc-forgot-error'), authErrorMessage(res.error, 'Something went wrong. Please try again.'));
+        return;
+      }
+      $('doc-forgot-sent-addr').textContent = email;
+      $('doc-forgot-form').classList.add('hidden');
+      $('doc-forgot-sent-note').classList.remove('hidden');
+    }finally{
+      $('doc-forgot-send-btn').disabled = false;
+    }
+  });
+  $('doc-forgot-email').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') $('doc-forgot-send-btn').click();
+  });
 
   // ================= PATIENT AUTH =================
   function showPatientAuthPane(pane){
@@ -587,11 +638,40 @@
   $('pat-signin-password').addEventListener('keydown', function(e){
     if (e.key === 'Enter') $('pat-signin-btn').click();
   });
-  $('pat-forgot-btn').addEventListener('click', function(){ $('pat-forgot-modal').classList.remove('hidden'); });
+  $('pat-forgot-btn').addEventListener('click', function(){
+    $('pat-forgot-form').classList.remove('hidden');
+    $('pat-forgot-sent-note').classList.add('hidden');
+    $('pat-forgot-email').value = '';
+    clearError($('pat-forgot-error'));
+    $('pat-forgot-modal').classList.remove('hidden');
+  });
   function closePatForgotModal(){ $('pat-forgot-modal').classList.add('hidden'); }
   $('pat-forgot-close').addEventListener('click', closePatForgotModal);
   $('pat-forgot-ok').addEventListener('click', closePatForgotModal);
   $('pat-forgot-modal').addEventListener('click', function(e){ if (e.target === $('pat-forgot-modal')) closePatForgotModal(); });
+  $('pat-forgot-send-btn').addEventListener('click', async function(){
+    var email = $('pat-forgot-email').value.trim();
+    clearError($('pat-forgot-error'));
+    if (!EMAIL_RE.test(email)){ showError($('pat-forgot-error'), 'Enter a valid email address.'); return; }
+    $('pat-forgot-send-btn').disabled = true;
+    try{
+      var res = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname
+      });
+      if (res.error){
+        showError($('pat-forgot-error'), authErrorMessage(res.error, 'Something went wrong. Please try again.'));
+        return;
+      }
+      $('pat-forgot-sent-addr').textContent = email;
+      $('pat-forgot-form').classList.add('hidden');
+      $('pat-forgot-sent-note').classList.remove('hidden');
+    }finally{
+      $('pat-forgot-send-btn').disabled = false;
+    }
+  });
+  $('pat-forgot-email').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') $('pat-forgot-send-btn').click();
+  });
 
   // ================= PATIENT DASHBOARD =================
   var currentPatientData = null;
@@ -1139,9 +1219,7 @@
     currentPatientData.allergies = allergies;
     currentPatientData.conditions = conditions;
     renderHealthCard(currentPatientData);
-    var note = $('pat-profile-save-note');
-    note.classList.add('show');
-    setTimeout(function(){ note.classList.remove('show'); }, 1800);
+    showView('view-patient-dash');
   });
 
   $('pat-save-btn').addEventListener('click', async function(){
@@ -1604,6 +1682,9 @@
     showView('view-pat-book-appt');
     var res = await supabaseClient.from('doctors').select('*');
     bookApptDoctors = (res.data || []).map(mapDoctorRow);
+    collectSpecialtyNames();
+    bookApptSpecialtyFilter = [];
+    renderFilterButtonAndChips();
     renderBookApptDoctorList(bookApptDoctors);
   }
   // Clicking a doctor doesn't navigate anywhere — it expands a clinics sub-list
@@ -1663,12 +1744,17 @@
     var res = await supabaseClient.from('doctor_availability').select('*').eq('doctor_id', d.id);
     var availability = (res.data || []).map(mapAvailabilityRow);
     var clinicNames = distinctBookableClinics(availability);
+    // A doctor's About is shown whether or not they're verified — it's their own
+    // words about themselves, not a verified credential.
+    var aboutHtml = d.about
+      ? '<div class="li-sub" style="padding:8px 10px; white-space:pre-wrap; color:var(--ink-soft);">'+escapeHtml(d.about)+'</div>'
+      : '';
     if (!clinicNames.length){
-      clinicsEl.innerHTML = '<div class="li-sub" style="padding:8px 10px;">No bookable clinics yet.</div>';
+      clinicsEl.innerHTML = aboutHtml + '<div class="li-sub" style="padding:8px 10px;">No bookable clinics yet.</div>';
       return;
     }
     var clinics = clinicNames.map(function(name){ return findClinicByName(d, name); });
-    clinicsEl.innerHTML = clinics.map(function(c){
+    clinicsEl.innerHTML = aboutHtml + clinics.map(function(c){
       return '<div class="list-item" data-clinic="'+escapeHtml(c.name)+'">'
         + '<div><div class="li-title">'+escapeHtml(c.name)+'</div>'
         + (c.address ? '<div class="li-sub">'+escapeHtml(c.address)+'</div>' : '')
@@ -1805,16 +1891,87 @@
       });
     });
   }
-  $('book-appt-search-input').addEventListener('input', function(){
-    var q = this.value.trim().toLowerCase();
-    if (!q){ renderBookApptDoctorList(bookApptDoctors); return; }
+  // A doctor's specialty is free text and can list several ("Cardiology, Family
+  // Medicine") — split on commas so each one is its own filter option/match.
+  function doctorSpecialties(d){
+    return (d.specialty || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  }
+  // Filter options come from the doctors actually registered (case-insensitive
+  // dedupe), so the checkbox list never offers a specialty nobody has. Selected
+  // ones are kept lowercase in bookApptSpecialtyFilter; a doctor matches if they
+  // list ANY of them (OR), on top of whatever the text search says.
+  var bookApptSpecialtyFilter = [];
+  var bookApptSpecialtyNames = {};
+  function collectSpecialtyNames(){
+    // Every specialty on the fixed list is always offered, even if no doctor has
+    // picked it yet; anything a doctor entered before the list existed is added too.
+    bookApptSpecialtyNames = {};
+    SPECIALTY_OPTIONS.forEach(function(s){ bookApptSpecialtyNames[s.toLowerCase()] = s; });
+    bookApptDoctors.forEach(function(d){
+      doctorSpecialties(d).forEach(function(s){
+        if (!bookApptSpecialtyNames[s.toLowerCase()]) bookApptSpecialtyNames[s.toLowerCase()] = s;
+      });
+    });
+  }
+  function renderFilterButtonAndChips(){
+    var n = bookApptSpecialtyFilter.length;
+    $('book-appt-filter-btn').textContent = n ? 'Filter (' + n + ')' : 'Filter';
+    var chipsEl = $('book-appt-filter-chips');
+    chipsEl.classList.toggle('hidden', !n);
+    chipsEl.innerHTML = bookApptSpecialtyFilter.map(function(k){
+      var label = bookApptSpecialtyNames[k] || k;
+      return '<span class="chip">'+escapeHtml(label)+'<button type="button" data-key="'+escapeHtml(k)+'" aria-label="Remove '+escapeHtml(label)+' filter">&times;</button></span>';
+    }).join('');
+    chipsEl.querySelectorAll('button').forEach(function(b){
+      b.addEventListener('click', function(){
+        bookApptSpecialtyFilter = bookApptSpecialtyFilter.filter(function(k){ return k !== b.getAttribute('data-key'); });
+        renderFilterButtonAndChips();
+        applyBookApptFilters();
+      });
+    });
+  }
+  function applyBookApptFilters(){
+    var q = $('book-appt-search-input').value.trim().toLowerCase();
     var filtered = bookApptDoctors.filter(function(d){
+      if (bookApptSpecialtyFilter.length){
+        var mine = doctorSpecialties(d).map(function(s){ return s.toLowerCase(); });
+        if (!bookApptSpecialtyFilter.some(function(k){ return mine.indexOf(k) !== -1; })) return false;
+      }
+      if (!q) return true;
       if ((d.name || '').toLowerCase().indexOf(q) !== -1) return true;
+      if ((d.specialty || '').toLowerCase().indexOf(q) !== -1) return true;
       if ((d.currentClinic || '').toLowerCase().indexOf(q) !== -1) return true;
       return (d.clinics || []).some(function(c){ return (c.name || '').toLowerCase().indexOf(q) !== -1; });
     });
     renderBookApptDoctorList(filtered);
+  }
+  function closeBookApptFilterModal(){ $('book-appt-filter-modal').classList.add('hidden'); }
+  $('book-appt-filter-btn').addEventListener('click', function(){
+    var keys = Object.keys(bookApptSpecialtyNames).sort(function(a, b){ return bookApptSpecialtyNames[a].localeCompare(bookApptSpecialtyNames[b]); });
+    var listEl = $('book-appt-filter-options');
+    listEl.innerHTML = keys.map(function(k){
+      return '<label class="check-row"><input type="checkbox" value="'+escapeHtml(k)+'"'
+        + (bookApptSpecialtyFilter.indexOf(k) !== -1 ? ' checked' : '') + '><span>'+escapeHtml(bookApptSpecialtyNames[k])+'</span></label>';
+    }).join('');
+    listEl.querySelectorAll('input').forEach(function(cb){
+      cb.addEventListener('change', function(){
+        bookApptSpecialtyFilter = Array.prototype.map.call(listEl.querySelectorAll('input:checked'), function(el){ return el.value; });
+        renderFilterButtonAndChips();
+        applyBookApptFilters();
+      });
+    });
+    $('book-appt-filter-modal').classList.remove('hidden');
   });
+  $('book-appt-filter-done').addEventListener('click', closeBookApptFilterModal);
+  $('book-appt-filter-close').addEventListener('click', closeBookApptFilterModal);
+  $('book-appt-filter-modal').addEventListener('click', function(e){ if (e.target === $('book-appt-filter-modal')) closeBookApptFilterModal(); });
+  $('book-appt-filter-clear').addEventListener('click', function(){
+    bookApptSpecialtyFilter = [];
+    $('book-appt-filter-options').querySelectorAll('input').forEach(function(cb){ cb.checked = false; });
+    renderFilterButtonAndChips();
+    applyBookApptFilters();
+  });
+  $('book-appt-search-input').addEventListener('input', applyBookApptFilters);
   $('book-appt-change-doctor').addEventListener('click', function(){
     bookApptSelectedDoctor = null;
     bookApptSelectedClinic = null;
@@ -2379,9 +2536,11 @@
     $('doc-email').value = authUser.email || '';
     $('doc-phone').value = data.phone || '';
     $('doc-license').value = data.license || '';
-    $('doc-specialty').value = data.specialty || '';
+    docSpecialties = doctorSpecialties(data);
+    renderDocSpecialtyChips();
     $('doc-education').value = data.education || '';
     $('doc-about').value = data.about || '';
+    updateDocCharCounts();
     renderDoctorCard(data);
     renderVerifyBanner('doc', authUser.email, !!authUser.email_confirmed_at);
     renderDoctorVerification(data);
@@ -2805,9 +2964,67 @@
       setTimeout(function(){ btn.textContent = 'Resend email'; btn.disabled = false; }, 2500);
     }
   });
+  // Specialties are picked from a fixed list, never typed. Stored in the existing
+  // doctors.specialty text column as a comma-separated string (so no schema
+  // change) — which is why no option below may itself contain a comma.
+  var SPECIALTY_OPTIONS = [
+    'Cardiology', 'Dentistry', 'Dermatology', 'Endocrinology', 'ENT (Ear Nose & Throat)',
+    'Family Medicine', 'Gastroenterology', 'General Medicine', 'General Surgery',
+    'Gynecology & Obstetrics', 'Neurology', 'Ophthalmology', 'Orthopedics', 'Pediatrics',
+    'Psychiatry', 'Pulmonology', 'Radiology', 'Urology'
+  ];
+  var docSpecialties = [];
+  // The maxlength attributes in the HTML (60 / 200) do the actual limiting; this
+  // just keeps the "n/max" counters under each field in step.
+  function updateDocCharCounts(){
+    $('doc-education-count').textContent = $('doc-education').value.length + '/60';
+    $('doc-about-count').textContent = $('doc-about').value.length + '/200';
+  }
+  $('doc-education').addEventListener('input', updateDocCharCounts);
+  $('doc-about').addEventListener('input', updateDocCharCounts);
+  function renderDocSpecialtyChips(){
+    var el = $('doc-specialty-chips');
+    if (!docSpecialties.length){
+      el.innerHTML = '<span class="panel-sub">No specialty added yet.</span>';
+      return;
+    }
+    el.innerHTML = docSpecialties.map(function(s, i){
+      return '<span class="chip">'+escapeHtml(s)+'<button type="button" data-idx="'+i+'" aria-label="Remove '+escapeHtml(s)+'">&times;</button></span>';
+    }).join('');
+    el.querySelectorAll('button').forEach(function(b){
+      b.addEventListener('click', function(){
+        docSpecialties.splice(parseInt(b.getAttribute('data-idx'), 10), 1);
+        renderDocSpecialtyChips();
+      });
+    });
+  }
+  function closeDocSpecialtyModal(){ $('doc-specialty-modal').classList.add('hidden'); }
+  $('doc-specialty-add-btn').addEventListener('click', function(){
+    var chosen = docSpecialties.map(function(s){ return s.toLowerCase(); });
+    var remaining = SPECIALTY_OPTIONS.filter(function(o){ return chosen.indexOf(o.toLowerCase()) === -1; });
+    var listEl = $('doc-specialty-options');
+    if (!remaining.length){
+      listEl.innerHTML = '<div class="li-sub" style="padding:8px 0;">You\'ve added every specialty on the list.</div>';
+    } else {
+      listEl.innerHTML = remaining.map(function(o){
+        return '<div class="list-item" data-opt="'+escapeHtml(o)+'"><div class="li-title">'+escapeHtml(o)+'</div></div>';
+      }).join('');
+      listEl.querySelectorAll('.list-item').forEach(function(item){
+        item.addEventListener('click', function(){
+          docSpecialties.push(item.getAttribute('data-opt'));
+          renderDocSpecialtyChips();
+          closeDocSpecialtyModal();
+        });
+      });
+    }
+    $('doc-specialty-modal').classList.remove('hidden');
+  });
+  $('doc-specialty-close').addEventListener('click', closeDocSpecialtyModal);
+  $('doc-specialty-modal').addEventListener('click', function(e){ if (e.target === $('doc-specialty-modal')) closeDocSpecialtyModal(); });
+
   $('doc-profile-save-btn').addEventListener('click', async function(){
     var name = $('doc-name').value.trim();
-    var specialty = $('doc-specialty').value.trim();
+    var specialty = docSpecialties.join(', ');
     var education = $('doc-education').value.trim();
     var about = $('doc-about').value.trim();
     await supabaseClient.from('doctors').update({ name: name, specialty: specialty, education: education, about: about }).eq('id', session.id);
@@ -2816,9 +3033,7 @@
     currentDoctorData.education = education;
     currentDoctorData.about = about;
     renderDoctorCard(currentDoctorData);
-    var note = $('doc-profile-save-note');
-    note.classList.add('show');
-    setTimeout(function(){ note.classList.remove('show'); }, 1800);
+    showView('view-doctor-dash');
   });
   $('doc-dash-copy').addEventListener('click', function(){
     copyToClipboard(currentDoctorData.doctorId, $('doc-dash-copy-note'));
@@ -3411,26 +3626,76 @@
   // ---------- Bootstrap ----------
   // Unlike the old kv_store version, the Supabase client persists its own session
   // in localStorage — so a reload no longer has to restart at landing. If a
-  // session already exists (including one just established by a confirmation or
-  // password-reset link's #access_token=... fragment, which the client consumes
-  // automatically during getSession()), route straight into the right dashboard
-  // instead of showing landing at all.
+  // session already exists (including one just established by a confirmation
+  // link's #access_token=... fragment, which the client consumes automatically
+  // during getSession()), route straight into the right dashboard instead of
+  // showing landing at all. A password-*recovery* link's session is handled
+  // separately — see PASSWORD_RECOVERY, near the top of this file.
+  //
+  // routeIntoDashboard() is shared by bootstrap() below and by the "set new
+  // password" success handler just above — both end up with an established
+  // auth session and need the exact same role-check/enter-dashboard routing,
+  // just reached a different way.
+  async function routeIntoDashboard(authSession){
+    var role = authSession.user.user_metadata && authSession.user.user_metadata.role;
+    var targetView = role === 'doctor' ? 'view-doctor-dash' : 'view-patient-dash';
+    history.replaceState({ view: targetView }, '', location.pathname + location.search);
+    suppressHistoryPush = true;
+    if (role === 'doctor'){
+      session = { type:'doctor', id: authSession.user.id };
+      await enterDoctorDash(authSession.user.id);
+    } else {
+      session = { type:'patient', id: authSession.user.id };
+      await enterPatientDash(authSession.user.id);
+    }
+    suppressHistoryPush = false;
+  }
+
+  $('set-new-password-btn').addEventListener('click', async function(){
+    var pw = $('set-new-password').value;
+    var confirmPw = $('set-new-password-confirm').value;
+    clearError($('set-new-password-error'));
+    if (!pw || pw.length < 6){ showError($('set-new-password-error'), 'Password must be at least 6 characters.'); return; }
+    if (pw !== confirmPw){ showError($('set-new-password-error'), "Passwords don't match."); return; }
+    $('set-new-password-btn').disabled = true;
+    try{
+      var res = await supabaseClient.auth.updateUser({ password: pw });
+      if (res.error){
+        // "Auth session missing" is what an expired/already-used reset link's
+        // session looks like here — the far more likely real-world case than a
+        // genuine backend error, so it gets its own plain-language message
+        // rather than surfacing Supabase's own wording.
+        var msg = /session/i.test(res.error.message || '')
+          ? 'This reset link has expired or was already used. Please request a new one.'
+          : authErrorMessage(res.error, 'Something went wrong. Please request a new reset link and try again.');
+        showError($('set-new-password-error'), msg);
+        return;
+      }
+      awaitingPasswordRecovery = false;
+      var sessionRes = await supabaseClient.auth.getSession();
+      var authSession = sessionRes.data && sessionRes.data.session;
+      if (authSession && authSession.user) await routeIntoDashboard(authSession);
+    }finally{
+      $('set-new-password-btn').disabled = false;
+    }
+  });
+  $('set-new-password').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') $('set-new-password-btn').click();
+  });
+  $('set-new-password-confirm').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') $('set-new-password-btn').click();
+  });
+
   (async function bootstrap(){
     var res = await supabaseClient.auth.getSession();
+    // A password-recovery session is real and valid, but the visitor hasn't set
+    // a new password yet — the PASSWORD_RECOVERY listener above has already (or
+    // is about to) show "Set a new password"; don't race it by also dropping
+    // them into their normal dashboard as if this were an ordinary sign-in.
+    if (awaitingPasswordRecovery) return;
     var authSession = res.data && res.data.session;
     if (authSession && authSession.user){
-      var role = authSession.user.user_metadata && authSession.user.user_metadata.role;
-      var targetView = role === 'doctor' ? 'view-doctor-dash' : 'view-patient-dash';
-      history.replaceState({ view: targetView }, '', location.pathname + location.search);
-      suppressHistoryPush = true;
-      if (role === 'doctor'){
-        session = { type:'doctor', id: authSession.user.id };
-        await enterDoctorDash(authSession.user.id);
-      } else {
-        session = { type:'patient', id: authSession.user.id };
-        await enterPatientDash(authSession.user.id);
-      }
-      suppressHistoryPush = false;
+      await routeIntoDashboard(authSession);
     } else {
       history.replaceState({ view: 'view-landing' }, '', '#view-landing');
       suppressHistoryPush = true;

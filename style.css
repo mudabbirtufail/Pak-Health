@@ -50,6 +50,24 @@
     .view.view-fade-in{ opacity:1; transition: opacity 180ms ease; }
   }
 
+  /* ---------- Welcome (shown while the dashboard loads after sign-in) ---------- */
+  /* Urdu, so right-to-left and set in a face with actual Arabic-script glyphs —
+     the app's other three fonts (Spectral/IBM Plex Sans/IBM Plex Mono) have none
+     at all, they'd just fall back to the browser's own default face mid-page.
+     Two lines, centered: a teal "Assalam o Alaikum" over the darker time-of-day
+     greeting, the second sliding in just after the first. Same
+     prefers-reduced-motion convention as the view-fade/pulse animations — the
+     text simply appears, already in place, for anyone who's asked for it. */
+  .welcome-wrap{ flex:1; display:flex; align-items:center; justify-content:center; padding:26px; }
+  .welcome-greeting{ font-family:'Noto Naskh Arabic', serif; text-align:center; }
+  .welcome-greeting-top{ display:block; font-size:2rem; font-weight:600; color: var(--teal-dark); }
+  .welcome-greeting-main{ display:block; font-size:2.6rem; font-weight:700; color: var(--ink); line-height:1.5; margin-top:4px; }
+  @media (prefers-reduced-motion: no-preference){
+    .welcome-greeting-top{ animation: greeting-slide-in 0.6s ease-out both; }
+    .welcome-greeting-main{ animation: greeting-slide-in 0.6s ease-out 0.5s both; }
+  }
+  @keyframes greeting-slide-in{ from{ opacity:0; transform: translateX(-28px); } to{ opacity:1; transform: translateX(0); } }
+
   /* ---------- Topbar ---------- */
   .topbar{
     display:flex; align-items:center; justify-content:space-between;
@@ -376,6 +394,15 @@
   }
   .badge.verified{ background: var(--teal-wash); color: var(--teal-dark); }
   .badge.unverified{ background: var(--amber-wash); color: var(--amber); }
+  /* A report the patient uploaded themselves (not written by a doctor) — neutral,
+     since it's neither verified nor a warning. */
+  .badge.self{ background: var(--bg); color: var(--ink-soft); border:1px solid var(--line); }
+
+  /* Styled stand-in for the native file input (kept hidden) so the picker matches
+     the rest of the form instead of showing the browser's own "Choose File" box. */
+  .file-pick{ display:flex; align-items:center; gap:10px; }
+  .file-pick .btn{ flex-shrink:0; }
+  .file-pick-name{ font-size:0.7rem; color: var(--muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
   .checklist{ list-style:none; padding:0; margin:11px 0 0; font-size:0.67rem; color: var(--ink-soft); }
   .checklist li{ padding:3px 0; display:flex; align-items:center; gap:6px; }
@@ -419,14 +446,6 @@
   .kv .block{ grid-column: 1 / -1; margin-top:2px; }
   .empty-state{ color: var(--muted); font-size:0.72rem; padding: 14px 0; }
   .not-found{ color: var(--red); font-size:0.72rem; padding: 8px 0; }
-
-  /* margin-top stays small on purpose — .copy-note right above this (empty
-     most of the time, see its own rule) no longer reserves a permanent slot,
-     so this just needs its own small gap under the health card, not extra
-     room for a reserved-but-usually-empty element on top of that. */
-  .privacy-note{
-    font-size:0.64rem; color: var(--muted); background: var(--bg); border-radius:6px; padding:10px 11px; line-height:1.5; margin-top:4px;
-  }
 
   /* ---------- Email verification banner ---------- */
   .verify-banner{

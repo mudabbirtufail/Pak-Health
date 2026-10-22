@@ -716,3 +716,66 @@ end;
 $$;
 
 grant execute on function public.remove_dependent(uuid) to authenticated;
+
+
+-- =============================================================================
+-- Patient-uploaded test reports
+-- =============================================================================
+-- A patient (or a guardian, for a dependent) can attach a PDF/image report to
+-- their own record. Stored in a PRIVATE bucket and only ever read through
+-- short-lived signed URLs, so a link can't be shared around indefinitely. The
+-- file lives under "<patient_id>/..." so storage policies can check access from
+-- the path alone: the patient/guardian, or a doctor with an active grant (same
+-- rule as tests_select above).
+--
+-- A patient-uploaded row is explicitly NOT doctor-authored: authored_by_doctor_id
+-- stays null and uploaded_by_patient is true, so the UI can label it honestly
+-- and nobody can dress a self-uploaded entry up as a doctor's.
+
+alter table public.tests add column if not exists report_file_path text;
+alter table public.tests add column if not exists uploaded_by_patient boolean not null default false;
+
+drop policy if exists "tests_insert_patient" on public.tests;
+create policy "tests_insert_patient" on public.tests
+  for insert with check (
+    uploaded_by_patient
+    and authored_by_doctor_id is null
+    and written_via_grant_id is null
+    and (auth.uid() = patient_id or public.is_guardian_of(patient_id))
+    and (report_file_path is null or report_file_path like patient_id::text || '/%')
+  );
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('test-reports', 'test-reports', false, 5242880,
+        array['application/pdf', 'image/png', 'image/jpeg', 'image/webp'])
+on conflict (id) do update
+  set public = false,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "test_reports_insert" on storage.objects;
+create policy "test_reports_insert" on storage.objects
+  for insert with check (
+    bucket_id = 'test-reports'
+    and ((storage.foldername(name))[1] = auth.uid()::text
+         or public.is_guardian_of(((storage.foldername(name))[1])::uuid))
+  );
+
+drop policy if exists "test_reports_select" on storage.objects;
+create policy "test_reports_select" on storage.objects
+  for select using (
+    bucket_id = 'test-reports'
+    and ((storage.foldername(name))[1] = auth.uid()::text
+         or public.is_guardian_of(((storage.foldername(name))[1])::uuid)
+         or public.has_active_grant(((storage.foldername(name))[1])::uuid, auth.uid()))
+  );
+
+-- Delete is for the patient/guardian only, so a failed upload can clean up after
+-- itself; doctors never get to remove a patient's file.
+drop policy if exists "test_reports_delete" on storage.objects;
+create policy "test_reports_delete" on storage.objects
+  for delete using (
+    bucket_id = 'test-reports'
+    and ((storage.foldername(name))[1] = auth.uid()::text
+         or public.is_guardian_of(((storage.foldername(name))[1])::uuid))
+  );

@@ -40,13 +40,13 @@
      crescent any more. -->
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Cpath%20fill-rule='evenodd'%20d='M2,12%20A9,9%200%201,0%2020,12%20A9,9%200%201,0%202,12%20Z%20M5.41,10.59%20A7,7%200%201,0%2019.41,10.59%20A7,7%200%201,0%205.41,10.59%20Z'%20fill='%231F6F63'/%3E%3Cpath%20d='M19,8.3%20C18,7.3%2016.3,7.3%2015.3,8.3%20L15,8.6%20L14.7,8.3%20C13.7,7.3%2012,7.3%2011,8.3%20C10,9.3%2010,11%2011,12%20L15,16%20L19,12%20C20,11%2020,9.3%2019,8.3%20Z'%20fill='%23A22D3B'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Naskh+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <!-- QR generation only (no scanning) for the family guardian-link code — see
      "Manage family" in CLAUDE.md. Pinned version, dependency-free, defines a
      single global `qrcode()` factory. -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<link rel="stylesheet" href="style.css?v=49">
+<link rel="stylesheet" href="style.css?v=58">
 </head>
 <body>
 
@@ -79,6 +79,20 @@
   <div class="loading-mark">
     <svg width="34" height="34" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>
     <span>Pak Health</span>
+  </div>
+</div>
+
+<!-- ============ WELCOME ============ -->
+<!-- Shown right after a successful sign-in/sign-up while the dashboard's data
+     loads (see startWelcome()/waitForWelcome() in app.js). Not part of
+     PATIENT_ONLY_VIEWS/DOCTOR_ONLY_VIEWS and never given a history entry, so
+     back/forward can't land on it. -->
+<div id="view-welcome" class="view hidden">
+  <div class="welcome-wrap">
+    <div class="welcome-greeting" dir="rtl">
+      <span class="welcome-greeting-top">السلام علیکم</span>
+      <span class="welcome-greeting-main" id="welcome-greeting-main">—</span>
+    </div>
   </div>
 </div>
 
@@ -374,7 +388,6 @@
         <input type="file" accept="image/*" id="pat-avatar-input" class="hidden">
 
         <div class="copy-note" id="pat-dash-copy-note"></div>
-        <div class="privacy-note">Your live code refreshes on its own every 2 minutes and works once. Hand it over in person — never post or text it. A doctor you've trusted doesn't need it at all.</div>
        </div>
       </div>
 
@@ -744,6 +757,27 @@
           <span class="eyebrow">Records</span>
           <h3 style="margin-top:5px;">Lab Results</h3>
           <p class="panel-sub" style="margin-top:6px;">Tests and reports on file.</p>
+          <div style="margin-bottom:10px;">
+            <button class="btn btn-secondary btn-block" id="pat-test-upload-btn" type="button">+ Upload a report</button>
+            <div id="pat-test-upload-fields" class="hidden" style="margin-top:11px;">
+              <div class="field"><label for="pat-test-upload-name">Report name</label><input type="text" id="pat-test-upload-name" maxlength="80" placeholder="e.g. Blood test, X-ray"></div>
+              <div class="field"><label for="pat-test-upload-date">Date</label><input type="date" id="pat-test-upload-date"></div>
+              <div class="field">
+                <label>File</label>
+                <div class="file-pick">
+                  <button type="button" class="btn btn-secondary btn-sm" id="pat-test-upload-choose">Choose file</button>
+                  <span class="file-pick-name" id="pat-test-upload-filename">No file chosen</span>
+                </div>
+                <input type="file" id="pat-test-upload-file" class="hidden" accept="application/pdf,image/png,image/jpeg,image/webp">
+                <div class="panel-sub" style="margin:4px 0 0;">PDF, PNG, JPG or WebP, up to 5 MB.</div>
+              </div>
+              <div class="error-text" id="pat-test-upload-error"></div>
+              <div class="save-row">
+                <button class="btn btn-primary" id="pat-test-upload-save" type="button">Upload report</button>
+                <button class="btn btn-secondary" id="pat-test-upload-cancel" type="button">Cancel</button>
+              </div>
+            </div>
+          </div>
           <div id="pat-tests-list"></div>
           <div class="empty-state" id="pat-tests-empty">No tests on file yet.</div>
         </div>
@@ -754,8 +788,13 @@
               <span class="eyebrow" id="test-detail-date">—</span>
               <h3 id="test-detail-name" style="margin-top:5px;">—</h3>
               <dl class="kv" style="margin-top:13px;">
-                <dt>Ordered by</dt><dd id="test-detail-doctor">—</dd>
+                <dt id="test-detail-doctor-label">Ordered by</dt><dd id="test-detail-doctor">—</dd>
                 <dt>Result summary</dt><dd class="block" id="test-detail-result">—</dd>
+                <dt id="test-detail-file-label" class="hidden">Report file</dt>
+                <dd id="test-detail-file-row" class="hidden">
+                  <button type="button" class="btn btn-secondary btn-sm" id="test-detail-file-btn">View report</button>
+                  <div class="error-text" id="test-detail-file-error"></div>
+                </dd>
               </dl>
             </div>
           </div>
@@ -1199,8 +1238,13 @@
             <span class="eyebrow" id="doc-test-detail-date">—</span>
             <h3 id="doc-test-detail-name" style="margin-top:5px;">—</h3>
             <dl class="kv" style="margin-top:13px;">
-              <dt>Ordered by</dt><dd id="doc-test-detail-doctor">—</dd>
+              <dt id="doc-test-detail-doctor-label">Ordered by</dt><dd id="doc-test-detail-doctor">—</dd>
               <dt>Result summary</dt><dd class="block" id="doc-test-detail-result">—</dd>
+              <dt id="doc-test-detail-file-label" class="hidden">Report file</dt>
+              <dd id="doc-test-detail-file-row" class="hidden">
+                <button type="button" class="btn btn-secondary btn-sm" id="doc-test-detail-file-btn">View report</button>
+                <div class="error-text" id="doc-test-detail-file-error"></div>
+              </dd>
             </dl>
           </div>
           <div class="record-detail-empty hidden" id="doc-prescription-detail-empty">Select a prescription to see its details.</div>
@@ -1402,6 +1446,6 @@
   </main>
 </div>
 
-<script src="app.js?v=65"></script>
+<script src="app.js?v=71"></script>
 </body>
 </html>

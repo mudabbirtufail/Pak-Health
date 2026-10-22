@@ -149,6 +149,35 @@
     }
   });
 
+  function timeOfDayGreetingUrdu(){
+    var h = new Date().getHours();
+    if (h < 12) return 'صبح بخیر';
+    if (h < 17) return 'دوپہر بخیر';
+    return 'شام بخیر';
+  }
+  // The welcome screen (#view-welcome) shown right after a successful sign-in or
+  // sign-up, while enterPatientDash()/enterDoctorDash() load the dashboard's
+  // data. Those functions finish by calling showView() for the dashboard the
+  // moment their data is ready — which on a fast connection would cut the
+  // greeting off almost instantly — so they first await waitForWelcome(),
+  // which holds until WELCOME_MIN_MS after startWelcome() was called. With no
+  // startWelcome() pending (family switching, reloads), welcomeUntil is 0 and
+  // waitForWelcome() returns immediately.
+  var WELCOME_MIN_MS = 2200;
+  var welcomeUntil = 0;
+  function startWelcome(){
+    $('welcome-greeting-main').textContent = timeOfDayGreetingUrdu();
+    welcomeUntil = Date.now() + WELCOME_MIN_MS;
+    // No history entry — back/forward must never land on the welcome screen.
+    suppressHistoryPush = true;
+    showView('view-welcome');
+    suppressHistoryPush = false;
+  }
+  async function waitForWelcome(){
+    var remaining = welcomeUntil - Date.now();
+    welcomeUntil = 0;
+    if (remaining > 0) await new Promise(function(resolve){ setTimeout(resolve, remaining); });
+  }
   function isDoctorVerified(d){ return !!(d && d.verified); }
   function maskPhone(phone){
     if (!phone) return 'No phone on file';
@@ -204,7 +233,8 @@
   function mapTestRow(row){
     return {
       id: row.id, name: row.name || '', date: row.date, doctorName: row.doctor_name || '',
-      resultSummary: row.result_summary || '', writtenViaGrantId: row.written_via_grant_id, unverified: !!row.unverified
+      resultSummary: row.result_summary || '', writtenViaGrantId: row.written_via_grant_id, unverified: !!row.unverified,
+      reportFilePath: row.report_file_path || '', uploadedByPatient: !!row.uploaded_by_patient
     };
   }
   function mapEyeRow(row){
@@ -483,6 +513,7 @@
       }
       if (res.data.session){
         session = { type:'doctor', id:res.data.user.id };
+        startWelcome();
         await enterDoctorDash(res.data.user.id);
       } else {
         $('doc-signup-checkemail-addr').textContent = email;
@@ -507,6 +538,7 @@
         return;
       }
       session = { type:'doctor', id:res.data.user.id };
+      startWelcome();
       await enterDoctorDash(res.data.user.id);
     }finally{
       $('doc-signin-btn').disabled = false;
@@ -606,6 +638,7 @@
       }
       if (res.data.session){
         session = { type:'patient', id:res.data.user.id };
+        startWelcome();
         await enterPatientDash(res.data.user.id);
       } else {
         $('pat-signup-checkemail-addr').textContent = email;
@@ -630,6 +663,7 @@
         return;
       }
       session = { type:'patient', id:res.data.user.id };
+      startWelcome();
       await enterPatientDash(res.data.user.id);
     }finally{
       $('pat-signin-btn').disabled = false;
@@ -761,6 +795,7 @@
     patHowItWorks.close();
     await regenerateLiveCode();
     await renderFamilySwitcher();
+    await waitForWelcome();
     showView('view-patient-dash');
     syncStickyColumnHeights();
   }
@@ -1492,7 +1527,7 @@
     listEl.innerHTML = tests.map(function(t, i){
       return '<div class="list-item" data-idx="'+i+'">'
         + '<div>'
-        + '<div class="li-title">'+escapeHtml(t.name || 'Test')+unverifiedTagHtml(t)+'</div>'
+        + '<div class="li-title">'+escapeHtml(t.name || 'Test')+testTagHtml(t, 'patient')+'</div>'
         + '<div class="li-sub">'+escapeHtml(formatDateDisplay(t.date))+'</div>'
         + '</div>'
         + chevronSvg + '</div>';
@@ -2095,9 +2130,11 @@
     $('pat-test-detail-empty').classList.add('hidden');
     $('pat-test-detail').classList.remove('hidden');
     $('test-detail-date').textContent = formatDateDisplay(t.date);
-    $('test-detail-name').innerHTML = escapeHtml(t.name || 'Test') + unverifiedTagHtml(t);
-    $('test-detail-doctor').textContent = t.doctorName || 'Not recorded';
-    $('test-detail-result').textContent = t.resultSummary || 'No result summary added yet.';
+    $('test-detail-name').innerHTML = escapeHtml(t.name || 'Test') + testTagHtml(t, 'patient');
+    $('test-detail-doctor-label').textContent = t.uploadedByPatient ? 'Added by' : 'Ordered by';
+    $('test-detail-doctor').textContent = t.uploadedByPatient ? 'You (uploaded)' : (t.doctorName || 'Not recorded');
+    $('test-detail-result').textContent = t.resultSummary || (t.uploadedByPatient ? 'No summary — see the attached report.' : 'No result summary added yet.');
+    showTestReportRow('test-detail', t);
   }
 
   // ---- My Eyes ----
@@ -2562,6 +2599,7 @@
     closeDeleteClinicModal();
     closeDocAcctDropdown();
     docHowItWorks.close();
+    await waitForWelcome();
     showView('view-doctor-dash');
   }
 
@@ -3122,6 +3160,124 @@
   function unverifiedTagHtml(entry){
     return entry && entry.unverified ? ' <span class="badge unverified" style="padding:2px 6px; font-size:0.54rem;">Unverified</span>' : '';
   }
+
+  // ---- Test reports a patient uploaded themselves ----
+  // A self-uploaded row is labelled as such instead of carrying the doctor-written
+  // "Unverified" tag — it was never a doctor's entry to begin with.
+  function testTagHtml(t, viewer){
+    if (t && t.uploadedByPatient){
+      return ' <span class="badge self" style="padding:2px 6px; font-size:0.54rem;">'+(viewer === 'doctor' ? 'Patient upload' : 'Uploaded by you')+'</span>';
+    }
+    return unverifiedTagHtml(t);
+  }
+  var TEST_REPORT_BUCKET = 'test-reports';
+  var TEST_REPORT_MAX_BYTES = 5 * 1024 * 1024;
+  var TEST_REPORT_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
+  var testReportOpenPath = {};   // detail prefix -> storage path of the entry on screen
+  // Shows/hides the "View report" row in a test detail panel. prefix is 'test-detail'
+  // (patient) or 'doc-test-detail' (doctor) — the two panels share the same markup shape.
+  function showTestReportRow(prefix, t){
+    var has = !!(t && t.reportFilePath);
+    $(prefix + '-file-label').classList.toggle('hidden', !has);
+    $(prefix + '-file-row').classList.toggle('hidden', !has);
+    clearError($(prefix + '-file-error'));
+    testReportOpenPath[prefix] = has ? t.reportFilePath : '';
+  }
+  // The file sits in a private bucket, so "View" asks for a signed URL that expires
+  // after two minutes. The tab is opened synchronously inside the click first —
+  // opening it only after the await would look like a popup to the browser and get
+  // blocked.
+  function wireTestReportButton(prefix){
+    $(prefix + '-file-btn').addEventListener('click', async function(){
+      var path = testReportOpenPath[prefix];
+      var errEl = $(prefix + '-file-error');
+      clearError(errEl);
+      if (!path) return;
+      var win = window.open('', '_blank');
+      var res = await supabaseClient.storage.from(TEST_REPORT_BUCKET).createSignedUrl(path, 120);
+      if (res.error || !res.data || !res.data.signedUrl){
+        if (win) win.close();
+        showError(errEl, 'Couldn\'t open this report. It may have been removed, or your access may have changed.');
+        return;
+      }
+      if (win){ win.opener = null; win.location.href = res.data.signedUrl; }
+      else { window.location.href = res.data.signedUrl; }
+    });
+  }
+  wireTestReportButton('test-detail');
+  wireTestReportButton('doc-test-detail');
+
+  function safeFileName(name){
+    var cleaned = (name || 'report').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '');
+    return (cleaned || 'report').slice(-80);
+  }
+  function resetPatTestUploadForm(){
+    $('pat-test-upload-name').value = '';
+    $('pat-test-upload-date').value = new Date().toISOString().slice(0, 10);
+    $('pat-test-upload-file').value = '';
+    $('pat-test-upload-filename').textContent = 'No file chosen';
+    clearError($('pat-test-upload-error'));
+  }
+  $('pat-test-upload-btn').addEventListener('click', function(){
+    resetPatTestUploadForm();
+    $('pat-test-upload-fields').classList.toggle('hidden');
+  });
+  $('pat-test-upload-cancel').addEventListener('click', function(){
+    $('pat-test-upload-fields').classList.add('hidden');
+  });
+  $('pat-test-upload-choose').addEventListener('click', function(){ $('pat-test-upload-file').click(); });
+  $('pat-test-upload-file').addEventListener('change', function(){
+    var f = this.files && this.files[0];
+    $('pat-test-upload-filename').textContent = f ? f.name : 'No file chosen';
+  });
+  $('pat-test-upload-save').addEventListener('click', async function(){
+    var errEl = $('pat-test-upload-error');
+    clearError(errEl);
+    var name = $('pat-test-upload-name').value.trim();
+    var date = $('pat-test-upload-date').value;
+    var file = $('pat-test-upload-file').files && $('pat-test-upload-file').files[0];
+    if (!name){ showError(errEl, 'Give the report a name.'); return; }
+    if (!date){ showError(errEl, 'Pick the date of the report.'); return; }
+    if (!file){ showError(errEl, 'Choose a file to upload.'); return; }
+    if (TEST_REPORT_TYPES.indexOf(file.type) === -1){ showError(errEl, 'Only PDF, PNG, JPG or WebP files can be uploaded.'); return; }
+    if (file.size > TEST_REPORT_MAX_BYTES){ showError(errEl, 'That file is over 5 MB — please choose a smaller one.'); return; }
+
+    var btn = $('pat-test-upload-save');
+    btn.disabled = true;
+    btn.textContent = 'Uploading…';
+    var path = activePatientId + '/' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) + '-' + safeFileName(file.name);
+    try{
+      var up = await supabaseClient.storage.from(TEST_REPORT_BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+      if (up.error){
+        showError(errEl, /bucket not found/i.test(up.error.message || '')
+          ? 'Report uploads aren\'t switched on for this project yet.'
+          : 'The file couldn\'t be uploaded. Please try again.');
+        return;
+      }
+      var ins = await supabaseClient.from('tests').insert({
+        patient_id: activePatientId, name: name, date: date, doctor_name: '', result_summary: '',
+        uploaded_by_patient: true, report_file_path: path
+      }).select().maybeSingle();
+      if (ins.error || !ins.data){
+        // Don't leave an orphaned file behind a row that never got written.
+        await supabaseClient.storage.from(TEST_REPORT_BUCKET).remove([path]);
+        showError(errEl, 'The report couldn\'t be saved. Please try again.');
+        return;
+      }
+      var entry = mapTestRow(ins.data);
+      currentPatientData.tests.push(entry);
+      currentPatientData.tests.sort(function(a, b){ return (b.date || '').localeCompare(a.date || ''); });
+      renderTestsList(currentPatientData.tests);
+      var idx = currentPatientData.tests.indexOf(entry);
+      var rows = $('pat-tests-list').querySelectorAll('.list-item');
+      if (rows[idx]) rows[idx].click();
+      $('pat-test-upload-fields').classList.add('hidden');
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'Upload report';
+    }
+  });
+
   var currentLookupCode = null;
   var currentLookupData = null;
   var currentLookupGrant = null;
@@ -3193,7 +3349,7 @@
     listEl.innerHTML = tests.map(function(t, i){
       return '<div class="list-item" data-idx="'+i+'">'
         + '<div>'
-        + '<div class="li-title">'+escapeHtml(t.name || 'Test')+unverifiedTagHtml(t)+'</div>'
+        + '<div class="li-title">'+escapeHtml(t.name || 'Test')+testTagHtml(t, 'doctor')+'</div>'
         + '<div class="li-sub">'+escapeHtml(formatDateDisplay(t.date))+'</div>'
         + '</div>'
         + chevronSvg + '</div>';
@@ -3212,9 +3368,11 @@
     hideAllDocDetails();
     $('doc-test-detail').classList.remove('hidden');
     $('doc-test-detail-date').textContent = formatDateDisplay(t.date);
-    $('doc-test-detail-name').innerHTML = escapeHtml(t.name || 'Test') + unverifiedTagHtml(t);
-    $('doc-test-detail-doctor').textContent = t.doctorName || 'Not recorded';
-    $('doc-test-detail-result').textContent = t.resultSummary || 'No result summary added yet.';
+    $('doc-test-detail-name').innerHTML = escapeHtml(t.name || 'Test') + testTagHtml(t, 'doctor');
+    $('doc-test-detail-doctor-label').textContent = t.uploadedByPatient ? 'Added by' : 'Ordered by';
+    $('doc-test-detail-doctor').textContent = t.uploadedByPatient ? 'Patient (uploaded)' : (t.doctorName || 'Not recorded');
+    $('doc-test-detail-result').textContent = t.resultSummary || (t.uploadedByPatient ? 'No summary — see the attached report.' : 'No result summary added yet.');
+    showTestReportRow('doc-test-detail', t);
   }
 
   function showLookupResult(patientId, data, grant){

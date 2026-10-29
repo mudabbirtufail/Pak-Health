@@ -1385,6 +1385,7 @@
     reader.readAsDataURL(file);
   });
   $('pat-signout').addEventListener('click', async function(){
+    closePatAcctDropdown();
     stopLiveCodeTimer();
     await supabaseClient.auth.signOut();
     session = { type:null, id:null };
@@ -2135,6 +2136,11 @@
     $('test-detail-doctor').textContent = t.uploadedByPatient ? 'You (uploaded)' : (t.doctorName || 'Not recorded');
     $('test-detail-result').textContent = t.resultSummary || (t.uploadedByPatient ? 'No summary — see the attached report.' : 'No result summary added yet.');
     showTestReportRow('test-detail', t);
+    // Delete is only ever offered for a report the patient uploaded themselves —
+    // a doctor-written test isn't theirs to remove (the database enforces the same).
+    patTestDetailCurrent = t;
+    $('test-detail-delete-wrap').classList.toggle('hidden', !t.uploadedByPatient);
+    clearError($('test-detail-delete-error'));
   }
 
   // ---- My Eyes ----
@@ -3101,6 +3107,7 @@
     reader.readAsDataURL(file);
   });
   $('doc-signout').addEventListener('click', async function(){
+    closeDocAcctDropdown();
     await supabaseClient.auth.signOut();
     session = { type:null, id:null };
     showView('view-landing');
@@ -3275,6 +3282,40 @@
     }finally{
       btn.disabled = false;
       btn.textContent = 'Upload report';
+    }
+  });
+
+  var patTestDetailCurrent = null;
+  makeHoldButton($('test-detail-delete-btn'), 2000, async function(){
+    var t = patTestDetailCurrent;
+    if (!t || !t.uploadedByPatient) return;
+    var errEl = $('test-detail-delete-error');
+    var btn = $('test-detail-delete-btn');
+    var label = btn.querySelector('.hold-label');
+    clearError(errEl);
+    btn.disabled = true;
+    label.textContent = 'Deleting...';
+    try{
+      // File first, then the row: if the second step fails the row is still there
+      // to retry from, rather than a file left behind with nothing pointing at it.
+      if (t.reportFilePath){
+        var rm = await supabaseClient.storage.from(TEST_REPORT_BUCKET).remove([t.reportFilePath]);
+        if (rm.error){ showError(errEl, 'The report file couldn\'t be deleted. Please try again.'); return; }
+      }
+      // .select() so a delete that row security silently turned into "0 rows" is
+      // caught here instead of looking like it worked until the next reload.
+      var res = await supabaseClient.from('tests').delete().eq('id', t.id).select();
+      if (res.error || !res.data || !res.data.length){
+        showError(errEl, 'The report couldn\'t be deleted. Please try again.');
+        return;
+      }
+      currentPatientData.tests = currentPatientData.tests.filter(function(x){ return x.id !== t.id; });
+      renderTestsList(currentPatientData.tests);
+    }catch(e){
+      showError(errEl, 'The report couldn\'t be deleted. Please try again.');
+    }finally{
+      btn.disabled = false;
+      label.textContent = 'Hold to delete report';
     }
   });
 

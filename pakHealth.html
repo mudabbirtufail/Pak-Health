@@ -46,7 +46,7 @@
      "Manage family" in CLAUDE.md. Pinned version, dependency-free, defines a
      single global `qrcode()` factory. -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<link rel="stylesheet" href="style.css?v=58">
+<link rel="stylesheet" href="style.css?v=60">
 </head>
 <body>
 
@@ -320,9 +320,8 @@
     <div class="wordmark"><svg width="18" height="18" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2,12 A9,9 0 1,0 20,12 A9,9 0 1,0 2,12 Z M5.41,10.59 A7,7 0 1,0 19.41,10.59 A7,7 0 1,0 5.41,10.59 Z" fill="#1F6F63"/><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="#A22D3B"/></svg>Pak Health</div>
     <div class="topbar-right">
       <div class="dropdown-wrap" id="pat-account-dropdown-wrap">
-        <button class="btn btn-secondary btn-sm dropdown-trigger" id="pat-account-dropdown-trigger" type="button" aria-haspopup="true" aria-expanded="false">
-          Account
-          <svg width="8" height="5" viewBox="0 0 10 6"><path d="M1,1 L5,5 L9,1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <button class="btn btn-secondary btn-sm dropdown-trigger menu-trigger" id="pat-account-dropdown-trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Menu">
+          <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><path d="M1,1.5 H15 M1,6 H15 M1,10.5 H15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
         </button>
         <div class="dropdown-menu hidden" id="pat-account-dropdown-menu">
           <button type="button" id="pat-howitworks-btn">How it works</button>
@@ -334,9 +333,10 @@
           <button type="button" id="pat-family-manage-btn">Manage family</button>
           <div class="dropdown-divider"></div>
           <button type="button" id="pat-stats-btn">My statistics</button>
+          <div class="dropdown-divider"></div>
+          <button type="button" class="danger" id="pat-signout">Sign out</button>
         </div>
       </div>
-      <button class="link-btn" id="pat-signout">Sign out</button>
     </div>
   </header>
   <main class="dash-main dash-main-wide">
@@ -796,6 +796,10 @@
                   <div class="error-text" id="test-detail-file-error"></div>
                 </dd>
               </dl>
+              <div class="hidden" id="test-detail-delete-wrap" style="margin-top:6px;">
+                <button class="btn btn-secondary hold-btn hold-btn-danger" id="test-detail-delete-btn" type="button" style="color:var(--red); border-color:var(--red);"><span class="hold-fill"></span><span class="hold-label">Hold to delete report</span></button>
+                <div class="error-text" id="test-detail-delete-error"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -991,9 +995,8 @@
     <div class="topbar-right">
       <span class="role-chip">Doctor account</span>
       <div class="dropdown-wrap" id="doc-account-dropdown-wrap">
-        <button class="btn btn-secondary btn-sm dropdown-trigger" id="doc-account-dropdown-trigger" type="button" aria-haspopup="true" aria-expanded="false">
-          Account
-          <svg width="8" height="5" viewBox="0 0 10 6"><path d="M1,1 L5,5 L9,1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <button class="btn btn-secondary btn-sm dropdown-trigger menu-trigger" id="doc-account-dropdown-trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Menu">
+          <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><path d="M1,1.5 H15 M1,6 H15 M1,10.5 H15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
         </button>
         <div class="dropdown-menu hidden" id="doc-account-dropdown-menu">
           <button type="button" id="doc-howitworks-btn">How it works</button>
@@ -1004,9 +1007,10 @@
           <button type="button" id="doc-clinics-btn">Manage clinics</button>
           <div class="dropdown-divider"></div>
           <button type="button" id="doc-stats-btn">My statistics</button>
+          <div class="dropdown-divider"></div>
+          <button type="button" class="danger" id="doc-signout">Sign out</button>
         </div>
       </div>
-      <button class="link-btn" id="doc-signout">Sign out</button>
     </div>
   </header>
   <main class="dash-main dash-main-wide">
@@ -1446,6 +1450,6 @@
   </main>
 </div>
 
-<script src="app.js?v=71"></script>
+<script src="app.js?v=73"></script>
 </body>
 </html>

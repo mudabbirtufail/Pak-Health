@@ -22,6 +22,13 @@
      still sizing to the full viewport. (This alone did not fix the
      landing-page card-growth issue below — see #view-landing.) */
   html,body{ margin:0; padding:0; height:100%; }
+  /* Stops the phone browser's own pull-to-refresh (and the iOS rubber-band bounce)
+     from reloading the page on a swipe past the top/bottom edge. A reload here
+     always lands back on the role's main dashboard (sub-pages can't be reopened,
+     see CLAUDE.md "Real browser back/forward"), and would throw away any
+     half-filled form, so an accidental one costs more than it does on a normal
+     site. Trade-off: no pull-to-refresh as a deliberate reload either. */
+  html,body{ overscroll-behavior-y: none; }
   body{
     background: var(--bg);
     color: var(--ink);
@@ -472,6 +479,12 @@
   }
   .dropdown-trigger svg{ color: var(--muted); transition: transform 0.15s ease; }
   .dropdown-trigger[aria-expanded="true"] svg{ transform: rotate(180deg); }
+  /* The three-line menu icon used instead of the labelled "Account ▾" button —
+     icon-only, dark rather than the muted chevron gray, and it doesn't flip over
+     when open (the chevron rule above is for the other dropdown triggers). */
+  .menu-trigger{ padding:8px 11px; }
+  .menu-trigger svg{ color: var(--ink); }
+  .menu-trigger[aria-expanded="true"] svg{ transform:none; }
   .dropdown-menu{
     position:absolute; top: calc(100% + 6px); right:0; min-width:144px;
     background: var(--paper); border:1px solid var(--line); border-radius:6px;

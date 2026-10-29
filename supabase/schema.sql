@@ -779,3 +779,12 @@ create policy "test_reports_delete" on storage.objects
     and ((storage.foldername(name))[1] = auth.uid()::text
          or public.is_guardian_of(((storage.foldername(name))[1])::uuid))
   );
+
+-- A patient/guardian can remove a report THEY uploaded — never a doctor-written
+-- test (uploaded_by_patient is false for those, so they stay untouchable).
+drop policy if exists "tests_delete_patient" on public.tests;
+create policy "tests_delete_patient" on public.tests
+  for delete using (
+    uploaded_by_patient
+    and (auth.uid() = patient_id or public.is_guardian_of(patient_id))
+  );

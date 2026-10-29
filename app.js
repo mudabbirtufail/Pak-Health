@@ -1520,6 +1520,7 @@
     if (!tests || !tests.length){
       listEl.innerHTML = '';
       emptyEl.classList.remove('hidden');
+      clearPatTestViewer();
       $('pat-test-detail-empty').classList.remove('hidden');
       $('pat-test-detail').classList.add('hidden');
       return;
@@ -2127,6 +2128,99 @@
     $('visit-detail-notes').textContent = v.notes || 'Not recorded';
   }
 
+  // The patient's Lab Results viewer. A report with a file is fetched as a blob
+  // (the bucket is private, and a blob URL also sidesteps the storage server's
+  // locked-down headers that can stop a PDF rendering inside an iframe) and shown
+  // in the right-hand panel; a report without one shows its text instead.
+  var patTestDetailCurrent = null;
+  var patTestViewerUrl = '';
+  var patTestViewerToken = 0;
+  function clearPatTestViewer(){
+    patTestViewerToken++;
+    if (patTestViewerUrl){ URL.revokeObjectURL(patTestViewerUrl); patTestViewerUrl = ''; }
+    $('test-detail-viewer').innerHTML = '';
+  }
+  function testReportMimeType(path){
+    var ext = (path.split('.').pop() || '').toLowerCase();
+    return { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }[ext] || '';
+  }
+  var PDFJS_BASE = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/';
+  var pdfjsPromise = null;
+  // PDF.js is only needed once someone opens a PDF report, so it's fetched on
+  // first use instead of weighing down every page load.
+  function loadPdfJs(){
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (!pdfjsPromise){
+      pdfjsPromise = new Promise(function(resolve, reject){
+        var sc = document.createElement('script');
+        sc.src = PDFJS_BASE + 'pdf.min.js';
+        sc.onload = function(){
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.js';
+          resolve(window.pdfjsLib);
+        };
+        sc.onerror = function(){ pdfjsPromise = null; reject(new Error('PDF.js failed to load')); };
+        document.head.appendChild(sc);
+      });
+    }
+    return pdfjsPromise;
+  }
+  async function showPatTestViewer(t){
+    var viewer = $('test-detail-viewer');
+    var errEl = $('test-detail-file-error');
+    clearError(errEl);
+    clearPatTestViewer();
+    var token = patTestViewerToken;
+    viewer.textContent = 'Loading report...';
+    var res = await supabaseClient.storage.from(TEST_REPORT_BUCKET).download(t.reportFilePath);
+    if (token !== patTestViewerToken) return;   // a different report was picked meanwhile
+    if (res.error || !res.data){
+      viewer.innerHTML = '';
+      showError(errEl, 'Couldn\'t load this report. It may have been removed, or your access may have changed.');
+      return;
+    }
+    var type = testReportMimeType(t.reportFilePath) || res.data.type;
+    patTestViewerUrl = URL.createObjectURL(new Blob([res.data], { type: type }));
+    viewer.innerHTML = '';
+    viewer.classList.toggle('pdf-pages', type === 'application/pdf');
+    if (type !== 'application/pdf'){
+      var img = document.createElement('img');
+      img.alt = t.name || 'Report';
+      img.src = patTestViewerUrl;
+      viewer.appendChild(img);
+      return;
+    }
+    // A PDF is drawn page by page onto plain canvases (PDF.js) so it reads as the
+    // document itself rather than sitting inside the browser's PDF viewer with its
+    // toolbar and side rail. If PDF.js can't load or the file can't be parsed, fall
+    // back to the browser's own viewer so the report is still readable.
+    try{
+      var pdfjs = await loadPdfJs();
+      var pdf = await pdfjs.getDocument({ data: await res.data.arrayBuffer() }).promise;
+      var cssWidth = viewer.clientWidth || 600;
+      var ratio = window.devicePixelRatio || 1;
+      for (var n = 1; n <= pdf.numPages; n++){
+        var page = await pdf.getPage(n);
+        if (token !== patTestViewerToken){ pdf.destroy(); return; }
+        var base = page.getViewport({ scale: 1 });
+        var vp = page.getViewport({ scale: (cssWidth / base.width) * ratio });
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.floor(vp.width);
+        canvas.height = Math.floor(vp.height);
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+        if (token !== patTestViewerToken){ pdf.destroy(); return; }
+        if (n === 1) viewer.innerHTML = '';   // clears "Loading report..." once page 1 is ready
+        viewer.appendChild(canvas);
+      }
+    }catch(e){
+      if (token !== patTestViewerToken) return;
+      viewer.classList.remove('pdf-pages');
+      viewer.innerHTML = '';
+      var frame = document.createElement('iframe');
+      frame.title = t.name || 'Report';
+      frame.src = patTestViewerUrl;
+      viewer.appendChild(frame);
+    }
+  }
   function renderTestDetail(t){
     $('pat-test-detail-empty').classList.add('hidden');
     $('pat-test-detail').classList.remove('hidden');
@@ -2134,14 +2228,24 @@
     $('test-detail-name').innerHTML = escapeHtml(t.name || 'Test') + testTagHtml(t, 'patient');
     $('test-detail-doctor-label').textContent = t.uploadedByPatient ? 'Added by' : 'Ordered by';
     $('test-detail-doctor').textContent = t.uploadedByPatient ? 'You (uploaded)' : (t.doctorName || 'Not recorded');
-    $('test-detail-result').textContent = t.resultSummary || (t.uploadedByPatient ? 'No summary — see the attached report.' : 'No result summary added yet.');
-    showTestReportRow('test-detail', t);
+    // A patient upload with no typed summary has nothing to say beyond the file itself.
+    var hideSummary = !t.resultSummary && !!t.reportFilePath;
+    $('test-detail-result-label').classList.toggle('hidden', hideSummary);
+    $('test-detail-result').classList.toggle('hidden', hideSummary);
+    $('test-detail-result').textContent = t.resultSummary || 'No result summary added yet.';
+    patTestDetailCurrent = t;
+    $('test-detail-viewer-wrap').classList.toggle('hidden', !t.reportFilePath);
+    if (t.reportFilePath) showPatTestViewer(t);
+    else { clearPatTestViewer(); clearError($('test-detail-file-error')); }
     // Delete is only ever offered for a report the patient uploaded themselves —
     // a doctor-written test isn't theirs to remove (the database enforces the same).
-    patTestDetailCurrent = t;
     $('test-detail-delete-wrap').classList.toggle('hidden', !t.uploadedByPatient);
     clearError($('test-detail-delete-error'));
   }
+  $('test-detail-file-btn').addEventListener('click', function(){
+    // The blob is already in hand, so this opens straight away — no popup-blocker dance.
+    if (patTestViewerUrl) window.open(patTestViewerUrl, '_blank');
+  });
 
   // ---- My Eyes ----
   // Clinical range per field, used both to position the number-line marker and
@@ -3194,25 +3298,23 @@
   // after two minutes. The tab is opened synchronously inside the click first —
   // opening it only after the await would look like a popup to the browser and get
   // blocked.
-  function wireTestReportButton(prefix){
-    $(prefix + '-file-btn').addEventListener('click', async function(){
-      var path = testReportOpenPath[prefix];
-      var errEl = $(prefix + '-file-error');
-      clearError(errEl);
-      if (!path) return;
-      var win = window.open('', '_blank');
-      var res = await supabaseClient.storage.from(TEST_REPORT_BUCKET).createSignedUrl(path, 120);
-      if (res.error || !res.data || !res.data.signedUrl){
-        if (win) win.close();
-        showError(errEl, 'Couldn\'t open this report. It may have been removed, or your access may have changed.');
-        return;
-      }
-      if (win){ win.opener = null; win.location.href = res.data.signedUrl; }
-      else { window.location.href = res.data.signedUrl; }
-    });
+  async function openTestReportFile(path, errEl){
+    clearError(errEl);
+    if (!path) return;
+    var win = window.open('', '_blank');
+    var res = await supabaseClient.storage.from(TEST_REPORT_BUCKET).createSignedUrl(path, 120);
+    if (res.error || !res.data || !res.data.signedUrl){
+      if (win) win.close();
+      showError(errEl, 'Couldn\'t open this report. It may have been removed, or your access may have changed.');
+      return;
+    }
+    if (win){ win.opener = null; win.location.href = res.data.signedUrl; }
+    else { window.location.href = res.data.signedUrl; }
   }
-  wireTestReportButton('test-detail');
-  wireTestReportButton('doc-test-detail');
+  // The doctor's detail panel still has a "View report" button.
+  $('doc-test-detail-file-btn').addEventListener('click', function(){
+    openTestReportFile(testReportOpenPath['doc-test-detail'], $('doc-test-detail-file-error'));
+  });
 
   function safeFileName(name){
     var cleaned = (name || 'report').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '');
@@ -3295,9 +3397,8 @@
       currentPatientData.tests.push(entry);
       currentPatientData.tests.sort(function(a, b){ return (b.date || '').localeCompare(a.date || ''); });
       renderTestsList(currentPatientData.tests);
-      var idx = currentPatientData.tests.indexOf(entry);
-      var rows = $('pat-tests-list').querySelectorAll('.list-item');
-      if (rows[idx]) rows[idx].click();
+      var newRow = $('pat-tests-list').querySelectorAll('.list-item')[currentPatientData.tests.indexOf(entry)];
+      if (newRow) newRow.click();
       $('pat-test-upload-fields').classList.add('hidden');
     }finally{
       btn.disabled = false;
@@ -3305,7 +3406,6 @@
     }
   });
 
-  var patTestDetailCurrent = null;
   makeHoldButton($('test-detail-delete-btn'), 2000, async function(){
     var t = patTestDetailCurrent;
     if (!t || !t.uploadedByPatient) return;

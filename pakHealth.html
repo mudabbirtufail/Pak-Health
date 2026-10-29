@@ -46,7 +46,7 @@
      "Manage family" in CLAUDE.md. Pinned version, dependency-free, defines a
      single global `qrcode()` factory. -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<link rel="stylesheet" href="style.css?v=61">
+<link rel="stylesheet" href="style.css?v=64">
 </head>
 <body>
 
@@ -787,18 +787,21 @@
         </div>
         <div class="sticky-inner">
           <div class="panel">
-            <div class="record-detail-empty" id="pat-test-detail-empty">Select a test to see its details.</div>
+            <div class="record-detail-empty" id="pat-test-detail-empty">Select a report to view it.</div>
             <div class="hidden" id="pat-test-detail">
               <span class="eyebrow" id="test-detail-date">—</span>
               <h3 id="test-detail-name" style="margin-top:5px;">—</h3>
+              <!-- A report with a file shows that file right here (PDF or image, see
+                   showPatTestViewer in app.js); one without — a doctor-written test
+                   that is just a name, date and summary — shows the text instead. -->
+              <div class="hidden" id="test-detail-viewer-wrap">
+                <div class="report-viewer" id="test-detail-viewer"></div>
+                <div class="error-text" id="test-detail-file-error"></div>
+                <button type="button" class="btn btn-secondary btn-sm" id="test-detail-file-btn" style="margin-top:9px;">Open in new tab</button>
+              </div>
               <dl class="kv" style="margin-top:13px;">
                 <dt id="test-detail-doctor-label">Ordered by</dt><dd id="test-detail-doctor">—</dd>
-                <dt>Result summary</dt><dd class="block" id="test-detail-result">—</dd>
-                <dt id="test-detail-file-label" class="hidden">Report file</dt>
-                <dd id="test-detail-file-row" class="hidden">
-                  <button type="button" class="btn btn-secondary btn-sm" id="test-detail-file-btn">View report</button>
-                  <div class="error-text" id="test-detail-file-error"></div>
-                </dd>
+                <dt id="test-detail-result-label">Result summary</dt><dd class="block" id="test-detail-result">—</dd>
               </dl>
               <div class="hidden" id="test-detail-delete-wrap" style="margin-top:6px;">
                 <button class="btn btn-secondary hold-btn hold-btn-danger" id="test-detail-delete-btn" type="button" style="color:var(--red); border-color:var(--red);"><span class="hold-fill"></span><span class="hold-label">Hold to delete report</span></button>
@@ -1454,6 +1457,6 @@
   </main>
 </div>
 
-<script src="app.js?v=74"></script>
+<script src="app.js?v=77"></script>
 </body>
 </html>

@@ -761,7 +761,6 @@
             <button class="btn btn-secondary btn-block" id="pat-test-upload-btn" type="button">+ Upload a report</button>
             <div id="pat-test-upload-fields" class="hidden" style="margin-top:11px;">
               <div class="field"><label for="pat-test-upload-name">Report name</label><input type="text" id="pat-test-upload-name" maxlength="80" placeholder="e.g. Blood test, X-ray"></div>
-              <div class="field"><label for="pat-test-upload-date">Date</label><input type="date" id="pat-test-upload-date"></div>
               <div class="field">
                 <label>File</label>
                 <div class="file-pick">
@@ -1248,14 +1247,14 @@
           <div class="hidden" id="doc-test-detail">
             <span class="eyebrow" id="doc-test-detail-date">—</span>
             <h3 id="doc-test-detail-name" style="margin-top:5px;">—</h3>
+            <div class="hidden" id="doc-test-detail-viewer-wrap">
+              <div class="report-viewer" id="doc-test-detail-viewer"></div>
+              <div class="error-text" id="doc-test-detail-file-error"></div>
+              <button type="button" class="btn btn-secondary btn-sm" id="doc-test-detail-file-btn" style="margin-top:9px;">Open in new tab</button>
+            </div>
             <dl class="kv" style="margin-top:13px;">
               <dt id="doc-test-detail-doctor-label">Ordered by</dt><dd id="doc-test-detail-doctor">—</dd>
-              <dt>Result summary</dt><dd class="block" id="doc-test-detail-result">—</dd>
-              <dt id="doc-test-detail-file-label" class="hidden">Report file</dt>
-              <dd id="doc-test-detail-file-row" class="hidden">
-                <button type="button" class="btn btn-secondary btn-sm" id="doc-test-detail-file-btn">View report</button>
-                <div class="error-text" id="doc-test-detail-file-error"></div>
-              </dd>
+              <dt id="doc-test-detail-result-label">Result summary</dt><dd class="block" id="doc-test-detail-result">—</dd>
             </dl>
           </div>
           <div class="record-detail-empty hidden" id="doc-prescription-detail-empty">Select a prescription to see its details.</div>
@@ -1457,6 +1456,6 @@
   </main>
 </div>
 
-<script src="app.js?v=77"></script>
+<script src="app.js?v=79"></script>
 </body>
 </html>

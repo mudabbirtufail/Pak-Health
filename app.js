@@ -1520,7 +1520,7 @@
     if (!tests || !tests.length){
       listEl.innerHTML = '';
       emptyEl.classList.remove('hidden');
-      clearPatTestViewer();
+      clearTestViewer('test-detail');
       $('pat-test-detail-empty').classList.remove('hidden');
       $('pat-test-detail').classList.add('hidden');
       return;
@@ -2128,17 +2128,40 @@
     $('visit-detail-notes').textContent = v.notes || 'Not recorded';
   }
 
-  // The patient's Lab Results viewer. A report with a file is fetched as a blob
-  // (the bucket is private, and a blob URL also sidesteps the storage server's
-  // locked-down headers that can stop a PDF rendering inside an iframe) and shown
-  // in the right-hand panel; a report without one shows its text instead.
+  // The Lab Results report viewer, shared by the patient's page ('test-detail')
+  // and the doctor's patient-record page ('doc-test-detail') — the two panels have
+  // the same markup shape, so every id is built from that prefix. A report with a
+  // file is fetched as a blob (the bucket is private, and a blob URL also sidesteps
+  // the storage server's locked-down headers that can stop a PDF rendering inside
+  // an iframe) and shown in the right-hand panel; a report without one shows its
+  // text instead.
   var patTestDetailCurrent = null;
-  var patTestViewerUrl = '';
-  var patTestViewerToken = 0;
-  function clearPatTestViewer(){
-    patTestViewerToken++;
-    if (patTestViewerUrl){ URL.revokeObjectURL(patTestViewerUrl); patTestViewerUrl = ''; }
-    $('test-detail-viewer').innerHTML = '';
+  var testViewers = {};   // prefix -> { url: blob URL on screen, token: bumped on every change }
+  function testViewerState(prefix){
+    return testViewers[prefix] || (testViewers[prefix] = { url: '', token: 0 });
+  }
+  function clearTestViewer(prefix){
+    var st = testViewerState(prefix);
+    st.token++;
+    if (st.url){ URL.revokeObjectURL(st.url); st.url = ''; }
+    $(prefix + '-viewer').innerHTML = '';
+  }
+  // Fills one detail panel's report area for test t (viewer + "Open in new tab").
+  function renderTestReport(prefix, t){
+    $(prefix + '-viewer-wrap').classList.toggle('hidden', !t.reportFilePath);
+    // A patient upload with no typed summary has nothing to say beyond the file itself.
+    var hideSummary = !t.resultSummary && !!t.reportFilePath;
+    $(prefix + '-result-label').classList.toggle('hidden', hideSummary);
+    $(prefix + '-result').classList.toggle('hidden', hideSummary);
+    if (t.reportFilePath) showTestViewer(prefix, t);
+    else { clearTestViewer(prefix); clearError($(prefix + '-file-error')); }
+  }
+  function wireTestOpenButton(prefix){
+    $(prefix + '-file-btn').addEventListener('click', function(){
+      // The blob is already in hand, so this opens straight away — no popup-blocker dance.
+      var url = testViewerState(prefix).url;
+      if (url) window.open(url, '_blank');
+    });
   }
   function testReportMimeType(path){
     var ext = (path.split('.').pop() || '').toLowerCase();
@@ -2164,28 +2187,29 @@
     }
     return pdfjsPromise;
   }
-  async function showPatTestViewer(t){
-    var viewer = $('test-detail-viewer');
-    var errEl = $('test-detail-file-error');
+  async function showTestViewer(prefix, t){
+    var viewer = $(prefix + '-viewer');
+    var errEl = $(prefix + '-file-error');
+    var st = testViewerState(prefix);
     clearError(errEl);
-    clearPatTestViewer();
-    var token = patTestViewerToken;
+    clearTestViewer(prefix);
+    var token = st.token;
     viewer.textContent = 'Loading report...';
     var res = await supabaseClient.storage.from(TEST_REPORT_BUCKET).download(t.reportFilePath);
-    if (token !== patTestViewerToken) return;   // a different report was picked meanwhile
+    if (token !== st.token) return;   // a different report was picked meanwhile
     if (res.error || !res.data){
       viewer.innerHTML = '';
       showError(errEl, 'Couldn\'t load this report. It may have been removed, or your access may have changed.');
       return;
     }
     var type = testReportMimeType(t.reportFilePath) || res.data.type;
-    patTestViewerUrl = URL.createObjectURL(new Blob([res.data], { type: type }));
+    st.url = URL.createObjectURL(new Blob([res.data], { type: type }));
     viewer.innerHTML = '';
     viewer.classList.toggle('pdf-pages', type === 'application/pdf');
     if (type !== 'application/pdf'){
       var img = document.createElement('img');
       img.alt = t.name || 'Report';
-      img.src = patTestViewerUrl;
+      img.src = st.url;
       viewer.appendChild(img);
       return;
     }
@@ -2200,24 +2224,24 @@
       var ratio = window.devicePixelRatio || 1;
       for (var n = 1; n <= pdf.numPages; n++){
         var page = await pdf.getPage(n);
-        if (token !== patTestViewerToken){ pdf.destroy(); return; }
+        if (token !== st.token){ pdf.destroy(); return; }
         var base = page.getViewport({ scale: 1 });
         var vp = page.getViewport({ scale: (cssWidth / base.width) * ratio });
         var canvas = document.createElement('canvas');
         canvas.width = Math.floor(vp.width);
         canvas.height = Math.floor(vp.height);
         await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-        if (token !== patTestViewerToken){ pdf.destroy(); return; }
+        if (token !== st.token){ pdf.destroy(); return; }
         if (n === 1) viewer.innerHTML = '';   // clears "Loading report..." once page 1 is ready
         viewer.appendChild(canvas);
       }
     }catch(e){
-      if (token !== patTestViewerToken) return;
+      if (token !== st.token) return;
       viewer.classList.remove('pdf-pages');
       viewer.innerHTML = '';
       var frame = document.createElement('iframe');
       frame.title = t.name || 'Report';
-      frame.src = patTestViewerUrl;
+      frame.src = st.url;
       viewer.appendChild(frame);
     }
   }
@@ -2228,24 +2252,16 @@
     $('test-detail-name').innerHTML = escapeHtml(t.name || 'Test') + testTagHtml(t, 'patient');
     $('test-detail-doctor-label').textContent = t.uploadedByPatient ? 'Added by' : 'Ordered by';
     $('test-detail-doctor').textContent = t.uploadedByPatient ? 'You (uploaded)' : (t.doctorName || 'Not recorded');
-    // A patient upload with no typed summary has nothing to say beyond the file itself.
-    var hideSummary = !t.resultSummary && !!t.reportFilePath;
-    $('test-detail-result-label').classList.toggle('hidden', hideSummary);
-    $('test-detail-result').classList.toggle('hidden', hideSummary);
     $('test-detail-result').textContent = t.resultSummary || 'No result summary added yet.';
     patTestDetailCurrent = t;
-    $('test-detail-viewer-wrap').classList.toggle('hidden', !t.reportFilePath);
-    if (t.reportFilePath) showPatTestViewer(t);
-    else { clearPatTestViewer(); clearError($('test-detail-file-error')); }
+    renderTestReport('test-detail', t);
     // Delete is only ever offered for a report the patient uploaded themselves —
     // a doctor-written test isn't theirs to remove (the database enforces the same).
     $('test-detail-delete-wrap').classList.toggle('hidden', !t.uploadedByPatient);
     clearError($('test-detail-delete-error'));
   }
-  $('test-detail-file-btn').addEventListener('click', function(){
-    // The blob is already in hand, so this opens straight away — no popup-blocker dance.
-    if (patTestViewerUrl) window.open(patTestViewerUrl, '_blank');
-  });
+  wireTestOpenButton('test-detail');
+  wireTestOpenButton('doc-test-detail');
 
   // ---- My Eyes ----
   // Clinical range per field, used both to position the number-line marker and
@@ -3284,38 +3300,6 @@
   var TEST_REPORT_BUCKET = 'test-reports';
   var TEST_REPORT_MAX_BYTES = 5 * 1024 * 1024;
   var TEST_REPORT_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
-  var testReportOpenPath = {};   // detail prefix -> storage path of the entry on screen
-  // Shows/hides the "View report" row in a test detail panel. prefix is 'test-detail'
-  // (patient) or 'doc-test-detail' (doctor) — the two panels share the same markup shape.
-  function showTestReportRow(prefix, t){
-    var has = !!(t && t.reportFilePath);
-    $(prefix + '-file-label').classList.toggle('hidden', !has);
-    $(prefix + '-file-row').classList.toggle('hidden', !has);
-    clearError($(prefix + '-file-error'));
-    testReportOpenPath[prefix] = has ? t.reportFilePath : '';
-  }
-  // The file sits in a private bucket, so "View" asks for a signed URL that expires
-  // after two minutes. The tab is opened synchronously inside the click first —
-  // opening it only after the await would look like a popup to the browser and get
-  // blocked.
-  async function openTestReportFile(path, errEl){
-    clearError(errEl);
-    if (!path) return;
-    var win = window.open('', '_blank');
-    var res = await supabaseClient.storage.from(TEST_REPORT_BUCKET).createSignedUrl(path, 120);
-    if (res.error || !res.data || !res.data.signedUrl){
-      if (win) win.close();
-      showError(errEl, 'Couldn\'t open this report. It may have been removed, or your access may have changed.');
-      return;
-    }
-    if (win){ win.opener = null; win.location.href = res.data.signedUrl; }
-    else { window.location.href = res.data.signedUrl; }
-  }
-  // The doctor's detail panel still has a "View report" button.
-  $('doc-test-detail-file-btn').addEventListener('click', function(){
-    openTestReportFile(testReportOpenPath['doc-test-detail'], $('doc-test-detail-file-error'));
-  });
-
   function safeFileName(name){
     var cleaned = (name || 'report').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '');
     return (cleaned || 'report').slice(-80);
@@ -3329,7 +3313,6 @@
   }
   function resetPatTestUploadForm(){
     $('pat-test-upload-name').value = '';
-    $('pat-test-upload-date').value = new Date().toISOString().slice(0, 10);
     $('pat-test-upload-file').value = '';
     $('pat-test-upload-camera-input').value = '';
     setPatTestUploadFile(null);
@@ -3363,10 +3346,10 @@
     var errEl = $('pat-test-upload-error');
     clearError(errEl);
     var name = $('pat-test-upload-name').value.trim();
-    var date = $('pat-test-upload-date').value;
+    // The report is dated the day it's uploaded — nothing for the patient to type.
+    var date = toDateKey(new Date());
     var file = patTestUploadFile;
     if (!name){ showError(errEl, 'Give the report a name.'); return; }
-    if (!date){ showError(errEl, 'Pick the date of the report.'); return; }
     if (!file){ showError(errEl, 'Choose a file to upload.'); return; }
     if (TEST_REPORT_TYPES.indexOf(file.type) === -1){ showError(errEl, 'Only PDF, PNG, JPG or WebP files can be uploaded.'); return; }
     if (file.size > TEST_REPORT_MAX_BYTES){ showError(errEl, 'That file is over 5 MB — please choose a smaller one.'); return; }
@@ -3452,6 +3435,7 @@
     $('doc-visit-detail').classList.add('hidden');
     $('doc-test-detail-empty').classList.add('hidden');
     $('doc-test-detail').classList.add('hidden');
+    clearTestViewer('doc-test-detail');
     $('doc-prescription-detail-empty').classList.add('hidden');
     $('doc-prescription-detail').classList.add('hidden');
   }
@@ -3532,8 +3516,8 @@
     $('doc-test-detail-name').innerHTML = escapeHtml(t.name || 'Test') + testTagHtml(t, 'doctor');
     $('doc-test-detail-doctor-label').textContent = t.uploadedByPatient ? 'Added by' : 'Ordered by';
     $('doc-test-detail-doctor').textContent = t.uploadedByPatient ? 'Patient (uploaded)' : (t.doctorName || 'Not recorded');
-    $('doc-test-detail-result').textContent = t.resultSummary || (t.uploadedByPatient ? 'No summary — see the attached report.' : 'No result summary added yet.');
-    showTestReportRow('doc-test-detail', t);
+    $('doc-test-detail-result').textContent = t.resultSummary || 'No result summary added yet.';
+    renderTestReport('doc-test-detail', t);
   }
 
   function showLookupResult(patientId, data, grant){

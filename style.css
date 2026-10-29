@@ -407,9 +407,9 @@
 
   /* Styled stand-in for the native file input (kept hidden) so the picker matches
      the rest of the form instead of showing the browser's own "Choose File" box. */
-  .file-pick{ display:flex; align-items:center; gap:10px; }
+  .file-pick{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
   .file-pick .btn{ flex-shrink:0; }
-  .file-pick-name{ font-size:0.7rem; color: var(--muted); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-pick-name{ font-size:0.7rem; color: var(--muted); margin-top:7px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
   .checklist{ list-style:none; padding:0; margin:11px 0 0; font-size:0.67rem; color: var(--ink-soft); }
   .checklist li{ padding:3px 0; display:flex; align-items:center; gap:6px; }

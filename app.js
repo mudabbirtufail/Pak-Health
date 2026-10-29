@@ -3218,13 +3218,33 @@
     var cleaned = (name || 'report').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '');
     return (cleaned || 'report').slice(-80);
   }
+  // The chosen file can come from either picker (camera or files), so it's kept
+  // here rather than read back off one input at save time.
+  var patTestUploadFile = null;
+  function setPatTestUploadFile(f){
+    patTestUploadFile = f || null;
+    $('pat-test-upload-filename').textContent = f ? f.name : 'No file chosen';
+  }
   function resetPatTestUploadForm(){
     $('pat-test-upload-name').value = '';
     $('pat-test-upload-date').value = new Date().toISOString().slice(0, 10);
     $('pat-test-upload-file').value = '';
-    $('pat-test-upload-filename').textContent = 'No file chosen';
+    $('pat-test-upload-camera-input').value = '';
+    setPatTestUploadFile(null);
     clearError($('pat-test-upload-error'));
   }
+  // "Take photo" opens the camera directly (capture="environment" = the rear
+  // camera) — but only where there is a camera to open. On a computer the
+  // attribute is ignored and the button would just be a second file dialog, so
+  // it's offered on touch devices only.
+  if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches){
+    $('pat-test-upload-camera').classList.remove('hidden');
+  }
+  $('pat-test-upload-camera').addEventListener('click', function(){ $('pat-test-upload-camera-input').click(); });
+  $('pat-test-upload-camera-input').addEventListener('change', function(){
+    $('pat-test-upload-file').value = '';
+    setPatTestUploadFile(this.files && this.files[0]);
+  });
   $('pat-test-upload-btn').addEventListener('click', function(){
     resetPatTestUploadForm();
     $('pat-test-upload-fields').classList.toggle('hidden');
@@ -3234,15 +3254,15 @@
   });
   $('pat-test-upload-choose').addEventListener('click', function(){ $('pat-test-upload-file').click(); });
   $('pat-test-upload-file').addEventListener('change', function(){
-    var f = this.files && this.files[0];
-    $('pat-test-upload-filename').textContent = f ? f.name : 'No file chosen';
+    $('pat-test-upload-camera-input').value = '';
+    setPatTestUploadFile(this.files && this.files[0]);
   });
   $('pat-test-upload-save').addEventListener('click', async function(){
     var errEl = $('pat-test-upload-error');
     clearError(errEl);
     var name = $('pat-test-upload-name').value.trim();
     var date = $('pat-test-upload-date').value;
-    var file = $('pat-test-upload-file').files && $('pat-test-upload-file').files[0];
+    var file = patTestUploadFile;
     if (!name){ showError(errEl, 'Give the report a name.'); return; }
     if (!date){ showError(errEl, 'Pick the date of the report.'); return; }
     if (!file){ showError(errEl, 'Choose a file to upload.'); return; }

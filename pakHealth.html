@@ -46,7 +46,7 @@
      "Manage family" in CLAUDE.md. Pinned version, dependency-free, defines a
      single global `qrcode()` factory. -->
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<link rel="stylesheet" href="style.css?v=60">
+<link rel="stylesheet" href="style.css?v=61">
 </head>
 <body>
 
@@ -765,11 +765,15 @@
               <div class="field">
                 <label>File</label>
                 <div class="file-pick">
-                  <button type="button" class="btn btn-secondary btn-sm" id="pat-test-upload-choose">Choose file</button>
-                  <span class="file-pick-name" id="pat-test-upload-filename">No file chosen</span>
+                  <!-- Only shown on touch devices (see app.js) — on a computer "capture"
+                       is ignored and this would just open an ordinary file dialog. -->
+                  <button type="button" class="btn btn-secondary btn-sm hidden" id="pat-test-upload-camera">Take photo</button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="pat-test-upload-choose">Choose PDF or image</button>
                 </div>
+                <div class="file-pick-name" id="pat-test-upload-filename">No file chosen</div>
+                <input type="file" id="pat-test-upload-camera-input" class="hidden" accept="image/*" capture="environment">
                 <input type="file" id="pat-test-upload-file" class="hidden" accept="application/pdf,image/png,image/jpeg,image/webp">
-                <div class="panel-sub" style="margin:4px 0 0;">PDF, PNG, JPG or WebP, up to 5 MB.</div>
+                <div class="panel-sub" style="margin:6px 0 0;">PDF, PNG, JPG or WebP, up to 5 MB.</div>
               </div>
               <div class="error-text" id="pat-test-upload-error"></div>
               <div class="save-row">
@@ -1450,6 +1454,6 @@
   </main>
 </div>
 
-<script src="app.js?v=73"></script>
+<script src="app.js?v=74"></script>
 </body>
 </html>

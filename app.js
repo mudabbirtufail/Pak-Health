@@ -1464,6 +1464,12 @@
     if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
   }
+  // Lab results are dated by when they were added, shown as "Date uploaded: 29-Oct-2026".
+  function formatUploadedDate(dateStr){
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr || '');
+    if (!m) return 'Date uploaded: ' + (dateStr || '—');
+    return 'Date uploaded: ' + m[3] + '-' + MONTH_NAMES[parseInt(m[2], 10) - 1].slice(0, 3) + '-' + m[1];
+  }
   var chevronSvg = '<svg class="chevron" width="11" height="7" viewBox="0 0 16 10"><path d="M0,5 H14 M9,0 L14,5 L9,10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
 
   function renderVisitsList(visits, opts){
@@ -1530,7 +1536,7 @@
       return '<div class="list-item" data-idx="'+i+'">'
         + '<div>'
         + '<div class="li-title">'+escapeHtml(t.name || 'Test')+testTagHtml(t, 'patient')+'</div>'
-        + '<div class="li-sub">'+escapeHtml(formatDateDisplay(t.date))+'</div>'
+        + '<div class="li-sub">'+escapeHtml(formatUploadedDate(t.date))+'</div>'
         + '</div>'
         + chevronSvg + '</div>';
     }).join('');
@@ -2248,7 +2254,7 @@
   function renderTestDetail(t){
     $('pat-test-detail-empty').classList.add('hidden');
     $('pat-test-detail').classList.remove('hidden');
-    $('test-detail-date').textContent = formatDateDisplay(t.date);
+    $('test-detail-date').textContent = formatUploadedDate(t.date);
     $('test-detail-name').innerHTML = escapeHtml(t.name || 'Test') + testTagHtml(t, 'patient');
     $('test-detail-doctor-label').textContent = t.uploadedByPatient ? 'Added by' : 'Ordered by';
     $('test-detail-doctor').textContent = t.uploadedByPatient ? 'You (uploaded)' : (t.doctorName || 'Not recorded');
@@ -3495,7 +3501,7 @@
       return '<div class="list-item" data-idx="'+i+'">'
         + '<div>'
         + '<div class="li-title">'+escapeHtml(t.name || 'Test')+testTagHtml(t, 'doctor')+'</div>'
-        + '<div class="li-sub">'+escapeHtml(formatDateDisplay(t.date))+'</div>'
+        + '<div class="li-sub">'+escapeHtml(formatUploadedDate(t.date))+'</div>'
         + '</div>'
         + chevronSvg + '</div>';
     }).join('');
@@ -3512,7 +3518,7 @@
   function renderDocTestDetail(t){
     hideAllDocDetails();
     $('doc-test-detail').classList.remove('hidden');
-    $('doc-test-detail-date').textContent = formatDateDisplay(t.date);
+    $('doc-test-detail-date').textContent = formatUploadedDate(t.date);
     $('doc-test-detail-name').innerHTML = escapeHtml(t.name || 'Test') + testTagHtml(t, 'doctor');
     $('doc-test-detail-doctor-label').textContent = t.uploadedByPatient ? 'Added by' : 'Ordered by';
     $('doc-test-detail-doctor').textContent = t.uploadedByPatient ? 'Patient (uploaded)' : (t.doctorName || 'Not recorded');
@@ -3728,7 +3734,6 @@
   function expandAddTestFields(){
     if (!currentLookupCode) return;
     $('test-name').value = '';
-    $('test-date').value = new Date().toISOString().slice(0, 10);
     $('test-result').value = '';
     clearError($('add-test-error'));
     $('add-test-fields').classList.remove('hidden');
@@ -3747,13 +3752,10 @@
       return;
     }
     var name = $('test-name').value.trim();
-    var date = $('test-date').value;
+    // Dated the day it's added — nothing for the doctor to type.
+    var date = toDateKey(new Date());
     if (!name){
       showError($('add-test-error'), 'Please enter a test name.');
-      return;
-    }
-    if (!date){
-      showError($('add-test-error'), 'Please choose a date.');
       return;
     }
     clearError($('add-test-error'));

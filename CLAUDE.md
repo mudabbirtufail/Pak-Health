@@ -127,9 +127,7 @@ verified, which would defeat the point of having the tag at all.
   for the pilot project), signup shows a "check your email" notice instead of
   dropping straight into the dashboard, and sign-in with an unconfirmed account shows
   a clear "please confirm your email" error rather than a generic failure.
-  "Forgot password?" still opens a modal that's honest about not being wired up yet
-  — real Supabase Auth makes `resetPasswordForEmail()` straightforward to add, but
-  it wasn't part of this pass; noted in "Natural next steps."
+  "Forgot password?" is a real self-service reset now — see "Password reset" below.
 - **Email verification**: real now, via Supabase Auth's own confirmation email —
   `email_confirmed_at` on the auth user is the actual flag, not a hand-rolled
   boolean. The amber dashboard banner shows whenever a signed-in user's email isn't
@@ -152,9 +150,12 @@ verified, which would defeat the point of having the tag at all.
   avatar + name + their **live access code** (see "Access model" below), not their
   permanent account ID — the account ID still exists (it's the storage key and
   sign-in identifier) but is deliberately not the thing shown front-and-center,
-  since it isn't what grants a doctor access anymore. It's still visible in Account
-  settings for the patient's own reference. The doctor card still shows brand text +
-  doctor ID, unchanged.
+  since it isn't what grants a doctor access anymore, and it's no longer shown
+  anywhere in the UI. The doctor card shows brand text ("PAK HEALTH · DOCTOR"), name,
+  specialties, the verified badge, and the **medical license number**
+  (`#doc-card-license`, "Not added" until set). **There is no doctor ID in the UI any
+  more** — nothing needed it once patients trust a doctor by name; `doctors.doctor_code`
+  and the mapped `doctorId` field still exist internally.
 - **Access model** (see [`ACCESS-MODEL.md`](ACCESS-MODEL.md) for the full design — this
   is Phase 1 of it, the core grant mechanism, built directly into this file): the
   moment a patient reaches their dashboard, a 6-digit live code is generated
@@ -166,8 +167,13 @@ verified, which would defeat the point of having the tag at all.
   stops being valid the instant a newer one exists. A doctor redeems it in "Find a
   patient → Enter a code," which creates a
   one-hour `access_grants` row instead of handing over standing access. Separately, a
-  patient's "Manage access" modal lets them trust a doctor by ID for standing,
-  revocable access (patient-initiated only — a doctor can never request it), shown in
+  patient's "Manage access" modal lets them trust a doctor for standing,
+  revocable access (patient-initiated only — a doctor can never request it). The
+  patient finds the doctor by **searching their name** (`runTrustSearch()`: a 250ms
+  debounced `ilike` on `doctors.name`, a leading "Dr." stripped, at least 2
+  characters, up to 6 rows with Verified/Unverified badges and a Trust button each)
+  — the same directory the booking page searches, so there's no ID to ask the doctor
+  for. Trusted doctors are shown in
   that doctor's "Find a patient → My patients" roster with no code needed. Revoking
   takes effect on the next load, not mid-session, because every lookup and every
   visit/test save re-checks grant validity rather than caching it. **This is now
@@ -182,49 +188,40 @@ verified, which would defeat the point of having the tag at all.
   `showView()`/"← Back to dashboard" pattern as every other primary destination in
   this app), rather than swapping content in place inside the dashboard — looking up
   a patient is a primary destination now, not an incidental panel change. The page
-  shows the patient's name, a "Search a different patient" link (`resetLookup()`,
-  routes back to `view-doctor-dash`), then an **"Add visit note" button sitting
-  directly above the tab row**, then the **Visits / Lab results / Prescriptions tab
-  row** (`.tabs`/`.tab`, same pattern as the "Enter a code" vs. "My patients" tabs one
-  level up), then the tab panes themselves. There is deliberately no "Access:
-  standing trust / one-time code" note anywhere on this page any more — it was
+  is a `.record-split` (see "Master-detail record pages"): a **left column of two
+  panels** — a patient-info panel (name, a red allergy banner when an allergy is on
+  file, and `#doc-pt-medical-info`, which lists Existing conditions) and a records
+  panel holding the **Visits / Lab results / Prescriptions tab row** (`.tabs`/`.tab`,
+  same pattern as the "Enter a code" vs. "My patients" tabs one level up) with the tab
+  panes under it — and a **right column** that opens with the **"Add visit note"
+  button** (`#doc-pt-add-visit-section`) directly above the shared detail panel. The
+  patient's emergency contact is deliberately not shown to doctors. The topbar's way
+  back is a home-icon button, and there is no "Search a different patient" link any
+  more (`resetLookup()` is gone) — the home button does that job. There is deliberately no
+  "Access: standing trust / one-time code" note anywhere on this page any more — it was
   removed outright rather than relocated. Prescriptions is derived the same way as
   the patient's own My Prescriptions page — scans that patient's visits for a
   non-empty, non-"None" `prescription` field (`renderDocPrescriptionsList()`,
   `isMeaningfulPrescription()` shared with the patient-side function) — read-only, no
   add button, since a prescription is written as part of a visit note, not as its own
-  entry. "Add test / report" is the same pattern as "Add visit note" but appears above
-  the Lab results pane instead — `switchPatientResultTab()` toggles which of
-  `#doc-pt-add-visit-section` / `#doc-pt-add-test-section` is shown (visits ↔ lab;
-  neither on the read-only Prescriptions tab) alongside which of
-  `#doc-pt-pane-visits` / `#doc-pt-pane-lab` / `#doc-pt-pane-rx` is visible.
-  **Clicking either add button expands a plain field section in place
-  (`#add-visit-fields`/`#add-test-fields`, toggled via
-  `expandAddVisitFields()`/`collapseAddVisitFields()` and their test-side
-  equivalents) directly underneath that same button — not a modal popup.** This
-  replaced an earlier modal-based version (`#add-visit-modal`/`#add-test-modal`) that
+  entry. **Doctors cannot add tests or reports at all** — the "Add test / report" form
+  was removed outright ("doctor can only add visits"); lab results are patient-uploaded
+  (see "Lab Results" below) and a doctor with an active grant only reads them.
+  `switchPatientResultTab()` shows `#doc-pt-add-visit-section` on the Visits tab only
+  and toggles which of `#doc-pt-pane-visits` / `#doc-pt-pane-lab` / `#doc-pt-pane-rx`
+  is visible.
+  **Clicking "Add visit note" expands a plain field section in place
+  (`#add-visit-fields`, toggled via `expandAddVisitFields()`/
+  `collapseAddVisitFields()`) directly underneath that button — not a modal popup.**
+  This replaced an earlier modal-based version (`#add-visit-modal`) that
   opened a form as an overlay; expanding inline reads better once the add button
-  already lives on the page itself rather than floating over dashboard content. The
-  three doctor-side *detail* modals (`#doc-visit-modal`/`#doc-test-modal`/
-  `#doc-prescription-modal`, opened by clicking an existing list row) still are real
-  modals — only the *add* forms moved off the modal pattern — and, since they're only
-  ever opened while `view-doctor-record` is the active view, they're nested directly
-  inside that view's markup rather than living as top-level siblings of every `.view`
-  div the way the old five doctor-side modals used to; a modal nested inside a
-  *different, currently hidden* view is unreachable, since `display:none` on the
-  ancestor collapses it regardless of the modal's own hidden state — a real bug found
-  and fixed once already during the RLS migration's browser verification, so this
-  nesting is safe specifically because these three modals have exactly one view they
-  can ever be opened from. **The visit note's date and time are not manually entered
+  already lives on the page itself rather than floating over dashboard content. **The visit note's date and time are not manually entered
   at all** — there's no date/time field in `#add-visit-fields` any more; saving stamps
   `date`/`time` with the current moment automatically (`new
   Date().toISOString().slice(0, 10)` and `formatCurrentTime()`, a small `h:mm AM/PM`
   formatter next to `formatHourLabel`), on the assumption a doctor is logging a note
   for the visit happening right now, not backdating one — no reason to make them type
-  today's date. Test entries keep a manual date field, since a test result is
-  routinely added after the fact (or shows "Pending" before results are back), so
-  today's date isn't a safe assumption there the way it is for a visit note. Saving
-  a visit or test re-validates the grant, stamps
+  today's date. Saving a visit re-validates the grant, stamps
   `writtenViaGrantId` and an `unverified` snapshot, then writes directly into that
   patient's record, so the patient sees it immediately next time they sign in; a
   newly added visit's prescription also re-renders the Prescriptions pane
@@ -237,12 +234,9 @@ verified, which would defeat the point of having the tag at all.
   re-entering `view-doctor-record` (e.g. via a day-grid block click, see
   "Appointments" below) just shows the same patient again (defaulting back to the
   Visits tab), exactly like the patient side's own record pages don't reset
-  `currentPatientData`. This is the core loop of the app. The doctor card's own
-  checklist only lists "Medical license number" now — email and phone were dropped
-  from it (the "Verified" badge itself still requires all three via
-  `isDoctorVerified()`, which is unaffected; only the checklist's display was
-  trimmed, matching the patient side no longer echoing its own email/phone back on
-  the dashboard either).
+  `currentPatientData`. This is the core loop of the app. The doctor card shows the license number itself — the
+  old checklist panel is gone. The "Verified" badge still requires email, phone and
+  license via `isDoctorVerified()`.
 - **Master-detail record pages**: the patient's Visits / Lab Results / My
   Prescriptions pages, and the doctor's own Visits/Lab results/Prescriptions
   tabs inside a patient lookup, all used to be a single centered list —
@@ -286,8 +280,9 @@ verified, which would defeat the point of having the tag at all.
 - Doctor dashboard layout: retrofitted into the same `.dash-grid` 3-column pattern the
   patient dashboard already used (`.sidebar` / `.center-col` / `.right-col`, each
   wrapped in `.sticky-inner`) rather than needing new CSS — the doctor dashboard's
-  "right" track was simply unused before this. Sidebar holds the doctor card and the
-  license-checklist/clinic-picker panel; center holds "Find a patient" (code entry +
+  "right" track was simply unused before this. Sidebar holds just the doctor card (the license-checklist/clinic-picker panel was
+  removed: the license moved onto the card, and the clinic picker moved to the
+  topbar — see "Doctor clinics"); center holds "Find a patient" (code entry +
   roster, no result content in-page any more now that a lookup navigates away — see
   above); right holds a **Google-Calendar-style single-day appointment grid**
   (`renderDoctorDayGrid()` in `app.js`) under the same "Upcoming appointments" heading
@@ -335,7 +330,7 @@ verified, which would defeat the point of having the tag at all.
   itself calls `refreshDoctorAppointments()` whenever its target is
   `'view-doctor-dash'` (before the early-return that would otherwise skip it during
   a suppressed/`popstate` navigation, so this fires for the topbar "← Back to
-  dashboard" link, "Search a different patient," and the browser's own back/forward
+  dashboard" button, the record page's home button, and the browser's own back/forward
   buttons alike, not just one specific button). This app has no realtime
   subscription anywhere — everything is fetch-on-load/fetch-on-action, consistent
   with the rest of it — so without this, an appointment a patient books while the
@@ -370,7 +365,9 @@ verified, which would defeat the point of having the tag at all.
   Tapping a row
   navigates to a real full-screen page (its own `<div class="view">`, shown via the
   same `showView()` top-level view-switching the rest of the app already uses, with a
-  "← Back to dashboard" link in its topbar) rather than opening a modal — these were
+  "Back to dashboard" button in its topbar — every back link in the app is now a
+  home-icon button, `data-goto="view-patient-dash"` / `"view-doctor-dash"`, not a
+  text link) rather than opening a modal — these were
   promoted to pages specifically because they're primary destinations now. Within
   the Visits and Lab Results pages, clicking a row renders its detail into a
   right-hand panel now, not a modal — see "Master-detail record pages" above
@@ -387,8 +384,9 @@ verified, which would defeat the point of having the tag at all.
   not stored separately** — it scans every visit for a non-empty, non-"None"
   `prescription` field and lists those, clicking through to the same visit-detail
   modal. "How it works," "My profile," "Account settings," "Manage access," and "My
-  statistics" all live in an "Account" dropdown menu in the topbar (next to "Sign
-  out") — nothing settings-related sits as a standalone sidebar button anymore. The
+  statistics" all live in the topbar's menu dropdown — a three-line menu-icon button
+  (`.menu-trigger`), not a text "Account" button — grouped into clusters with
+  dividers, with "Sign out" as its last item (it closes the menu) — nothing settings-related sits as a standalone sidebar button anymore. The
   dropdown reuses `.dropdown-wrap`/`.dropdown-trigger`/`.dropdown-menu`, CSS that
   already existed in the stylesheet but had no markup using it until this was built.
   The doctor dashboard has the equivalent dropdown minus "Manage access" (no doctor
@@ -399,9 +397,10 @@ verified, which would defeat the point of having the tag at all.
   chunk of doctor-only functionality to deserve its own dropdown entry rather
   than being buried under contact-info fields it has nothing to do with; see
   "Doctor clinics" below for what that page actually contains now. The
-  doctor's sidebar panel below the card ends up holding
-  just the clinic picker; the patient's sidebar panel below the card ends up holding
-  no buttons at all, just the copy-note and privacy-note text.
+  doctor's sidebar holds only the card (the clinic picker moved to the topbar); the
+  patient's sidebar panel below the card holds no buttons at all, just the copy-note
+  and privacy-note text (the live-code explainer note that used to sit there was
+  removed).
 
   "My profile," "Account settings," and "My statistics" are full pages
   (`view-pat-profile`/`view-pat-account-settings`/`view-pat-stats`, and the `doc-`
@@ -412,10 +411,11 @@ verified, which would defeat the point of having the tag at all.
   "Account settings" already edited, which was confusing (two pages, identical
   content, unclear why either existed) rather than useful, so the fields were split
   by what they represent instead: "My profile" holds identity/bio fields (patient:
-  just name; doctor: name, specialty, education, about — the fields a patient might
-  eventually see), "Account settings" holds contact/access fields (patient: email,
-  phone; doctor: email, phone, license, plus the doctor ID display and clinics
-  management). Both pages are independently editable with their own save button
+  name plus a Medical info section — emergency contact, allergies, existing
+  conditions; doctor: name, specialties, education, about — the fields a patient
+  might eventually see), "Account settings" holds contact/access fields (patient:
+  email, phone; doctor: email, phone, license). Saving "My profile" (either role)
+  returns to the dashboard rather than staying on the page. Both pages are independently editable with their own save button
   (`pat-profile-save-btn` / `pat-save-btn`, `doc-profile-save-btn` / `doc-save-btn`)
   that only writes the fields it owns — e.g. saving Account settings never touches
   `name`, so it can't accidentally stomp on an unsaved edit sitting in the profile
@@ -632,7 +632,9 @@ verified, which would defeat the point of having the tag at all.
   easy to compare at a glance; hover a point for the exact date and value. Doctors
   have no visibility into this — it's entirely patient-owned data, unlike visits/tests
   which doctors write.
-- Doctor clinics: a "Currently seeing patients at" dropdown on the doctor dashboard,
+- Doctor clinics: a "Seeing patients at" dropdown (`#doc-current-clinic`) in the doctor
+  dashboard's topbar beside the menu button (`.topbar-clinic`; its label is hidden
+  under 600px, leaving just the select),
   fed by a `clinics` list the doctor builds on its own **"Manage clinics" page**
   (`view-doc-clinics`, reached from the Account dropdown — pulled out of Account
   settings into its own page since it had grown into a big enough chunk of
@@ -884,9 +886,8 @@ verified, which would defeat the point of having the tag at all.
     parallel `#pat-family-indicator .role-chip` override matching its
     numbers by hand) fixes size, shape, and text case/weight/color in one
     move, and keeps the two in sync automatically if `.btn`/`.btn-sm` ever
-    change. The doctor-side "Doctor account" tag is unaffected — it's a
-    separate, plain `.role-chip` span elsewhere in the DOM, never inside
-    `#pat-family-indicator`.
+    change. (The doctor side's separate "Doctor account" tag this note once
+    contrasted with has since been removed from the dashboard entirely.)
   - **The switcher itself moved off the topbar entirely, onto the health
     card as its own "Change person" button — the previous several bullets
     describe two designs this superseded.** First move (topbar → card):
@@ -940,6 +941,89 @@ verified, which would defeat the point of having the tag at all.
     completes, worst case with the verify-banner/email fields simply blank
     for that one render.
 
+- **Password reset**: both roles' "Forgot password?" modals call
+  `supabase.auth.resetPasswordForEmail(email, { redirectTo: origin + pathname })` and
+  swap to a "check your email" note. A `PASSWORD_RECOVERY` listener, registered
+  synchronously right after the client is created (so it is in place before the
+  client's own URL-token handling fires, and before `bootstrap()`), sets
+  `awaitingPasswordRecovery` and shows `view-set-new-password` with no history entry.
+  That form calls `auth.updateUser({ password })` (min 6 characters, confirm field),
+  maps the "Auth session missing" error to "This reset link has expired or was
+  already used", then goes through `routeIntoDashboard()` — the same routing a normal
+  sign-in uses. **Needs Supabase's URL Configuration** (Authentication → URL
+  Configuration: Site URL + Redirect URLs) to include the deployed address, or the
+  emailed link lands somewhere else.
+- **Welcome screen**: after a successful sign-in or sign-up, `startWelcome()` shows
+  `view-welcome` — "Assalam o Alaikum" plus an Urdu time-of-day greeting
+  (`timeOfDayGreetingUrdu()`) sliding in — while the dashboard loads.
+  `enterPatientDash()`/`enterDoctorDash()` both `await waitForWelcome()` before
+  showing the dashboard, which holds until `WELCOME_MIN_MS` (2200ms) after the start so
+  it isn't cut off on a fast connection. It never gets a history entry, and it is
+  skipped for page reloads and family switching (no `startWelcome()` pending means
+  `waitForWelcome()` returns immediately). When testing in a browser, wait past it
+  before clicking dashboard controls.
+- **Lab Results (patient-uploaded reports)**: a patient (or a guardian, for a
+  dependent) uploads a PDF/PNG/JPG/WebP report from the Lab Results page — "+ Upload a
+  report" expands a form with a report name and a file picker (the chosen file name on
+  the left, "Choose file" on the right, plus a "Take photo" button that is only
+  revealed on touch devices, since `capture` is ignored on a computer). Type and a
+  5 MB limit (`TEST_REPORT_MAX_BYTES`) are checked client-side and by the bucket.
+  **There is no date field: a report is dated the day it was uploaded**
+  (`toDateKey(new Date())`, local date), shown everywhere as "Date uploaded:
+  29-Oct-2026" (`formatUploadedDate()`). Files go to the **private** `test-reports`
+  Storage bucket under `<patient_id>/<file>`; the `tests` row carries
+  `report_file_path` and `uploaded_by_patient` (and `authored_by_doctor_id` stays
+  null, so the UI never passes a patient upload off as a doctor's). The page keeps the
+  master-detail layout — list on the left, and the right panel *is* the viewer: the
+  file is fetched with `storage.from(...).download()` into a blob (a blob URL also
+  sidesteps the storage server's locked-down headers that stop a PDF rendering in an
+  iframe), then an image is shown as a plain `<img>` and a PDF is drawn page by page
+  onto canvases with **PDF.js** (3.11.174, lazy-loaded from jsDelivr on first use,
+  pages scaled to the container width × devicePixelRatio, falling back to an iframe if
+  PDF.js fails to load). "Open in new tab" opens the same blob. A report with no file
+  just shows its summary text. **Delete** (patient-uploaded reports only) is a
+  press-and-hold button in the detail panel: the file is removed first, then the row,
+  and the row delete is checked so a silently RLS-blocked delete can't look like it
+  worked. **The doctor's Lab results tab uses the same viewer**: the viewer code is
+  shared and keyed by element-id prefix (`'test-detail'` for the patient page,
+  `'doc-test-detail'` for the doctor's) — `testViewerState(prefix)`,
+  `renderTestReport(prefix, t)`, `showTestViewer()`, `clearTestViewer()`,
+  `wireTestOpenButton()` — with a `token` per prefix so a slow download can't paint
+  over a newer selection. Storage and `tests` policies for all of this are at the end
+  of `supabase/schema.sql` (`tests_insert_patient`, `tests_delete_patient`,
+  `test_reports_insert/select/delete` — the select policy lets a doctor with an active
+  grant read the file). Canvases render at the width the viewer had when the report was
+  selected, so after resizing the window re-select the report to redraw it sharp.
+- **List row shape**: rows in the record pages' left lists (and the booking page's
+  doctor list) are full-bleed — `margin:0 -19px; padding:10px 22px; border-radius:6px`
+  — so hover and the selected `.active` state share one rounded shape reaching the
+  panel's edges; the dividers between rows are drawn with `::after` and hidden on
+  hover/active so they don't cut through the highlight.
+- **Doctor specialties and the booking filter**: a doctor's specialties are picked,
+  never typed — "+ Add specialty" opens a popup of the fixed `SPECIALTY_OPTIONS` list,
+  shown as removable chips, stored as a comma-separated string in the existing
+  `doctors.specialty` column (no schema change; `doctorSpecialties()` splits it).
+  Education and About are capped at 60 and 200 characters with live counters. On the
+  patient's booking page a Filter popup of checkboxes (every option on the fixed list,
+  plus any specialty a doctor has that isn't on it) narrows the doctor directory by
+  specialty (`bookApptSpecialtyFilter`), alongside the name/clinic search; a doctor's
+  About text shows regardless of verification status.
+- **Medical info and visit search**: the patient's My Profile page holds Emergency
+  contact, Allergies and Existing conditions (`patients.emergency_contact`/
+  `allergies`/`conditions`). On a doctor's patient-record page, an allergy shows as a
+  red banner and existing conditions are listed; the emergency contact is not shown to
+  doctors. The patient's Visits list has a doctor-name search box.
+- **Native controls restyled**: `<input type="time">`/`type="date"` and checkboxes are
+  styled to match the app's rounded/teal language instead of showing bare OS controls.
+- **Cache busting**: `pakHealth.html` loads `style.css?v=N` and `app.js?v=N`. There is
+  no build step, so **bump `N` on whichever file you change** or the browser (and
+  GitHub Pages) can keep serving the old copy (currently `style.css?v=66`,
+  `app.js?v=86`).
+- **Phone behavior**: `overscroll-behavior-y:none` stops a pull-down at the top from
+  triggering the browser's pull-to-refresh (which reloaded the app and discarded
+  unsaved input). Under 600px the health/doctor card spans the same width as the
+  panels (`max-width:none`) and is taller (`min-height:236px`).
+
 ## Known limitations (the honest list)
 
 1. **RESOLVED — real auth, database-enforced access.** Accounts are real Supabase
@@ -962,9 +1046,12 @@ verified, which would defeat the point of having the tag at all.
    Remaining caveat, not a bug: Resend's sandbox restricts delivery to the account
    owner's own email until a sending domain is verified — needs that verification
    done before onboarding real pilot users (see "Email verification" above).
-5. **No delete/edit** on visits or tests once added.
-6. **Test "reports"** are just a name/date/short text summary — no file upload, no
-   structured lab-value data. Deliberately deferred.
+5. **No edit** on visits or tests, and no delete on visits or doctor-written tests.
+   The only delete is a patient removing a report *they* uploaded.
+6. **Test reports are files, not data.** A patient can upload a PDF/image (≤5 MB —
+   there is no client-side compression, so a large phone photo is rejected rather than
+   shrunk), but there are no structured lab values or reference ranges. Deliberately
+   deferred ("leave this for now").
 7. **Clinics are per-doctor free text**, not a shared directory — two doctors typing
    "City General Hospital" slightly differently produce two unrelated entries. Fine
    for a pilot; would need a shared `clinics` table (like patients/doctors) to dedupe
@@ -979,6 +1066,10 @@ verified, which would defeat the point of having the tag at all.
    invented text.
 10. **Free-tier Supabase project.** No automated backups, subject to auto-pausing on
     inactivity. Upgrade to Pro before any real patient data goes in.
+11. **The database still lets a doctor insert a test.** The UI no longer offers it, but
+    the `tests_insert` policy (doctor with an active grant) is unchanged, so someone
+    bypassing the app could still write one. Tighten or drop that policy if "only
+    patients add lab results" is meant as a rule, not just a UI choice.
 
 ## Going live (Supabase + static hosting)
 
@@ -1015,7 +1106,9 @@ anywhere.
    project**: Resend is connected and verified working (host `smtp.resend.com`,
    username literally `resend`, password = Resend API key) — the one remaining step
    is verifying a sending domain in Resend, since its sandbox mode only delivers to
-   the account owner's own email otherwise.
+   the account owner's own email otherwise. Also set Authentication → URL
+   Configuration (Site URL and Redirect URLs) to the deployed address, or password-reset
+   links won't come back to the app (see "Password reset").
 5. **Host the static file** — GitHub Pages, Netlify, Vercel, or Cloudflare Pages all
    work.
 6. Before wider rollout: upgrade the Supabase project to Pro (automated backups, no
@@ -1046,18 +1139,17 @@ and "Auth." What's still not built, matching the doc's own scope and deferred li
    actually receive email — right now delivery is sandbox-restricted to the account
    owner's own address (see "Known limitations"). A real consent flow at signup is
    the other concrete blocker before onboarding real pilot users.
-2. Wire `supabase.auth.resetPasswordForEmail()` into the "Forgot password?" modal —
-   the *email-sending mechanism* is already verified working (tested directly via
-   the `/auth/v1/recover` endpoint during SMTP setup), but the app's UI still just
-   explains self-service reset isn't built; needs the modal's form wired to call it,
-   plus handling the `type=recovery` link landing (a "set new password" screen).
-3. Edit/delete for visits and tests.
+2. **RESOLVED — password reset** (see "Password reset" above). What's left is the
+   Supabase URL Configuration for the deployed site, and the Resend sending domain
+   (item 1) before the email can reach anyone but the account owner.
+3. Edit for visits and tests (delete exists only for patient-uploaded reports).
 4. Access-history log UI, now that `written_via_grant_id` is already being captured.
 5. Real rate limiting on live-code redemption attempts.
 6. Mobile pass — responsive breakpoints exist but haven't been stress-tested on an
    actual phone.
-7. Real file upload for test reports (once there's file storage wired up — Supabase
-   Storage is a natural fit given everything else is already on Supabase).
+7. **RESOLVED — file upload for test reports** (private Supabase Storage bucket plus the
+   in-page viewer; see "Lab Results" above). Still open: structured lab values with
+   reference ranges, and compressing large phone photos before upload.
 8. **RESOLVED — appointment booking.** Patients search the full doctor directory by
    name or clinic and book directly (see "Appointments" above); auto-confirmed,
    auto-grants access, no doctor review step by deliberate scope choice. A real

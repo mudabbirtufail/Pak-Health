@@ -914,27 +914,48 @@
       });
     });
   }
-  $('pat-trust-add-btn').addEventListener('click', async function(){
-    var raw = $('pat-trust-input').value.trim().toUpperCase();
-    var code = raw.indexOf('DR-') === 0 ? raw : 'DR-' + raw.replace(/[^0-9]/g,'');
+  // Trusting a doctor is a name search against the doctor directory (the same one
+  // booking uses) — there's no ID to ask the doctor for.
+  var trustSearchToken = 0;
+  var trustSearchTimer = null;
+  async function runTrustSearch(){
+    var resultsEl = $('pat-trust-results');
     clearError($('pat-trust-error'));
-    if (!/^DR-\d{6}$/.test(code)){
-      showError($('pat-trust-error'), 'Enter a valid doctor ID, like DR-482913.');
+    var q = $('pat-trust-input').value.trim().replace(/^Dr\.?\s*/i, '').replace(/[%_,()]/g, ' ').trim();
+    var token = ++trustSearchToken;
+    if (q.length < 2){ resultsEl.innerHTML = ''; return; }
+    var res = await supabaseClient.from('doctors').select('*').ilike('name', '%' + q + '%').limit(6);
+    if (token !== trustSearchToken) return;
+    var docs = (res.data || []).map(mapDoctorRow);
+    if (!docs.length){
+      resultsEl.innerHTML = '<div class="empty-state">No doctor found with that name.</div>';
       return;
     }
-    var docRes = await supabaseClient.from('doctors').select('id').eq('doctor_code', code).maybeSingle();
-    if (!docRes.data){
-      showError($('pat-trust-error'), 'No doctor found with that ID.');
-      return;
-    }
-    $('pat-trust-add-btn').disabled = true;
-    try{
-      await createTrustGrant(activePatientId, docRes.data.id);
-      $('pat-trust-input').value = '';
-      renderTrustedList();
-    }finally{
-      $('pat-trust-add-btn').disabled = false;
-    }
+    resultsEl.innerHTML = docs.map(function(d, i){
+      var sub = [d.specialty, (d.clinics || []).map(function(c){ return c.name; }).join(', ')].filter(Boolean).join(' · ');
+      return '<div class="list-item static">'
+        + '<div><div class="li-title">'+escapeHtml(doctorDisplayName(d))+' <span class="badge '+(d.verified?'verified':'unverified')+'" style="margin-left:5px;">'+(d.verified?'Verified':'Unverified')+'</span></div>'
+        + '<div class="li-sub">'+escapeHtml(sub || 'No clinic on file')+'</div></div>'
+        + '<button type="button" class="btn btn-secondary btn-sm trust-doctor-btn" data-idx="'+i+'">Trust</button>'
+        + '</div>';
+    }).join('');
+    resultsEl.querySelectorAll('.trust-doctor-btn').forEach(function(btn){
+      btn.addEventListener('click', async function(){
+        btn.disabled = true;
+        try{
+          await createTrustGrant(activePatientId, docs[parseInt(btn.getAttribute('data-idx'), 10)].id);
+          $('pat-trust-input').value = '';
+          resultsEl.innerHTML = '';
+          renderTrustedList();
+        }finally{
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+  $('pat-trust-input').addEventListener('input', function(){
+    clearTimeout(trustSearchTimer);
+    trustSearchTimer = setTimeout(runTrustSearch, 250);
   });
 
   // ---- Family (dependent profiles) ----
@@ -1783,17 +1804,17 @@
     });
     if (alreadyOpen) return;
     clinicsEl.classList.remove('hidden');
-    clinicsEl.innerHTML = '<div class="li-sub" style="padding:8px 10px;">Loading…</div>';
+    clinicsEl.innerHTML = '<div class="li-sub" style="padding:8px 15px;">Loading…</div>';
     var res = await supabaseClient.from('doctor_availability').select('*').eq('doctor_id', d.id);
     var availability = (res.data || []).map(mapAvailabilityRow);
     var clinicNames = distinctBookableClinics(availability);
     // A doctor's About is shown whether or not they're verified — it's their own
     // words about themselves, not a verified credential.
     var aboutHtml = d.about
-      ? '<div class="li-sub" style="padding:8px 10px; white-space:pre-wrap; color:var(--ink-soft);">'+escapeHtml(d.about)+'</div>'
+      ? '<div class="li-sub" style="padding:8px 15px; white-space:pre-wrap; color:var(--ink-soft);">'+escapeHtml(d.about)+'</div>'
       : '';
     if (!clinicNames.length){
-      clinicsEl.innerHTML = aboutHtml + '<div class="li-sub" style="padding:8px 10px;">No bookable clinics yet.</div>';
+      clinicsEl.innerHTML = aboutHtml + '<div class="li-sub" style="padding:8px 15px;">No bookable clinics yet.</div>';
       return;
     }
     var clinics = clinicNames.map(function(name){ return findClinicByName(d, name); });
@@ -2699,8 +2720,6 @@
       try{ await supabaseClient.from('doctors').update({ current_clinic: autoClinic }).eq('id', id); }catch(e){}
     }
     currentDoctorData = data;
-    $('doc-dash-id').textContent = data.doctorId;
-    $('doc-modal-id').textContent = data.doctorId;
     $('doc-name').value = data.name || '';
     $('doc-email').value = authUser.email || '';
     $('doc-phone').value = data.phone || '';
@@ -2726,7 +2745,6 @@
     switchFindTab('code');
     renderRoster();
     collapseAddVisitFields();
-    collapseAddTestFields();
     closeManageBookingsModal();
     closeDeleteClinicModal();
     closeDocAcctDropdown();
@@ -2785,14 +2803,7 @@
     var badge = $('doc-badge');
     badge.textContent = verified ? 'Verified' : 'Unverified';
     badge.className = 'badge ' + (verified ? 'verified' : 'unverified');
-    var items = [
-      { label:'Medical license number', done: !!data.license }
-    ];
-    var html = '';
-    items.forEach(function(it){
-      html += '<li class="'+(it.done?'done':'')+'"><span class="dot"></span>'+it.label+'</li>';
-    });
-    $('doc-checklist').innerHTML = html;
+    $('doc-card-license').textContent = data.license || 'Not added';
   }
 
   // ---- Clinics ----
@@ -2803,7 +2814,7 @@
     select.innerHTML = '<option value="">No clinic selected</option>' + clinics.map(function(c){
       return '<option value="'+escapeHtml(c.name)+'"'+(c.name === current ? ' selected' : '')+'>'+escapeHtml(c.name)+'</option>';
     }).join('');
-    $('doc-clinic-hint').classList.toggle('hidden', clinics.length > 0);
+    select.title = clinics.length ? 'Currently seeing patients at' : 'Add clinics under Manage clinics to select one here.';
   }
   function renderClinicsList(data){
     var clinics = data.clinics || [];
@@ -3205,9 +3216,6 @@
     renderDoctorCard(currentDoctorData);
     showView('view-doctor-dash');
   });
-  $('doc-dash-copy').addEventListener('click', function(){
-    copyToClipboard(currentDoctorData.doctorId, $('doc-dash-copy-note'));
-  });
   $('doc-avatar-btn').addEventListener('click', function(){
     $('doc-avatar-input').click();
   });
@@ -3282,7 +3290,7 @@
   $('doc-howitworks-btn').addEventListener('click', docHowItWorks.open);
 
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape'){ collapseAddVisitFields(); collapseAddTestFields(); closeAddEyeModal(); closeEyeRxPrevModal(); closePatAccessModal(); closePatApptDetailModal(); closeBookApptConfirmModal(); closeManageBookingsModal(); closeDeleteClinicModal(); closePatFamilyModal(); closeFamilyDetailModal(); closeAddFamilyModal(); closeFamilySwitcher(); closePatAcctDropdown(); patHowItWorks.close(); closeDocAcctDropdown(); docHowItWorks.close(); }
+    if (e.key === 'Escape'){ collapseAddVisitFields(); closeAddEyeModal(); closeEyeRxPrevModal(); closePatAccessModal(); closePatApptDetailModal(); closeBookApptConfirmModal(); closeManageBookingsModal(); closeDeleteClinicModal(); closePatFamilyModal(); closeFamilyDetailModal(); closeAddFamilyModal(); closeFamilySwitcher(); closePatAcctDropdown(); patHowItWorks.close(); closeDocAcctDropdown(); docHowItWorks.close(); }
   });
 
   function escapeHtml(s){
@@ -3533,10 +3541,8 @@
     $('res-name').textContent = data.name || 'Unnamed patient';
     $('doc-pt-allergy-banner').classList.toggle('hidden', !data.allergies);
     $('doc-pt-allergy-text').textContent = data.allergies || '';
-    $('doc-pt-emergency-contact-text').textContent = data.emergencyContact || 'Not recorded';
     $('doc-pt-conditions-text').textContent = data.conditions || 'Not recorded';
     collapseAddVisitFields();
-    collapseAddTestFields();
     renderDoctorVisitsList(data.visits || []);
     renderDoctorTestsList(data.tests || []);
     renderDocPrescriptionsList(data.visits || []);
@@ -3544,14 +3550,13 @@
     showView('view-doctor-record');
   }
 
-  // ---- Patient record tabs: Visits / Lab results / Prescriptions, and the
-  // matching "Add ..." section shown above the tab row (only one relevant to
-  // the active tab — Prescriptions has neither, since it's derived). ----
+  // ---- Patient record tabs: Visits / Lab results / Prescriptions. The "Add visit
+  // note" section above the tab row only shows on Visits — a doctor can only add
+  // visits, so Lab results (patient uploads, plus older doctor entries) and
+  // Prescriptions (derived from visits) are read-only. ----
   function switchPatientResultTab(tab){
     collapseAddVisitFields();
-    collapseAddTestFields();
     $('doc-pt-add-visit-section').classList.toggle('hidden', tab !== 'visits');
-    $('doc-pt-add-test-section').classList.toggle('hidden', tab !== 'lab');
     $('doc-pt-tab-visits').classList.toggle('active', tab === 'visits');
     $('doc-pt-tab-lab').classList.toggle('active', tab === 'lab');
     $('doc-pt-tab-rx').classList.toggle('active', tab === 'rx');
@@ -3611,18 +3616,6 @@
     if (!items.length) items = ['Not recorded'];
     $('doc-prescription-detail-list').innerHTML = items.map(function(s){ return '<li>'+escapeHtml(s)+'</li>'; }).join('');
   }
-  function resetLookup(){
-    currentLookupCode = null;
-    currentLookupData = null;
-    currentLookupGrant = null;
-    $('lookup-code').value = '';
-    switchFindTab('code');
-    $('lookup-row').classList.remove('hidden');
-    $('lookup-subtitle').classList.remove('hidden');
-    $('lookup-not-found').classList.add('hidden');
-    showView('view-doctor-dash');
-    $('lookup-code').focus();
-  }
   $('lookup-btn').addEventListener('click', async function(){
     var code = $('lookup-code').value.replace(/[^0-9]/g,'');
     if (code.length !== 6){
@@ -3655,7 +3648,6 @@
   $('lookup-code').addEventListener('keydown', function(e){
     if (e.key === 'Enter') $('lookup-btn').click();
   });
-  $('lookup-change-btn').addEventListener('click', resetLookup);
 
   function currentDoctorDisplayName(){
     var name = currentDoctorData && currentDoctorData.name ? currentDoctorData.name.trim() : '';
@@ -3728,71 +3720,6 @@
     }finally{
       $('add-visit-save').disabled = false;
       $('add-visit-save').textContent = 'Save visit note';
-    }
-  });
-
-  function expandAddTestFields(){
-    if (!currentLookupCode) return;
-    $('test-name').value = '';
-    $('test-result').value = '';
-    clearError($('add-test-error'));
-    $('add-test-fields').classList.remove('hidden');
-  }
-  function collapseAddTestFields(){
-    $('add-test-fields').classList.add('hidden');
-  }
-  $('add-test-btn').addEventListener('click', function(){
-    if ($('add-test-fields').classList.contains('hidden')) expandAddTestFields();
-    else collapseAddTestFields();
-  });
-  $('add-test-cancel').addEventListener('click', collapseAddTestFields);
-  $('add-test-save').addEventListener('click', async function(){
-    if (!currentLookupCode){
-      showError($('add-test-error'), 'No patient selected.');
-      return;
-    }
-    var name = $('test-name').value.trim();
-    // Dated the day it's added — nothing for the doctor to type.
-    var date = toDateKey(new Date());
-    if (!name){
-      showError($('add-test-error'), 'Please enter a test name.');
-      return;
-    }
-    clearError($('add-test-error'));
-    $('add-test-save').disabled = true;
-    $('add-test-save').textContent = 'Saving...';
-    try{
-      var activeGrant = await getActiveGrant(currentLookupCode, session.id);
-      if (!activeGrant){
-        showError($('add-test-error'), 'Your access to this patient has expired or been revoked. Ask them for a new code or to re-trust you.');
-        return;
-      }
-      var row = {
-        patient_id: currentLookupCode,
-        authored_by_doctor_id: session.id,
-        written_via_grant_id: activeGrant.id,
-        name: name,
-        date: date,
-        doctor_name: currentDoctorDisplayName(),
-        result_summary: $('test-result').value.trim(),
-        unverified: !isDoctorVerified(currentDoctorData || {})
-      };
-      var res = await supabaseClient.from('tests').insert(row).select().maybeSingle();
-      if (res.error || !res.data){
-        showError($('add-test-error'), 'Your access to this patient has expired or been revoked. Ask them for a new code or to re-trust you.');
-        return;
-      }
-      currentLookupData.tests = [mapTestRow(res.data)].concat(currentLookupData.tests || []);
-      renderDoctorTestsList(currentLookupData.tests);
-      collapseAddTestFields();
-      var note = $('add-test-note');
-      note.classList.add('show');
-      setTimeout(function(){ note.classList.remove('show'); }, 2200);
-    }catch(e){
-      showError($('add-test-error'), 'Something went wrong saving this test. Please try again.');
-    }finally{
-      $('add-test-save').disabled = false;
-      $('add-test-save').textContent = 'Save test';
     }
   });
 

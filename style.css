@@ -84,6 +84,14 @@
   .wordmark{ display:flex; align-items:center; gap:8px; font-family:'Spectral', serif; font-weight:600; font-size:1rem; letter-spacing:0.01em; }
   .wordmark svg{ flex-shrink:0; }
   .topbar-right{ display:flex; align-items:center; gap:11px; }
+  /* Doctor dashboard: "Seeing patients at" picker beside the menu button. */
+  .topbar-clinic{ display:flex; align-items:center; gap:8px; min-width:0; margin:0; }
+  .topbar-clinic-label{ font-size:0.64rem; color: var(--muted); white-space:nowrap; }
+  .topbar-clinic select{ width:auto; max-width:200px; padding:6px 10px; font-size:0.66rem; }
+  @media (max-width: 600px){
+    .topbar-clinic-label{ display:none; }
+    .topbar-clinic select{ max-width:140px; }
+  }
   .role-chip{
     font-size:0.58rem; text-transform:uppercase; letter-spacing:0.08em; white-space:nowrap;
     color: var(--muted); border:1px solid var(--line); border-radius:999px; padding:3px 8px;
@@ -617,6 +625,22 @@
   .list-item.static:hover{ background:none; }
   .book-doctor-clinics{ background: var(--bg); padding-left:13px; }
   .book-doctor-clinics .list-item:last-child{ border-bottom:none; }
+  /* The booking page's doctor list uses the same row shape as the record pages:
+     each row reaches the panel's edges with rounded corners, hovered or not, and
+     the clinics that expand under a doctor sit on the tinted band with the same
+     rounded hover. */
+  #book-appt-doctor-list .book-doctor-entry > .list-item{
+    position:relative; margin:0 -19px; padding:10px 22px; border-bottom:none; border-radius:6px;
+  }
+  #book-appt-doctor-list .book-doctor-entry:not(:last-child) > .list-item::after{
+    content:''; position:absolute; left:19px; right:19px; bottom:0; border-bottom:1px solid var(--line);
+  }
+  #book-appt-doctor-list .book-doctor-entry > .list-item:hover::after{ display:none; }
+  #book-appt-doctor-list .book-doctor-clinics{ margin:0 -19px; padding:4px 19px 8px; }
+  #book-appt-doctor-list .book-doctor-clinics .list-item{
+    margin:0 -7px; padding:10px 22px; border-bottom:none; border-radius:6px;
+  }
+  #book-appt-doctor-list .book-doctor-clinics .list-item:hover{ background: var(--teal-wash); }
 
   /* ---------- Appointments calendar ---------- */
   .calendar-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:11px; }
@@ -715,7 +739,10 @@
        padding all round, more breathing room above the code row) to actually
        give the card some real height/presence on a phone instead of just
        "not clipped." */
-    .health-card{ aspect-ratio:auto; padding:20px 18px 18px; }
+    /* On a phone the card spans the same width as the panels around it (its 352px
+       desktop cap left it narrower than them) and is taller, with the extra
+       height spread between the top, the name and the code row. */
+    .health-card{ aspect-ratio:auto; max-width:none; min-height:236px; padding:22px 20px 20px; }
     .avatar-btn-lg{ width:66px; height:66px; }
     .avatar-btn-lg .avatar-fallback{ font-size:1.35rem; }
     .health-card-body-centered{ gap:13px; }

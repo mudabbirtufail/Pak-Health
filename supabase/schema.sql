@@ -818,3 +818,177 @@ drop policy if exists "bp_entries_own" on public.bp_entries;
 create policy "bp_entries_own" on public.bp_entries
   for all using (auth.uid() = patient_id or public.is_guardian_of(patient_id))
   with check (auth.uid() = patient_id or public.is_guardian_of(patient_id));
+
+
+-- =============================================================================
+-- Doctor-recorded blood pressure
+-- =============================================================================
+-- A doctor writing a visit note can add a blood pressure reading. It is kept on the
+-- visit itself AND added to the patient's blood pressure log, labelled as the
+-- doctor's (recorded_by_*), so it can't be passed off as the patient's own entry.
+-- Same trust rule as visits: the doctor needs an active grant at insert time.
+-- Safe to re-run.
+
+alter table public.visits add column if not exists bp_systolic smallint check (bp_systolic between 50 and 300);
+alter table public.visits add column if not exists bp_diastolic smallint check (bp_diastolic between 30 and 200);
+alter table public.visits add column if not exists pulse smallint check (pulse between 20 and 250);
+
+alter table public.bp_entries add column if not exists recorded_by_doctor_id uuid references public.doctors(id);
+alter table public.bp_entries add column if not exists recorded_by_name text not null default '';
+alter table public.bp_entries add column if not exists written_via_grant_id uuid;
+alter table public.bp_entries add column if not exists visit_id uuid references public.visits(id) on delete set null;
+
+-- The single "own" policy becomes per-action ones: a patient (or guardian) manages
+-- their own entries but can only create ones with no doctor attribution, and can
+-- neither edit nor delete a reading a doctor recorded (like a doctor-written test).
+drop policy if exists "bp_entries_own" on public.bp_entries;
+
+drop policy if exists "bp_entries_select_own" on public.bp_entries;
+create policy "bp_entries_select_own" on public.bp_entries
+  for select using (auth.uid() = patient_id or public.is_guardian_of(patient_id));
+
+drop policy if exists "bp_entries_insert_own" on public.bp_entries;
+create policy "bp_entries_insert_own" on public.bp_entries
+  for insert with check (
+    (auth.uid() = patient_id or public.is_guardian_of(patient_id))
+    and recorded_by_doctor_id is null and written_via_grant_id is null and visit_id is null
+  );
+
+drop policy if exists "bp_entries_update_own" on public.bp_entries;
+create policy "bp_entries_update_own" on public.bp_entries
+  for update using ((auth.uid() = patient_id or public.is_guardian_of(patient_id)) and recorded_by_doctor_id is null)
+  with check ((auth.uid() = patient_id or public.is_guardian_of(patient_id)) and recorded_by_doctor_id is null);
+
+drop policy if exists "bp_entries_delete_own" on public.bp_entries;
+create policy "bp_entries_delete_own" on public.bp_entries
+  for delete using ((auth.uid() = patient_id or public.is_guardian_of(patient_id)) and recorded_by_doctor_id is null);
+
+-- A doctor can add (never read, edit or delete) a reading for a patient they hold an
+-- active grant on, attributed to themselves.
+drop policy if exists "bp_entries_insert_doctor" on public.bp_entries;
+create policy "bp_entries_insert_doctor" on public.bp_entries
+  for insert with check (
+    recorded_by_doctor_id = auth.uid()
+    and public.has_active_grant(patient_id, auth.uid())
+  );
+
+
+-- =============================================================================
+-- Blood glucose log
+-- =============================================================================
+-- Same shape and rules as bp_entries: patient-owned (the patient or a guardian logs
+-- their own readings), plus readings a doctor records during a visit, labelled as the
+-- doctor's and linked to the visit. Values are mg/dL. A patient can't edit or delete a
+-- doctor-recorded reading; a doctor can add (never read, edit or delete) one for a
+-- patient they hold an active grant on. Safe to re-run.
+
+alter table public.visits add column if not exists glucose_value smallint check (glucose_value between 20 and 800);
+alter table public.visits add column if not exists glucose_context text;
+
+create table if not exists public.glucose_entries (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references public.patients(id) on delete cascade,
+  measured_at timestamptz not null default now(),
+  value smallint not null check (value between 20 and 800),
+  context text not null default 'random'
+    check (context in ('fasting', 'before_meal', 'after_meal', 'bedtime', 'random')),
+  note text not null default '',
+  recorded_by_doctor_id uuid references public.doctors(id),
+  recorded_by_name text not null default '',
+  written_via_grant_id uuid,
+  visit_id uuid references public.visits(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists glucose_entries_patient_measured_idx
+  on public.glucose_entries (patient_id, measured_at desc);
+
+alter table public.glucose_entries enable row level security;
+
+drop policy if exists "glucose_entries_select_own" on public.glucose_entries;
+create policy "glucose_entries_select_own" on public.glucose_entries
+  for select using (auth.uid() = patient_id or public.is_guardian_of(patient_id));
+
+drop policy if exists "glucose_entries_insert_own" on public.glucose_entries;
+create policy "glucose_entries_insert_own" on public.glucose_entries
+  for insert with check (
+    (auth.uid() = patient_id or public.is_guardian_of(patient_id))
+    and recorded_by_doctor_id is null and written_via_grant_id is null and visit_id is null
+  );
+
+drop policy if exists "glucose_entries_update_own" on public.glucose_entries;
+create policy "glucose_entries_update_own" on public.glucose_entries
+  for update using ((auth.uid() = patient_id or public.is_guardian_of(patient_id)) and recorded_by_doctor_id is null)
+  with check ((auth.uid() = patient_id or public.is_guardian_of(patient_id)) and recorded_by_doctor_id is null);
+
+drop policy if exists "glucose_entries_delete_own" on public.glucose_entries;
+create policy "glucose_entries_delete_own" on public.glucose_entries
+  for delete using ((auth.uid() = patient_id or public.is_guardian_of(patient_id)) and recorded_by_doctor_id is null);
+
+drop policy if exists "glucose_entries_insert_doctor" on public.glucose_entries;
+create policy "glucose_entries_insert_doctor" on public.glucose_entries
+  for insert with check (
+    recorded_by_doctor_id = auth.uid()
+    and public.has_active_grant(patient_id, auth.uid())
+  );
+
+
+-- =============================================================================
+-- Weight and height log
+-- =============================================================================
+-- Same shape and rules as bp_entries / glucose_entries: the patient (or a guardian)
+-- keeps their own log, and a doctor can add a measurement during a visit, labelled as
+-- theirs and linked to the visit. Metric (kg, cm). Either value can be left out (height
+-- rarely changes), but not both. A patient can't edit or delete a doctor-recorded
+-- entry; a doctor can add (never read, edit or delete) one for a patient they hold an
+-- active grant on. Safe to re-run.
+
+alter table public.visits add column if not exists weight_kg numeric(5,1) check (weight_kg between 1 and 500);
+alter table public.visits add column if not exists height_cm numeric(4,1) check (height_cm between 30 and 260);
+
+create table if not exists public.body_entries (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references public.patients(id) on delete cascade,
+  measured_at timestamptz not null default now(),
+  weight_kg numeric(5,1) check (weight_kg between 1 and 500),
+  height_cm numeric(4,1) check (height_cm between 30 and 260),
+  note text not null default '',
+  recorded_by_doctor_id uuid references public.doctors(id),
+  recorded_by_name text not null default '',
+  written_via_grant_id uuid,
+  visit_id uuid references public.visits(id) on delete set null,
+  created_at timestamptz not null default now(),
+  check (weight_kg is not null or height_cm is not null)
+);
+
+create index if not exists body_entries_patient_measured_idx
+  on public.body_entries (patient_id, measured_at desc);
+
+alter table public.body_entries enable row level security;
+
+drop policy if exists "body_entries_select_own" on public.body_entries;
+create policy "body_entries_select_own" on public.body_entries
+  for select using (auth.uid() = patient_id or public.is_guardian_of(patient_id));
+
+drop policy if exists "body_entries_insert_own" on public.body_entries;
+create policy "body_entries_insert_own" on public.body_entries
+  for insert with check (
+    (auth.uid() = patient_id or public.is_guardian_of(patient_id))
+    and recorded_by_doctor_id is null and written_via_grant_id is null and visit_id is null
+  );
+
+drop policy if exists "body_entries_update_own" on public.body_entries;
+create policy "body_entries_update_own" on public.body_entries
+  for update using ((auth.uid() = patient_id or public.is_guardian_of(patient_id)) and recorded_by_doctor_id is null)
+  with check ((auth.uid() = patient_id or public.is_guardian_of(patient_id)) and recorded_by_doctor_id is null);
+
+drop policy if exists "body_entries_delete_own" on public.body_entries;
+create policy "body_entries_delete_own" on public.body_entries
+  for delete using ((auth.uid() = patient_id or public.is_guardian_of(patient_id)) and recorded_by_doctor_id is null);
+
+drop policy if exists "body_entries_insert_doctor" on public.body_entries;
+create policy "body_entries_insert_doctor" on public.body_entries
+  for insert with check (
+    recorded_by_doctor_id = auth.uid()
+    and public.has_active_grant(patient_id, auth.uid())
+  );

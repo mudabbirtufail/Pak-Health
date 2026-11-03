@@ -81,6 +81,8 @@
     // The blood-pressure chart is drawn at the width it actually has on screen, which
     // is only known once its page is showing.
     if (id === 'view-patient-bp') renderBpChart();
+    if (id === 'view-patient-glucose') renderGlucoseChart();
+    if (id === 'view-patient-body') renderBodyChart();
     // Keep the "Individual account"/"Viewing: X" indicator on screen across
     // every patient page, not just the dashboard — see placeFamilyIndicator().
     if (session && session.type === 'patient' && PATIENT_ONLY_VIEWS.indexOf(id) !== -1) placeFamilyIndicator(id);
@@ -91,7 +93,7 @@
       history.pushState({ view: id }, '', '#' + id);
     }
   }
-  var PATIENT_ONLY_VIEWS = ['view-patient-dash','view-record-visits','view-record-tests','view-record-prescriptions','view-patient-eyes','view-patient-bp','view-pat-profile','view-pat-account-settings','view-pat-stats','view-pat-book-appt'];
+  var PATIENT_ONLY_VIEWS = ['view-patient-dash','view-record-visits','view-record-tests','view-record-prescriptions','view-patient-eyes','view-patient-bp','view-patient-glucose','view-patient-body','view-pat-profile','view-pat-account-settings','view-pat-stats','view-pat-book-appt'];
   var DOCTOR_ONLY_VIEWS = ['view-doctor-dash', 'view-doctor-record', 'view-doc-profile', 'view-doc-account-settings', 'view-doc-clinics', 'view-doc-stats'];
   window.addEventListener('popstate', function(e){
     var requested = (e.state && e.state.view) || 'view-landing';
@@ -230,9 +232,13 @@
     return {
       id: row.id, doctorName: row.doctor_name || '', clinicName: row.clinic_name || '', date: row.date,
       time: row.time || '', symptoms: row.symptoms || '', diagnosis: row.diagnosis || '', prescription: row.prescription || '',
-      notes: row.notes || '', writtenViaGrantId: row.written_via_grant_id, unverified: !!row.unverified
+      notes: row.notes || '', writtenViaGrantId: row.written_via_grant_id, unverified: !!row.unverified,
+      bpSystolic: numOrNull(row.bp_systolic), bpDiastolic: numOrNull(row.bp_diastolic), pulse: numOrNull(row.pulse),
+      glucoseValue: numOrNull(row.glucose_value), glucoseContext: row.glucose_context || '',
+      weightKg: numOrNull(row.weight_kg), heightCm: numOrNull(row.height_cm)
     };
   }
+  function numOrNull(v){ return (v === null || v === undefined) ? null : v; }
   function mapTestRow(row){
     return {
       id: row.id, name: row.name || '', date: row.date, doctorName: row.doctor_name || '',
@@ -775,10 +781,16 @@
     var apptsRes = await supabaseClient.from('appointments').select('*').eq('patient_id', id).order('date', { ascending:true });
     var bpRes = await supabaseClient.from('bp_entries').select('*').eq('patient_id', id).order('measured_at', { ascending:false });
     if (bpRes.error) console.warn('Could not load blood pressure readings:', bpRes.error.message);
+    var gluRes = await supabaseClient.from('glucose_entries').select('*').eq('patient_id', id).order('measured_at', { ascending:false });
+    if (gluRes.error) console.warn('Could not load glucose readings:', gluRes.error.message);
+    var bodyRes = await supabaseClient.from('body_entries').select('*').eq('patient_id', id).order('measured_at', { ascending:false });
+    if (bodyRes.error) console.warn('Could not load weight/height entries:', bodyRes.error.message);
     data.visits = (visitsRes.data || []).map(mapVisitRow);
     data.tests = (testsRes.data || []).map(mapTestRow);
     data.eyeEntries = (eyesRes.data || []).map(mapEyeRow);
     data.bpEntries = (bpRes.data || []).map(mapBpRow);
+    data.glucoseEntries = (gluRes.data || []).map(mapGlucoseRow);
+    data.bodyEntries = (bodyRes.data || []).map(mapBodyRow);
     data.appointments = (apptsRes.data || []).map(mapAppointmentRow);
     currentPatientData = data;
     renderHealthCard(data);
@@ -790,12 +802,16 @@
     renderPrescriptionsList(data.visits);
     renderEyesList(data.eyeEntries);
     renderBpPage(data.bpEntries);
+    renderGlucosePage(data.glucoseEntries);
+    renderBodyPage(data.bodyEntries);
     calViewDate = new Date();
     renderAppointmentsCalendar(data.appointments);
     renderAppointmentsList(data.appointments);
     closeAddEyeModal();
     closeEyeRxPrevModal();
     closeAddBpModal();
+    closeAddGlucoseModal();
+    closeAddBodyModal();
     closePatAccessModal();
     closePatApptDetailModal();
     closePatFamilyModal();
@@ -2169,6 +2185,9 @@
     $('visit-detail-date').textContent = formatDateDisplay(v.date) + (v.time ? ' · ' + v.time : '');
     $('visit-detail-doctor').innerHTML = escapeHtml(v.doctorName || 'Doctor') + unverifiedTagHtml(v);
     $('visit-detail-clinic').textContent = v.clinicName || 'Not recorded';
+    renderVisitBp('visit-detail', v);
+    renderVisitGlucose('visit-detail', v);
+    renderVisitBody('visit-detail', v, currentPatientData && currentPatientData.dob);
     $('visit-detail-symptoms').textContent = v.symptoms || 'Not recorded';
     $('visit-detail-diagnosis').textContent = v.diagnosis || 'Not recorded';
     $('visit-detail-prescription').textContent = v.prescription || 'Not recorded';
@@ -2557,7 +2576,8 @@
   function mapBpRow(row){
     return {
       id: row.id, measuredAt: row.measured_at, systolic: row.systolic, diastolic: row.diastolic,
-      pulse: (row.pulse === null || row.pulse === undefined) ? null : row.pulse, note: row.note || ''
+      pulse: (row.pulse === null || row.pulse === undefined) ? null : row.pulse, note: row.note || '',
+      recordedByDoctorId: row.recorded_by_doctor_id || null, recordedByName: row.recorded_by_name || ''
     };
   }
   // The usual adult bands (AHA). Shown as a label for tracking, never as a diagnosis.
@@ -2587,6 +2607,38 @@
   function setBpCategory(el, cat){
     el.textContent = cat.label;
     el.className = 'bp-category ' + cat.tone;
+  }
+  // Whole numbers in the usual ranges. Returns { error } or { sys, dia, pulse }; shared by
+  // the patient's "Add reading" form and the doctor's visit-note form.
+  function parseBpInputs(sysRaw, diaRaw, pulseRaw){
+    function whole(raw){
+      raw = (raw || '').trim();
+      return /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
+    }
+    var sys = whole(sysRaw), dia = whole(diaRaw);
+    if (isNaN(sys) || isNaN(dia)) return { error: 'Enter both the systolic (top) and diastolic (bottom) numbers.' };
+    if (sys < 50 || sys > 300) return { error: 'Systolic should be between 50 and 300.' };
+    if (dia < 30 || dia > 200) return { error: 'Diastolic should be between 30 and 200.' };
+    if (sys <= dia) return { error: 'Systolic (top) should be higher than diastolic (bottom).' };
+    var pulse = null;
+    if ((pulseRaw || '').trim() !== ''){
+      pulse = whole(pulseRaw);
+      if (isNaN(pulse) || pulse < 20 || pulse > 250) return { error: 'Pulse should be between 20 and 250.' };
+    }
+    return { sys: sys, dia: dia, pulse: pulse };
+  }
+  // "120/80 mmHg ♥ 72 [Normal]" for a visit's detail panel.
+  function bpSummaryHtml(sys, dia, pulse){
+    var cat = bpCategory(sys, dia);
+    return '<span class="bp-row-value">' + sys + '/' + dia + '</span> mmHg' + bpPulseHtml(pulse)
+      + '<span class="bp-category sm ' + cat.tone + '">' + escapeHtml(cat.label) + '</span>';
+  }
+  // Shows (or hides) a visit's blood pressure row; prefix is 'visit-detail' or 'doc-visit-detail'.
+  function renderVisitBp(prefix, v){
+    var has = v.bpSystolic !== null && v.bpDiastolic !== null;
+    $(prefix + '-bp-label').classList.toggle('hidden', !has);
+    $(prefix + '-bp').classList.toggle('hidden', !has);
+    if (has) $(prefix + '-bp').innerHTML = bpSummaryHtml(v.bpSystolic, v.bpDiastolic, v.pulse);
   }
 
   var BP_LIST_INITIAL = 15;
@@ -2624,11 +2676,11 @@
         + '<div class="li-title"><span class="bp-row-value">'+escapeHtml(bpReading(e))+'</span> mmHg'
         + bpPulseHtml(e.pulse)
         + '<span class="bp-category sm '+c.tone+'">'+escapeHtml(c.label)+'</span></div>'
-        + '<div class="li-sub">'+escapeHtml(formatBpWhen(e.measuredAt))+'</div>'
+        + '<div class="li-sub">'+escapeHtml(formatBpWhen(e.measuredAt))+(e.recordedByDoctorId ? ' · Recorded by '+escapeHtml(e.recordedByName || 'your doctor') : '')+'</div>'
         + (e.note ? '<div class="li-sub bp-note">'+escapeHtml(e.note)+'</div>' : '')
         + '</div>'
-        + '<button class="btn btn-secondary btn-sm hold-btn hold-btn-danger bp-del-btn" type="button" data-id="'+escapeHtml(e.id)+'" title="Press and hold to delete" aria-label="Press and hold to delete this reading">'
-        + '<span class="hold-fill"></span><span class="hold-label">'+BIN_SVG+'</span></button>'
+        + (e.recordedByDoctorId ? '' : '<button class="btn btn-secondary btn-sm hold-btn hold-btn-danger bp-del-btn" type="button" data-id="'+escapeHtml(e.id)+'" title="Press and hold to delete" aria-label="Press and hold to delete this reading">'
+          + '<span class="hold-fill"></span><span class="hold-label">'+BIN_SVG+'</span></button>')
         + '</div>';
     }).join('');
     // Press-and-hold like the app's other irreversible deletes. The delete is checked by
@@ -2657,13 +2709,14 @@
     renderBpPage(currentPatientData.bpEntries);
   });
 
-  // Which stretch of time the trend chart covers. Today is the calendar day (so the axis
+  // Which stretch of time a trend chart covers. Today is the calendar day (so the axis
   // shows the whole day, with the rest still to come); 30 days, 6 months and 1 year are
   // rolling windows counted back from now; All runs from the first reading to the latest,
   // never less than a week so a lone reading still sits on a timeline.
   var bpRange = 'all';
+  var gluRange = 'all';
   var BP_MS_DAY = 24 * 60 * 60 * 1000;
-  function bpRangeWindow(range, entries){
+  function vitalRangeWindow(range, entries){
     var now = new Date(), y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
     // A reading may be dated a few minutes ahead (the form allows 5), so rolling windows
     // reach slightly past now rather than clipping it.
@@ -2677,29 +2730,29 @@
     return { start: Math.min(oldest, newest - 7 * BP_MS_DAY), end: newest + 1 };   // +1ms: the window is end-exclusive
   }
 
-  // Systolic (teal) and diastolic (red) against real elapsed time, drawn at the
-  // container's real pixel width so its text isn't stretched on a phone.
-  function renderBpChart(){
-    var wrap = $('bp-chart-wrap');
-    var entries = currentPatientData && currentPatientData.bpEntries;
+  // One or more value series against real elapsed time, drawn at the container's real
+  // pixel width so its text isn't stretched on a phone. Shared by the blood pressure and
+  // glucose pages. cfg: { entries (newest first), range, rangeSel, wrap, sub,
+  //   series: [{ key, color, label }], average(points) -> text, scale(lo, hi) -> { minV, maxV, step },
+  //   tip(entry, series) -> hover text }
+  function renderVitalChart(cfg){
+    var wrap = $(cfg.wrap), entries = cfg.entries;
     if (!wrap || !entries || !entries.length){ if (wrap) wrap.innerHTML = ''; return; }
-    document.querySelectorAll('#bp-range .bp-range-btn').forEach(function(btn){
-      btn.classList.toggle('active', btn.getAttribute('data-range') === bpRange);
+    document.querySelectorAll(cfg.rangeSel + ' .bp-range-btn').forEach(function(btn){
+      btn.classList.toggle('active', btn.getAttribute('data-range') === cfg.range);
     });
-    var win = bpRangeWindow(bpRange, entries);
+    var win = vitalRangeWindow(cfg.range, entries);
     var pts = entries.filter(function(e){
       var t = new Date(e.measuredAt).getTime();
       return t >= win.start && t < win.end;
     }).reverse();   // oldest first
-    var subEl = $('pat-bp-chart-sub');
+    var subEl = $(cfg.sub);
     if (!pts.length){
       subEl.textContent = 'No readings in this period.';
       wrap.innerHTML = '';
       return;
     }
-    var avgSys = Math.round(pts.reduce(function(a, e){ return a + e.systolic; }, 0) / pts.length);
-    var avgDia = Math.round(pts.reduce(function(a, e){ return a + e.diastolic; }, 0) / pts.length);
-    subEl.textContent = pts.length + (pts.length === 1 ? ' reading' : ' readings') + ' · average ' + avgSys + '/' + avgDia + ' mmHg';
+    subEl.textContent = pts.length + (pts.length === 1 ? ' reading' : ' readings') + ' · ' + cfg.average(pts);
     var w = wrap.clientWidth;
     if (!w) return;   // page not showing yet — showView() calls this again once it is
 
@@ -2707,9 +2760,10 @@
     var innerW = w - padL - padR, innerH = h - padT - padB;
     var span = win.end - win.start;
     var lo = Infinity, hi = -Infinity;
-    pts.forEach(function(e){ lo = Math.min(lo, e.diastolic); hi = Math.max(hi, e.systolic); });
-    var minV = Math.floor((lo - 10) / 10) * 10, maxV = Math.ceil((hi + 10) / 10) * 10;
-    var step = (maxV - minV) > 100 ? 40 : 20;
+    pts.forEach(function(e){
+      cfg.series.forEach(function(sr){ lo = Math.min(lo, e[sr.key]); hi = Math.max(hi, e[sr.key]); });
+    });
+    var sc = cfg.scale(lo, hi), minV = sc.minV, maxV = sc.maxV, step = sc.step;
     function xAt(t){ return padL + ((t - win.start) / span) * innerW; }
     function x(iso){ return xAt(new Date(iso).getTime()); }
     function y(v){ return padT + innerH - ((v - minV) / (maxV - minV)) * innerH; }
@@ -2723,7 +2777,7 @@
     // Axis labels: hours across a day; otherwise start / middle / end dates (with the
     // year once the window is long enough for the month alone to be ambiguous).
     var ticks = [];
-    if (bpRange === 'today'){
+    if (cfg.range === 'today'){
       var base = new Date(win.start);
       [0, 6, 12, 18, 24].forEach(function(hr){
         var t = new Date(base.getFullYear(), base.getMonth(), base.getDate(), hr).getTime();
@@ -2745,19 +2799,55 @@
     }).join('');
 
     var r = pts.length > 60 ? 2 : 3;
-    function line(key, color, label){
-      var poly = pts.map(function(e){ return x(e.measuredAt)+','+y(e[key]); }).join(' ');
+    function line(sr){
+      var poly = pts.map(function(e){ return x(e.measuredAt)+','+y(e[sr.key]); }).join(' ');
       var dots = pts.map(function(e){
-        return '<circle cx="'+x(e.measuredAt)+'" cy="'+y(e[key])+'" r="'+r+'" fill="'+color+'"><title>'
-          + escapeHtml(formatBpWhen(e.measuredAt)+' — '+label+' '+e[key])+'</title></circle>';
+        return '<circle cx="'+x(e.measuredAt)+'" cy="'+y(e[sr.key])+'" r="'+r+'" fill="'+sr.color+'"><title>'
+          + escapeHtml(cfg.tip(e, sr))+'</title></circle>';
       }).join('');
-      return '<polyline points="'+poly+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' + dots;
+      return '<polyline points="'+poly+'" fill="none" stroke="'+sr.color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' + dots;
     }
     wrap.innerHTML = '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'">'
-      + grid + xLabels + line('systolic', 'var(--teal)', 'Systolic') + line('diastolic', 'var(--red)', 'Diastolic')
+      + grid + xLabels + cfg.series.map(line).join('')
       + '</svg>'
-      + '<div class="chart-legend"><span><span class="legend-dot" style="background:var(--teal);"></span>Systolic</span>'
-      + '<span><span class="legend-dot" style="background:var(--red);"></span>Diastolic</span></div>';
+      + (cfg.series.length > 1
+        ? '<div class="chart-legend">' + cfg.series.map(function(sr){
+            return '<span><span class="legend-dot" style="background:'+sr.color+';"></span>'+escapeHtml(sr.label)+'</span>';
+          }).join('') + '</div>'
+        : '');
+  }
+  function renderBpChart(){
+    renderVitalChart({
+      entries: currentPatientData && currentPatientData.bpEntries, range: bpRange, rangeSel: '#bp-range',
+      wrap: 'bp-chart-wrap', sub: 'pat-bp-chart-sub',
+      series: [{ key: 'systolic', color: 'var(--teal)', label: 'Systolic' }, { key: 'diastolic', color: 'var(--red)', label: 'Diastolic' }],
+      average: function(pts){
+        var sys = Math.round(pts.reduce(function(a, e){ return a + e.systolic; }, 0) / pts.length);
+        var dia = Math.round(pts.reduce(function(a, e){ return a + e.diastolic; }, 0) / pts.length);
+        return 'average ' + sys + '/' + dia + ' mmHg';
+      },
+      scale: function(lo, hi){
+        var minV = Math.floor((lo - 10) / 10) * 10, maxV = Math.ceil((hi + 10) / 10) * 10;
+        return { minV: minV, maxV: maxV, step: (maxV - minV) > 100 ? 40 : 20 };
+      },
+      tip: function(e, sr){ return formatBpWhen(e.measuredAt) + ' — ' + sr.label + ' ' + e[sr.key]; }
+    });
+  }
+  function renderGlucoseChart(){
+    renderVitalChart({
+      entries: currentPatientData && currentPatientData.glucoseEntries, range: gluRange, rangeSel: '#glu-range',
+      wrap: 'glu-chart-wrap', sub: 'pat-glu-chart-sub',
+      series: [{ key: 'value', color: 'var(--teal)', label: 'Glucose' }],
+      average: function(pts){
+        return 'average ' + Math.round(pts.reduce(function(a, e){ return a + e.value; }, 0) / pts.length) + ' mg/dL';
+      },
+      scale: function(lo, hi){
+        var minV = Math.max(0, Math.floor((lo - 20) / 20) * 20), maxV = Math.ceil((hi + 20) / 20) * 20;
+        var spanV = maxV - minV;
+        return { minV: minV, maxV: maxV, step: spanV <= 120 ? 20 : (spanV <= 240 ? 40 : 100) };
+      },
+      tip: function(e){ return formatBpWhen(e.measuredAt) + ' — ' + e.value + ' mg/dL, ' + glucoseContextLabel(e.context).toLowerCase(); }
+    });
   }
   document.querySelectorAll('#bp-range .bp-range-btn').forEach(function(btn){
     btn.addEventListener('click', function(){
@@ -2765,8 +2855,16 @@
       renderBpChart();
     });
   });
+  document.querySelectorAll('#glu-range .bp-range-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      gluRange = btn.getAttribute('data-range');
+      renderGlucoseChart();
+    });
+  });
   window.addEventListener('resize', function(){
     if (!$('view-patient-bp').classList.contains('hidden')) renderBpChart();
+    if (!$('view-patient-glucose').classList.contains('hidden')) renderGlucoseChart();
+    if (!$('view-patient-body').classList.contains('hidden')) renderBodyChart();
   });
 
   function pad2(n){ return (n < 10 ? '0' : '') + n; }
@@ -2791,20 +2889,9 @@
     var when = new Date(date + 'T' + time);   // local time
     if (isNaN(when.getTime())){ showError(errEl, 'Please choose a valid date and time.'); return; }
     if (when.getTime() > Date.now() + 5 * 60 * 1000){ showError(errEl, 'The date and time can\'t be in the future.'); return; }
-    function whole(id){
-      var raw = $(id).value.trim();
-      return /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
-    }
-    var sys = whole('bp-sys'), dia = whole('bp-dia');
-    if (isNaN(sys) || isNaN(dia)){ showError(errEl, 'Enter both the systolic (top) and diastolic (bottom) numbers.'); return; }
-    if (sys < 50 || sys > 300){ showError(errEl, 'Systolic should be between 50 and 300.'); return; }
-    if (dia < 30 || dia > 200){ showError(errEl, 'Diastolic should be between 30 and 200.'); return; }
-    if (sys <= dia){ showError(errEl, 'Systolic (top) should be higher than diastolic (bottom).'); return; }
-    var pulse = null;
-    if ($('bp-pulse').value.trim() !== ''){
-      pulse = whole('bp-pulse');
-      if (isNaN(pulse) || pulse < 20 || pulse > 250){ showError(errEl, 'Pulse should be between 20 and 250.'); return; }
-    }
+    var parsed = parseBpInputs($('bp-sys').value, $('bp-dia').value, $('bp-pulse').value);
+    if (parsed.error){ showError(errEl, parsed.error); return; }
+    var sys = parsed.sys, dia = parsed.dia, pulse = parsed.pulse;
     var row = {
       patient_id: activePatientId, measured_at: when.toISOString(),
       systolic: sys, diastolic: dia, pulse: pulse, note: $('bp-note').value.trim()
@@ -2832,6 +2919,401 @@
     }finally{
       $('add-bp-save').disabled = false;
       $('add-bp-save').textContent = 'Save reading';
+    }
+  });
+
+  // ---- Blood Glucose ----
+  // Same idea as the blood pressure log: the patient (or a guardian) keeps their own
+  // readings, and a doctor can add one while writing a visit note. Values are mg/dL.
+  var GLUCOSE_CONTEXTS = {
+    fasting: 'Fasting', before_meal: 'Before a meal', after_meal: 'After a meal', bedtime: 'At bedtime', random: 'Random'
+  };
+  function glucoseContextLabel(ctx){ return GLUCOSE_CONTEXTS[ctx] || 'Random'; }
+  function mapGlucoseRow(row){
+    return {
+      id: row.id, measuredAt: row.measured_at, value: row.value, context: row.context || 'random', note: row.note || '',
+      recordedByDoctorId: row.recorded_by_doctor_id || null, recordedByName: row.recorded_by_name || ''
+    };
+  }
+  // The usual adult bands, for a non-pregnant adult, in mg/dL: fasting or before a meal
+  // under 100 is normal, 100-125 elevated, 126+ high; at other times under 140, 140-199,
+  // 200+. Shown as a label for tracking, never as a diagnosis.
+  function glucoseCategory(value, context){
+    if (value < 54) return { label: 'Very low', tone: 'high', urgent: true };
+    if (value > 400) return { label: 'Very high', tone: 'high', urgent: true };
+    if (value < 70) return { label: 'Low', tone: 'high' };
+    var fastingLike = context === 'fasting' || context === 'before_meal';
+    if (value >= (fastingLike ? 126 : 200)) return { label: 'High', tone: 'high' };
+    if (value >= (fastingLike ? 100 : 140)) return { label: 'Elevated', tone: 'elevated' };
+    return { label: 'Normal', tone: 'normal' };
+  }
+  // Returns { error } or { value, context }; shared by the patient's form and the doctor's visit note.
+  function parseGlucoseInputs(valueRaw, contextRaw){
+    var raw = (valueRaw || '').trim();
+    var value = /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
+    if (isNaN(value)) return { error: 'Enter the glucose reading as a whole number (mg/dL).' };
+    if (value < 20 || value > 800) return { error: 'Glucose should be between 20 and 800 mg/dL.' };
+    return { value: value, context: GLUCOSE_CONTEXTS[contextRaw] ? contextRaw : 'random' };
+  }
+  // "105 mg/dL · Fasting [Normal]" for a visit's detail panel.
+  function glucoseSummaryHtml(value, context){
+    var cat = glucoseCategory(value, context);
+    return '<span class="bp-row-value">' + value + '</span> mg/dL · ' + escapeHtml(glucoseContextLabel(context))
+      + '<span class="bp-category sm ' + cat.tone + '">' + escapeHtml(cat.label) + '</span>';
+  }
+  // Shows (or hides) a visit's glucose row; prefix is 'visit-detail' or 'doc-visit-detail'.
+  function renderVisitGlucose(prefix, v){
+    var has = v.glucoseValue !== null;
+    $(prefix + '-glu-label').classList.toggle('hidden', !has);
+    $(prefix + '-glu').classList.toggle('hidden', !has);
+    if (has) $(prefix + '-glu').innerHTML = glucoseSummaryHtml(v.glucoseValue, v.glucoseContext || 'random');
+  }
+
+  var gluShowAll = false;
+  function renderGlucosePage(entries){
+    entries = entries || [];
+    var has = entries.length > 0;
+    $('pat-glu-empty').classList.toggle('hidden', has);
+    $('glu-latest').classList.toggle('hidden', !has);
+    $('pat-glu-chart-panel').classList.toggle('hidden', !has);
+    $('pat-glu-list-panel').classList.toggle('hidden', !has);
+    if (!has){
+      $('pat-glu-list').innerHTML = '';
+      $('glu-chart-wrap').innerHTML = '';
+      gluShowAll = false;
+      return;
+    }
+    var latest = entries[0];
+    var cat = glucoseCategory(latest.value, latest.context);
+    $('glu-latest-value').textContent = latest.value;
+    $('glu-latest-meta').textContent = glucoseContextLabel(latest.context) + ' · ' + formatBpWhen(latest.measuredAt);
+    setBpCategory($('glu-latest-category'), cat);
+    $('glu-latest-hint').textContent = cat.urgent
+      ? 'A reading this far outside the normal range needs attention. If you feel shaky, confused, very thirsty or unwell, get medical help now.'
+      : 'For your own tracking — this label isn\'t a diagnosis. Talk to your doctor about your readings.';
+
+    var shown = gluShowAll ? entries : entries.slice(0, BP_LIST_INITIAL);
+    clearError($('pat-glu-list-error'));
+    $('pat-glu-list').innerHTML = shown.map(function(e){
+      var c = glucoseCategory(e.value, e.context);
+      return '<div class="list-item static">'
+        + '<div>'
+        + '<div class="li-title"><span class="bp-row-value">'+e.value+'</span> mg/dL'
+        + '<span class="bp-category sm '+c.tone+'">'+escapeHtml(c.label)+'</span></div>'
+        + '<div class="li-sub">'+escapeHtml(glucoseContextLabel(e.context))+' · '+escapeHtml(formatBpWhen(e.measuredAt))+(e.recordedByDoctorId ? ' · Recorded by '+escapeHtml(e.recordedByName || 'your doctor') : '')+'</div>'
+        + (e.note ? '<div class="li-sub bp-note">'+escapeHtml(e.note)+'</div>' : '')
+        + '</div>'
+        + (e.recordedByDoctorId ? '' : '<button class="btn btn-secondary btn-sm hold-btn hold-btn-danger bp-del-btn" type="button" data-id="'+escapeHtml(e.id)+'" title="Press and hold to delete" aria-label="Press and hold to delete this reading">'
+          + '<span class="hold-fill"></span><span class="hold-label">'+BIN_SVG+'</span></button>')
+        + '</div>';
+    }).join('');
+    $('pat-glu-list').querySelectorAll('.bp-del-btn').forEach(function(btn){
+      makeHoldButton(btn, 2000, async function(){
+        var id = btn.getAttribute('data-id');
+        clearError($('pat-glu-list-error'));
+        var res = await supabaseClient.from('glucose_entries').delete().eq('id', id).select();
+        if (res.error || !res.data || !res.data.length){
+          showError($('pat-glu-list-error'), 'Couldn\'t delete this reading. Please try again.');
+          return;
+        }
+        currentPatientData.glucoseEntries = currentPatientData.glucoseEntries.filter(function(e){ return e.id !== id; });
+        renderGlucosePage(currentPatientData.glucoseEntries);
+      });
+    });
+    var hidden = entries.length - shown.length;
+    $('pat-glu-more-btn').classList.toggle('hidden', hidden <= 0);
+    $('pat-glu-more-btn').textContent = 'Show older readings (' + hidden + ')';
+
+    renderGlucoseChart();
+  }
+  $('pat-glu-more-btn').addEventListener('click', function(){
+    gluShowAll = true;
+    renderGlucosePage(currentPatientData.glucoseEntries);
+  });
+
+  function openAddGlucoseModal(){
+    var now = new Date();
+    $('glu-date').value = toDateKey(now);
+    $('glu-time').value = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    ['glu-value', 'glu-note'].forEach(function(id){ $(id).value = ''; });
+    $('glu-context').value = 'random';
+    clearError($('add-glu-error'));
+    $('add-glu-modal').classList.remove('hidden');
+  }
+  function closeAddGlucoseModal(){ $('add-glu-modal').classList.add('hidden'); }
+  $('add-glu-btn').addEventListener('click', openAddGlucoseModal);
+  $('add-glu-close').addEventListener('click', closeAddGlucoseModal);
+  $('add-glu-cancel').addEventListener('click', closeAddGlucoseModal);
+  $('add-glu-modal').addEventListener('click', function(e){ if (e.target === $('add-glu-modal')) closeAddGlucoseModal(); });
+  $('add-glu-save').addEventListener('click', async function(){
+    var errEl = $('add-glu-error');
+    clearError(errEl);
+    var date = $('glu-date').value, time = $('glu-time').value;
+    if (!date || !time){ showError(errEl, 'Please choose a date and time.'); return; }
+    var when = new Date(date + 'T' + time);   // local time
+    if (isNaN(when.getTime())){ showError(errEl, 'Please choose a valid date and time.'); return; }
+    if (when.getTime() > Date.now() + 5 * 60 * 1000){ showError(errEl, 'The date and time can\'t be in the future.'); return; }
+    var parsed = parseGlucoseInputs($('glu-value').value, $('glu-context').value);
+    if (parsed.error){ showError(errEl, parsed.error); return; }
+    var row = {
+      patient_id: activePatientId, measured_at: when.toISOString(),
+      value: parsed.value, context: parsed.context, note: $('glu-note').value.trim()
+    };
+    $('add-glu-save').disabled = true;
+    $('add-glu-save').textContent = 'Saving...';
+    try{
+      var res = await supabaseClient.from('glucose_entries').insert(row).select().maybeSingle();
+      if (res.error || !res.data){
+        if (res.error) console.warn('Could not save glucose reading:', res.error.message);
+        showError(errEl, 'Something went wrong saving this reading. Please try again.');
+        return;
+      }
+      var entries = currentPatientData.glucoseEntries;
+      entries.push(mapGlucoseRow(res.data));
+      // Back-dated readings belong in date order, not at the top.
+      entries.sort(function(a, b){ return new Date(b.measuredAt) - new Date(a.measuredAt); });
+      renderGlucosePage(entries);
+      closeAddGlucoseModal();
+      var note = $('add-glu-note');
+      note.classList.add('show');
+      setTimeout(function(){ note.classList.remove('show'); }, 2200);
+    }catch(err){
+      showError(errEl, 'Something went wrong saving this reading. Please try again.');
+    }finally{
+      $('add-glu-save').disabled = false;
+      $('add-glu-save').textContent = 'Save reading';
+    }
+  });
+
+  // ---- Weight & Height ----
+  // Same idea as the other logs: the patient (or a guardian) keeps their own entries and a
+  // doctor can add one while writing a visit note. Metric only (kg, cm). Either value can
+  // be left out — height rarely changes — so BMI uses the newest height at or before an entry.
+  var bodyRange = 'all';
+  function mapBodyRow(row){
+    return {
+      id: row.id, measuredAt: row.measured_at, weightKg: numOrNull(row.weight_kg), heightCm: numOrNull(row.height_cm),
+      note: row.note || '', recordedByDoctorId: row.recorded_by_doctor_id || null, recordedByName: row.recorded_by_name || ''
+    };
+  }
+  // Whole years from a 'YYYY-MM-DD' date of birth, or null when there isn't one.
+  function ageInYears(dob){
+    var d = dob ? parseLocalDate(dob) : null;
+    if (!d || isNaN(d.getTime())) return null;
+    var now = new Date(), y = now.getFullYear() - d.getFullYear();
+    if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) y--;
+    return y;
+  }
+  function bmiOf(weightKg, heightCm){
+    if (!weightKg || !heightCm) return null;
+    return weightKg / Math.pow(heightCm / 100, 2);
+  }
+  function fmtBmi(b){ return (Math.round(b * 10) / 10).toFixed(1); }
+  function fmtMeasure(v){ return String(Math.round(v * 10) / 10); }
+  // Adult bands (WHO). Under 19 the bands don't apply — children are judged on growth
+  // charts — so no label is given. Shown for tracking only, never as a diagnosis.
+  function bmiCategory(bmi, dob){
+    var age = ageInYears(dob);
+    if (age !== null && age < 19) return null;
+    if (bmi < 18.5) return { label: 'Underweight', tone: 'elevated' };
+    if (bmi < 25) return { label: 'Normal', tone: 'normal' };
+    if (bmi < 30) return { label: 'Overweight', tone: 'elevated' };
+    return { label: 'Obese', tone: 'high' };
+  }
+  function bmiPillHtml(bmi, dob){
+    var cat = bmiCategory(bmi, dob);
+    return cat ? '<span class="bp-category sm ' + cat.tone + '">' + escapeHtml(cat.label) + '</span>' : '';
+  }
+  // Returns { error } or { weight, height } (either may be null, not both); shared by the
+  // patient's form and the doctor's visit note.
+  function parseBodyInputs(weightRaw, heightRaw){
+    function num(raw){ return /^\d+(\.\d+)?$/.test(raw) ? Math.round(parseFloat(raw) * 10) / 10 : NaN; }
+    var wr = (weightRaw || '').trim(), hr = (heightRaw || '').trim();
+    if (!wr && !hr) return { error: 'Enter a weight, a height, or both.' };
+    var w = null, h = null;
+    if (wr){
+      w = num(wr);
+      if (isNaN(w) || w < 1 || w > 500) return { error: 'Weight should be between 1 and 500 kg.' };
+    }
+    if (hr){
+      h = num(hr);
+      if (isNaN(h) || h < 30 || h > 260) return { error: 'Height should be between 30 and 260 cm.' };
+    }
+    return { weight: w, height: h };
+  }
+  // "68.5 kg · 165 cm · BMI 25.2 [Overweight]" for a visit's detail panel.
+  function bodySummaryHtml(weightKg, heightCm, dob){
+    var parts = [];
+    if (weightKg !== null) parts.push('<span class="bp-row-value">' + fmtMeasure(weightKg) + '</span> kg');
+    if (heightCm !== null) parts.push('<span class="bp-row-value">' + fmtMeasure(heightCm) + '</span> cm');
+    var bmi = bmiOf(weightKg, heightCm);
+    return parts.join(' · ') + (bmi !== null ? ' · BMI ' + fmtBmi(bmi) + bmiPillHtml(bmi, dob) : '');
+  }
+  // Shows (or hides) a visit's weight/height row; prefix is 'visit-detail' or 'doc-visit-detail'.
+  function renderVisitBody(prefix, v, dob){
+    var has = v.weightKg !== null || v.heightCm !== null;
+    $(prefix + '-body-label').classList.toggle('hidden', !has);
+    $(prefix + '-body').classList.toggle('hidden', !has);
+    if (has) $(prefix + '-body').innerHTML = bodySummaryHtml(v.weightKg, v.heightCm, dob);
+  }
+
+  var bodyShowAll = false;
+  function renderBodyPage(entries){
+    entries = entries || [];
+    var has = entries.length > 0;
+    var dob = currentPatientData && currentPatientData.dob;
+    $('pat-body-empty').classList.toggle('hidden', has);
+    $('body-latest').classList.toggle('hidden', !has);
+    $('pat-body-chart-panel').classList.toggle('hidden', !has);
+    $('pat-body-list-panel').classList.toggle('hidden', !has);
+    if (!has){
+      $('pat-body-list').innerHTML = '';
+      $('body-chart-wrap').innerHTML = '';
+      bodyShowAll = false;
+      return;
+    }
+    // Entries are newest first: the latest weight and the latest height can come from different entries.
+    var lastW = entries.filter(function(e){ return e.weightKg !== null; })[0];
+    var lastH = entries.filter(function(e){ return e.heightCm !== null; })[0];
+    var bmi = bmiOf(lastW && lastW.weightKg, lastH && lastH.heightCm);
+    $('body-latest-weight').textContent = lastW ? fmtMeasure(lastW.weightKg) : '—';
+    $('body-latest-height').textContent = lastH ? fmtMeasure(lastH.heightCm) : '—';
+    $('body-latest-bmi').textContent = bmi !== null ? fmtBmi(bmi) : '—';
+    $('body-latest-meta').textContent = 'Last updated ' + formatBpWhen(entries[0].measuredAt);
+    var cat = bmi !== null ? bmiCategory(bmi, dob) : null;
+    var catEl = $('body-latest-category');
+    catEl.classList.toggle('hidden', !cat);
+    if (cat) setBpCategory(catEl, cat);
+    var age = ageInYears(dob);
+    $('body-latest-hint').textContent = bmi === null
+      ? 'Add both a weight and a height to see your BMI.'
+      : (age !== null && age < 19
+        ? 'BMI categories for children and teenagers are judged on growth charts, so none is shown here. Ask the doctor how this compares.'
+        : 'For your own tracking — this label isn\'t a diagnosis. Talk to your doctor about your measurements.');
+
+    // BMI for each entry uses the newest height recorded at or before it.
+    var carry = [], lastHeight = null;
+    for (var i = entries.length - 1; i >= 0; i--){
+      if (entries[i].heightCm !== null) lastHeight = entries[i].heightCm;
+      carry[i] = lastHeight;
+    }
+    var shown = bodyShowAll ? entries : entries.slice(0, BP_LIST_INITIAL);
+    clearError($('pat-body-list-error'));
+    $('pat-body-list').innerHTML = shown.map(function(e, idx){
+      var parts = [];
+      if (e.weightKg !== null) parts.push('<span class="bp-row-value">'+fmtMeasure(e.weightKg)+'</span> kg');
+      if (e.heightCm !== null) parts.push('<span class="bp-row-value">'+fmtMeasure(e.heightCm)+'</span> cm');
+      var eb = e.weightKg !== null ? bmiOf(e.weightKg, carry[idx]) : null;
+      return '<div class="list-item static">'
+        + '<div>'
+        + '<div class="li-title">'+parts.join(' · ')+(eb !== null ? ' · BMI '+fmtBmi(eb)+bmiPillHtml(eb, dob) : '')+'</div>'
+        + '<div class="li-sub">'+escapeHtml(formatBpWhen(e.measuredAt))+(e.recordedByDoctorId ? ' · Recorded by '+escapeHtml(e.recordedByName || 'your doctor') : '')+'</div>'
+        + (e.note ? '<div class="li-sub bp-note">'+escapeHtml(e.note)+'</div>' : '')
+        + '</div>'
+        + (e.recordedByDoctorId ? '' : '<button class="btn btn-secondary btn-sm hold-btn hold-btn-danger bp-del-btn" type="button" data-id="'+escapeHtml(e.id)+'" title="Press and hold to delete" aria-label="Press and hold to delete this entry">'
+          + '<span class="hold-fill"></span><span class="hold-label">'+BIN_SVG+'</span></button>')
+        + '</div>';
+    }).join('');
+    $('pat-body-list').querySelectorAll('.bp-del-btn').forEach(function(btn){
+      makeHoldButton(btn, 2000, async function(){
+        var id = btn.getAttribute('data-id');
+        clearError($('pat-body-list-error'));
+        var res = await supabaseClient.from('body_entries').delete().eq('id', id).select();
+        if (res.error || !res.data || !res.data.length){
+          showError($('pat-body-list-error'), 'Couldn\'t delete this entry. Please try again.');
+          return;
+        }
+        currentPatientData.bodyEntries = currentPatientData.bodyEntries.filter(function(e){ return e.id !== id; });
+        renderBodyPage(currentPatientData.bodyEntries);
+      });
+    });
+    var hidden = entries.length - shown.length;
+    $('pat-body-more-btn').classList.toggle('hidden', hidden <= 0);
+    $('pat-body-more-btn').textContent = 'Show older entries (' + hidden + ')';
+
+    renderBodyChart();
+  }
+  $('pat-body-more-btn').addEventListener('click', function(){
+    bodyShowAll = true;
+    renderBodyPage(currentPatientData.bodyEntries);
+  });
+
+  // The trend chart is weight only (an entry that is just a height has no point on it).
+  function renderBodyChart(){
+    var all = currentPatientData && currentPatientData.bodyEntries;
+    renderVitalChart({
+      entries: all && all.filter(function(e){ return e.weightKg !== null; }), range: bodyRange, rangeSel: '#body-range',
+      wrap: 'body-chart-wrap', sub: 'pat-body-chart-sub',
+      series: [{ key: 'weightKg', color: 'var(--teal)', label: 'Weight' }],
+      average: function(pts){
+        var first = pts[0].weightKg, last = pts[pts.length - 1].weightKg, diff = Math.round((last - first) * 10) / 10;
+        return 'latest ' + fmtMeasure(last) + ' kg' + (pts.length > 1 ? ' (' + (diff > 0 ? '+' : '') + fmtMeasure(diff) + ' kg over this period)' : '');
+      },
+      scale: function(lo, hi){
+        var minV = Math.max(0, Math.floor((lo - 3) / 5) * 5), maxV = Math.ceil((hi + 3) / 5) * 5;
+        var spanV = maxV - minV;
+        return { minV: minV, maxV: maxV, step: spanV <= 30 ? 5 : (spanV <= 60 ? 10 : 20) };
+      },
+      tip: function(e){ return formatBpWhen(e.measuredAt) + ' — ' + fmtMeasure(e.weightKg) + ' kg'; }
+    });
+  }
+  document.querySelectorAll('#body-range .bp-range-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      bodyRange = btn.getAttribute('data-range');
+      renderBodyChart();
+    });
+  });
+
+  function openAddBodyModal(){
+    var now = new Date();
+    $('body-date').value = toDateKey(now);
+    $('body-time').value = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    ['body-weight', 'body-height', 'body-note'].forEach(function(id){ $(id).value = ''; });
+    clearError($('add-body-error'));
+    $('add-body-modal').classList.remove('hidden');
+  }
+  function closeAddBodyModal(){ $('add-body-modal').classList.add('hidden'); }
+  $('add-body-btn').addEventListener('click', openAddBodyModal);
+  $('add-body-close').addEventListener('click', closeAddBodyModal);
+  $('add-body-cancel').addEventListener('click', closeAddBodyModal);
+  $('add-body-modal').addEventListener('click', function(e){ if (e.target === $('add-body-modal')) closeAddBodyModal(); });
+  $('add-body-save').addEventListener('click', async function(){
+    var errEl = $('add-body-error');
+    clearError(errEl);
+    var date = $('body-date').value, time = $('body-time').value;
+    if (!date || !time){ showError(errEl, 'Please choose a date and time.'); return; }
+    var when = new Date(date + 'T' + time);   // local time
+    if (isNaN(when.getTime())){ showError(errEl, 'Please choose a valid date and time.'); return; }
+    if (when.getTime() > Date.now() + 5 * 60 * 1000){ showError(errEl, 'The date and time can\'t be in the future.'); return; }
+    var parsed = parseBodyInputs($('body-weight').value, $('body-height').value);
+    if (parsed.error){ showError(errEl, parsed.error); return; }
+    var row = {
+      patient_id: activePatientId, measured_at: when.toISOString(),
+      weight_kg: parsed.weight, height_cm: parsed.height, note: $('body-note').value.trim()
+    };
+    $('add-body-save').disabled = true;
+    $('add-body-save').textContent = 'Saving...';
+    try{
+      var res = await supabaseClient.from('body_entries').insert(row).select().maybeSingle();
+      if (res.error || !res.data){
+        if (res.error) console.warn('Could not save weight/height entry:', res.error.message);
+        showError(errEl, 'Something went wrong saving this entry. Please try again.');
+        return;
+      }
+      var entries = currentPatientData.bodyEntries;
+      entries.push(mapBodyRow(res.data));
+      // Back-dated entries belong in date order, not at the top.
+      entries.sort(function(a, b){ return new Date(b.measuredAt) - new Date(a.measuredAt); });
+      renderBodyPage(entries);
+      closeAddBodyModal();
+      var note = $('add-body-note');
+      note.classList.add('show');
+      setTimeout(function(){ note.classList.remove('show'); }, 2200);
+    }catch(err){
+      showError(errEl, 'Something went wrong saving this entry. Please try again.');
+    }finally{
+      $('add-body-save').disabled = false;
+      $('add-body-save').textContent = 'Save measurement';
     }
   });
 
@@ -3596,7 +4078,7 @@
   $('doc-howitworks-btn').addEventListener('click', docHowItWorks.open);
 
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape'){ collapseAddVisitFields(); closeAddEyeModal(); closeEyeRxPrevModal(); closePatAccessModal(); closePatApptDetailModal(); closeBookApptConfirmModal(); closeManageBookingsModal(); closeDeleteClinicModal(); closePatFamilyModal(); closeFamilyDetailModal(); closeAddFamilyModal(); closeFamilySwitcher(); closePatAcctDropdown(); patHowItWorks.close(); closeDocAcctDropdown(); docHowItWorks.close(); }
+    if (e.key === 'Escape'){ cancelAddVisit(); closeAddEyeModal(); closeEyeRxPrevModal(); closePatAccessModal(); closePatApptDetailModal(); closeBookApptConfirmModal(); closeManageBookingsModal(); closeDeleteClinicModal(); closePatFamilyModal(); closeFamilyDetailModal(); closeAddFamilyModal(); closeFamilySwitcher(); closePatAcctDropdown(); patHowItWorks.close(); closeDocAcctDropdown(); docHowItWorks.close(); }
   });
 
   function escapeHtml(s){
@@ -3765,6 +4247,10 @@
   // pair before showing the one that's actually relevant is simpler than
   // tracking which of the three was last shown.
   function hideAllDocDetails(){
+    // Picking anything in a list takes over from the new-visit editor, and brings the
+    // detail panel back if the editor had replaced it.
+    $('add-visit-fields').classList.add('hidden');
+    $('doc-pt-detail-panel').classList.remove('hidden');
     $('doc-visit-detail-empty').classList.add('hidden');
     $('doc-visit-detail').classList.add('hidden');
     $('doc-test-detail-empty').classList.add('hidden');
@@ -3773,18 +4259,17 @@
     $('doc-prescription-detail-empty').classList.add('hidden');
     $('doc-prescription-detail').classList.add('hidden');
   }
+  // The "+" row that opens the new-visit editor; it sits above the visits and is rendered
+  // with them, so it is there even before the patient has any.
+  var ADD_VISIT_ROW_HTML = '<div class="list-item doc-add-row" id="doc-add-visit-row" role="button" tabindex="0" title="Add visit note" aria-label="Add visit note">'
+    + '<div class="li-spacer" aria-hidden="true"><div class="li-title">&nbsp;</div><div class="li-sub">&nbsp;</div></div>'
+    + '<span class="doc-add-plus"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12,5 V19 M5,12 H19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>'
+    + '</div>';
   function renderDoctorVisitsList(visits){
     var listEl = $('doc-visits-list');
     var emptyEl = $('doc-visits-empty');
-    if (!visits || !visits.length){
-      listEl.innerHTML = '';
-      emptyEl.classList.remove('hidden');
-      hideAllDocDetails();
-      $('doc-visit-detail-empty').classList.remove('hidden');
-      return;
-    }
-    emptyEl.classList.add('hidden');
-    listEl.innerHTML = visits.map(function(v, i){
+    visits = visits || [];
+    listEl.innerHTML = ADD_VISIT_ROW_HTML + visits.map(function(v, i){
       return '<div class="list-item" data-idx="'+i+'">'
         + '<div>'
         + '<div class="li-title">'+escapeHtml(v.doctorName || 'Doctor')+unverifiedTagHtml(v)+'</div>'
@@ -3792,7 +4277,18 @@
         + '</div>'
         + chevronSvg + '</div>';
     }).join('');
-    var items = listEl.querySelectorAll('.list-item');
+    var addRow = $('doc-add-visit-row');
+    addRow.addEventListener('click', expandAddVisitFields);
+    addRow.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); expandAddVisitFields(); }
+    });
+    emptyEl.classList.toggle('hidden', visits.length > 0);
+    if (!visits.length){
+      hideAllDocDetails();
+      $('doc-visit-detail-empty').classList.remove('hidden');
+      return;
+    }
+    var items = listEl.querySelectorAll('.list-item[data-idx]');
     items.forEach(function(el){
       el.addEventListener('click', function(){
         markActiveListItem(listEl, el);
@@ -3808,6 +4304,9 @@
     $('doc-visit-detail-date').textContent = formatDateDisplay(v.date) + (v.time ? ' · ' + v.time : '');
     $('doc-visit-detail-doctor').innerHTML = escapeHtml(v.doctorName || 'Doctor') + unverifiedTagHtml(v);
     $('doc-visit-detail-clinic').textContent = v.clinicName || 'Not recorded';
+    renderVisitBp('doc-visit-detail', v);
+    renderVisitGlucose('doc-visit-detail', v);
+    renderVisitBody('doc-visit-detail', v, currentLookupData && currentLookupData.dob);
     $('doc-visit-detail-symptoms').textContent = v.symptoms || 'Not recorded';
     $('doc-visit-detail-diagnosis').textContent = v.diagnosis || 'Not recorded';
     $('doc-visit-detail-prescription').textContent = v.prescription || 'Not recorded';
@@ -3878,7 +4377,6 @@
   // Prescriptions (derived from visits) are read-only. ----
   function switchPatientResultTab(tab){
     collapseAddVisitFields();
-    $('doc-pt-add-visit-section').classList.toggle('hidden', tab !== 'visits');
     $('doc-pt-tab-visits').classList.toggle('active', tab === 'visits');
     $('doc-pt-tab-lab').classList.toggle('active', tab === 'lab');
     $('doc-pt-tab-rx').classList.toggle('active', tab === 'rx');
@@ -3976,6 +4474,7 @@
     if (name) return 'Dr. ' + name.replace(/^Dr\.?\s*/i, '');
     return (currentDoctorData && currentDoctorData.doctorId) || 'Doctor';
   }
+  // Pressing the "+" row swaps the right-hand panel from a visit's details to the editor.
   function expandAddVisitFields(){
     if (!currentLookupCode) return;
     $('visit-symptoms').value = '';
@@ -3983,22 +4482,83 @@
     $('visit-prescription').value = '';
     $('visit-notes').value = '';
     clearError($('add-visit-error'));
+    setVisitBpOpen(false);
+    setVisitGluOpen(false);
+    setVisitBodyOpen(false);
+    $('add-visit-doctor').textContent = currentDoctorDisplayName();
+    hideAllDocDetails();
+    $('doc-pt-detail-panel').classList.add('hidden');
     $('add-visit-fields').classList.remove('hidden');
+    markActiveListItem($('doc-visits-list'), $('doc-add-visit-row'));
+    // On a narrow screen the panels stack, so the editor sits below the whole list.
+    if (window.matchMedia('(max-width: 760px)').matches){
+      $('add-visit-fields').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    $('visit-symptoms').focus({ preventScroll: true });
   }
   function collapseAddVisitFields(){
     $('add-visit-fields').classList.add('hidden');
   }
-  $('add-visit-btn').addEventListener('click', function(){
-    if ($('add-visit-fields').classList.contains('hidden')) expandAddVisitFields();
-    else collapseAddVisitFields();
+  var addVisitNoteTimer = null;   // so an earlier save's hide-timer can't cut a newer message short
+  // The optional blood pressure reading inside the new-visit editor.
+  function setVisitBpOpen(open){
+    $('visit-bp-fields').classList.toggle('hidden', !open);
+    $('visit-bp-toggle').textContent = open ? 'Remove blood pressure reading' : '+ Add blood pressure reading';
+    if (!open) ['visit-bp-sys', 'visit-bp-dia', 'visit-bp-pulse'].forEach(function(id){ $(id).value = ''; });
+  }
+  function setVisitGluOpen(open){
+    $('visit-glu-fields').classList.toggle('hidden', !open);
+    $('visit-glu-toggle').textContent = open ? 'Remove glucose reading' : '+ Add glucose reading';
+    if (!open){ $('visit-glu-value').value = ''; $('visit-glu-context').value = 'random'; }
+  }
+  function setVisitBodyOpen(open){
+    $('visit-body-fields').classList.toggle('hidden', !open);
+    $('visit-body-toggle').textContent = open ? 'Remove weight / height' : '+ Add weight / height';
+    if (!open) ['visit-body-weight', 'visit-body-height'].forEach(function(id){ $(id).value = ''; });
+  }
+  $('visit-body-toggle').addEventListener('click', function(){
+    var open = $('visit-body-fields').classList.contains('hidden');
+    setVisitBodyOpen(open);
+    if (open) $('visit-body-weight').focus();
   });
-  $('add-visit-cancel').addEventListener('click', collapseAddVisitFields);
+  $('visit-glu-toggle').addEventListener('click', function(){
+    var open = $('visit-glu-fields').classList.contains('hidden');
+    setVisitGluOpen(open);
+    if (open) $('visit-glu-value').focus();
+  });
+  $('visit-bp-toggle').addEventListener('click', function(){
+    var open = $('visit-bp-fields').classList.contains('hidden');
+    setVisitBpOpen(open);
+    if (open) $('visit-bp-sys').focus();
+  });
+  // Leaving the editor without saving puts the list's first visit back on the right.
+  function cancelAddVisit(){
+    if ($('add-visit-fields').classList.contains('hidden')) return;
+    collapseAddVisitFields();
+    if (currentLookupData) renderDoctorVisitsList(currentLookupData.visits || []);
+  }
+  $('add-visit-cancel').addEventListener('click', cancelAddVisit);
   $('add-visit-save').addEventListener('click', async function(){
     if (!currentLookupCode){
       showError($('add-visit-error'), 'No patient selected.');
       return;
     }
     clearError($('add-visit-error'));
+    var bp = null;
+    if (!$('visit-bp-fields').classList.contains('hidden')){
+      bp = parseBpInputs($('visit-bp-sys').value, $('visit-bp-dia').value, $('visit-bp-pulse').value);
+      if (bp.error){ showError($('add-visit-error'), bp.error + ' Or remove the blood pressure reading.'); return; }
+    }
+    var glu = null;
+    if (!$('visit-glu-fields').classList.contains('hidden')){
+      glu = parseGlucoseInputs($('visit-glu-value').value, $('visit-glu-context').value);
+      if (glu.error){ showError($('add-visit-error'), glu.error + ' Or remove the glucose reading.'); return; }
+    }
+    var body = null;
+    if (!$('visit-body-fields').classList.contains('hidden')){
+      body = parseBodyInputs($('visit-body-weight').value, $('visit-body-height').value);
+      if (body.error){ showError($('add-visit-error'), body.error + ' Or remove the weight / height.'); return; }
+    }
     $('add-visit-save').disabled = true;
     $('add-visit-save').textContent = 'Saving...';
     try{
@@ -4021,6 +4581,10 @@
         notes: $('visit-notes').value.trim(),
         unverified: !isDoctorVerified(currentDoctorData || {})
       };
+      // Only sent when there is a reading, so a visit without one saves exactly as before.
+      if (bp){ row.bp_systolic = bp.sys; row.bp_diastolic = bp.dia; row.pulse = bp.pulse; }
+      if (glu){ row.glucose_value = glu.value; row.glucose_context = glu.context; }
+      if (body){ row.weight_kg = body.weight; row.height_cm = body.height; }
       // RLS re-checks the grant independently at insert time (has_active_grant on
       // the visits_insert policy) — the client-side check above is UX, not the
       // security boundary, so a rejected insert here means access was revoked in
@@ -4030,13 +4594,54 @@
         showError($('add-visit-error'), 'Your access to this patient has expired or been revoked. Ask them for a new code or to re-trust you.');
         return;
       }
+      // The same reading also goes into the patient's own log, labelled as this doctor's
+      // and linked to the visit. The visit is already saved, so if this part fails the
+      // doctor is told rather than the whole note being lost.
+      var loggedToPatient = true;
+      var nowIso = new Date().toISOString();
+      if (bp){
+        var logRes = await supabaseClient.from('bp_entries').insert({
+          patient_id: currentLookupCode, measured_at: nowIso,
+          systolic: bp.sys, diastolic: bp.dia, pulse: bp.pulse, note: '',
+          recorded_by_doctor_id: session.id, recorded_by_name: currentDoctorDisplayName(),
+          written_via_grant_id: activeGrant.id, visit_id: res.data.id
+        });
+        if (logRes.error){
+          loggedToPatient = false;
+          console.warn('Could not add the reading to the patient\'s blood pressure log:', logRes.error.message);
+        }
+      }
+      if (glu){
+        var gluLogRes = await supabaseClient.from('glucose_entries').insert({
+          patient_id: currentLookupCode, measured_at: nowIso, value: glu.value, context: glu.context, note: '',
+          recorded_by_doctor_id: session.id, recorded_by_name: currentDoctorDisplayName(),
+          written_via_grant_id: activeGrant.id, visit_id: res.data.id
+        });
+        if (gluLogRes.error){
+          loggedToPatient = false;
+          console.warn('Could not add the reading to the patient\'s glucose log:', gluLogRes.error.message);
+        }
+      }
+      if (body){
+        var bodyLogRes = await supabaseClient.from('body_entries').insert({
+          patient_id: currentLookupCode, measured_at: nowIso, weight_kg: body.weight, height_cm: body.height, note: '',
+          recorded_by_doctor_id: session.id, recorded_by_name: currentDoctorDisplayName(),
+          written_via_grant_id: activeGrant.id, visit_id: res.data.id
+        });
+        if (bodyLogRes.error){
+          loggedToPatient = false;
+          console.warn('Could not add the measurement to the patient\'s weight/height log:', bodyLogRes.error.message);
+        }
+      }
       currentLookupData.visits = [mapVisitRow(res.data)].concat(currentLookupData.visits || []);
       renderDoctorVisitsList(currentLookupData.visits);
       renderDocPrescriptionsList(currentLookupData.visits);
       collapseAddVisitFields();
       var note = $('add-visit-note');
+      note.textContent = loggedToPatient ? 'Visit added' : 'Visit added, but a reading couldn\'t be added to the patient\'s log.';
       note.classList.add('show');
-      setTimeout(function(){ note.classList.remove('show'); }, 2200);
+      clearTimeout(addVisitNoteTimer);
+      addVisitNoteTimer = setTimeout(function(){ note.classList.remove('show'); }, loggedToPatient ? 2200 : 6000);
     }catch(e){
       showError($('add-visit-error'), 'Something went wrong saving this visit. Please try again.');
     }finally{

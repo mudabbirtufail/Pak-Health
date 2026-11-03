@@ -653,6 +653,26 @@
      past it — so the scroller itself spans the whole card and pads its content back in. */
   #doc-specialty-options{ margin-left:-24px; margin-right:-24px; padding:0 24px; }
 
+  /* The "+" row at the top of a doctor's Visits list. It carries the same invisible
+     two-line text as a visit row, so it is always exactly as tall (and, being a
+     .list-item, as wide) as one. */
+  .doc-add-row{ position:relative; justify-content:center; color: var(--teal); }
+  .doc-add-row .li-spacer{ visibility:hidden; }
+  .doc-add-row .doc-add-plus{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .doc-add-row .doc-add-plus svg{ width:22px; height:22px; }
+  .doc-add-row:focus-visible{ outline:2px solid var(--teal); outline-offset:-2px; }
+  /* Drawn as a button: its own outlined box at the list's text width (not the full-bleed
+     highlight the visit rows use), so the plus sits in the middle of something visible.
+     The padding is one pixel less than a visit row's to make up for the border. */
+  .record-split .list-item.doc-add-row{
+    margin:0 0 8px; padding:9px 22px; border:1px solid var(--teal); border-radius:6px; background: var(--paper);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .record-split .list-item.doc-add-row::after{ display:none; }
+  .record-split .list-item.doc-add-row:hover{ background: var(--teal-wash); }
+  .record-split .list-item.doc-add-row.active, .record-split .list-item.doc-add-row.active:hover{
+    background: var(--teal); color:#fff;
+  }
   .rx-medicine-list{ margin:8px 0 0; padding-left:16px; }
   .rx-medicine-list li{ margin-bottom:6px; line-height:1.5; }
   .rx-medicine-list li:last-child{ margin-bottom:0; }
@@ -950,6 +970,9 @@
 
   /* ---------- Blood pressure ---------- */
   .bp-add-btn{ width:auto; }
+  .visit-bp-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:11px; }
+  .kv .bp-row-value{ font-family:'IBM Plex Mono', monospace; font-weight:600; }
+  .kv .bp-category.sm{ margin-left:9px; }
   .bp-latest{ border:1px solid var(--line); border-radius: var(--radius); padding:18px; margin-top:13px; }
   .bp-latest-value{
     font-family:'Spectral', serif; font-weight:600; font-size:2.1rem; line-height:1.1; color: var(--ink); margin-top:6px;
@@ -976,9 +999,15 @@
   .bp-range-btn.active, .bp-range-btn.active:hover{ background: var(--teal); border-color: var(--teal); color:#fff; }
   .bp-chart-wrap{ margin-top:6px; }
   .bp-chart-wrap svg{ width:100%; display:block; }
-  #pat-bp-list .bp-row-value{ font-family:'IBM Plex Mono', monospace; }
-  #pat-bp-list .list-item{ gap:12px; align-items:flex-start; }
-  #pat-bp-list .bp-note{ color: var(--ink-soft); margin-top:3px; line-height:1.4; overflow-wrap:anywhere; }
+  #pat-bp-list .bp-row-value, #pat-glu-list .bp-row-value, #pat-body-list .bp-row-value{ font-family:'IBM Plex Mono', monospace; }
+  #pat-bp-list .list-item, #pat-glu-list .list-item, #pat-body-list .list-item{ gap:12px; align-items:flex-start; }
+  .body-stats{ display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-top:8px; }
+  .body-stat-label{ font-size:0.58rem; text-transform:uppercase; letter-spacing:0.06em; color: var(--muted); font-family:'IBM Plex Mono', monospace; }
+  .body-stat-value{ font-family:'Spectral', serif; font-weight:600; font-size:1.5rem; line-height:1.15; color: var(--ink); margin-top:4px; }
+  .body-stat-value .bp-unit{ font-family:'IBM Plex Sans', sans-serif; font-weight:400; font-size:0.62rem; color: var(--muted); margin-left:4px; }
+  #pat-bp-list .bp-note, #pat-glu-list .bp-note, #pat-body-list .bp-note{ color: var(--ink-soft); margin-top:3px; line-height:1.4; overflow-wrap:anywhere; }
+  .vitals-add-btns{ display:flex; flex-wrap:wrap; gap:8px; }
+  .visit-glu-grid{ display:grid; grid-template-columns:1fr 1fr; gap:11px; }
   /* The pulse sits right beside the reading: "120/80 mmHg ♥ 72". */
   .bp-pulse{ display:inline-flex; align-items:center; gap:4px; margin-left:9px; white-space:nowrap; font-weight:600; }
   .bp-pulse svg{ color: var(--red); flex-shrink:0; }

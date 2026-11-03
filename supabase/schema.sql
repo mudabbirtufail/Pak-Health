@@ -788,3 +788,33 @@ create policy "tests_delete_patient" on public.tests
     uploaded_by_patient
     and (auth.uid() = patient_id or public.is_guardian_of(patient_id))
   );
+
+
+-- =============================================================================
+-- Blood pressure log
+-- =============================================================================
+-- Patient-owned like eye_entries: the patient (or a guardian, for a dependent)
+-- keeps their own readings, and doctors never read or write them. One row per
+-- reading; measured_at is a real timestamp so readings sort and chart by when
+-- they were taken, not when they were typed in. Safe to re-run.
+
+create table if not exists public.bp_entries (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references public.patients(id) on delete cascade,
+  measured_at timestamptz not null default now(),
+  systolic smallint not null check (systolic between 50 and 300),
+  diastolic smallint not null check (diastolic between 30 and 200),
+  pulse smallint check (pulse between 20 and 250),
+  note text not null default '',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists bp_entries_patient_measured_idx
+  on public.bp_entries (patient_id, measured_at desc);
+
+alter table public.bp_entries enable row level security;
+
+drop policy if exists "bp_entries_own" on public.bp_entries;
+create policy "bp_entries_own" on public.bp_entries
+  for all using (auth.uid() = patient_id or public.is_guardian_of(patient_id))
+  with check (auth.uid() = patient_id or public.is_guardian_of(patient_id));

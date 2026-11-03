@@ -490,14 +490,10 @@
   .verify-banner span{ line-height:1.4; }
   .verify-banner .btn{ flex-shrink:0; }
 
-  /* Only shown when a looked-up patient actually has an allergy on file —
-     deliberately louder than the plain .kv rows below it (red, not the
-     .verify-banner's amber) since a missed drug allergy is the one piece of
-     "medical info" worth a doctor never having to go looking for. */
-  .allergy-banner{
-    background: var(--red-wash); color: var(--red); border:1px solid var(--red);
-    border-radius: var(--radius); padding:10px 14px; margin-bottom:13px; font-size:0.7rem; line-height:1.4;
-  }
+  /* A patient's allergies, on the doctor's record page, show in red whenever any are
+     on file — a missed drug allergy is the one piece of "medical info" worth a doctor
+     never having to go looking for. */
+  .kv dd.allergy-on-file{ color: var(--red); font-weight:600; }
 
   /* ---------- Account dropdown ---------- */
   .dropdown-wrap{ position:relative; }
@@ -606,18 +602,56 @@
      rectangle; the row's own padding is bumped back up by the same amount so
      its text doesn't shift when the highlight is added. */
   .list-item.active, .list-item.active:hover{ background: var(--teal-wash); }
-  /* In the record pages every row reaches the panel's own edges and has rounded
+  /* In the record pages (and the other lists below) every row reaches the panel's own edges and has rounded
      corners all the time, so a hovered row and the selected row share the same
      shape (the highlight used to stop short of the edges on hover only). The
      divider lines are drawn inset instead of as a border, so they keep their old
      length and sit hidden under a highlighted row. */
-  .record-split .list-item{
-    position:relative; margin:0 -19px; padding:10px 22px; border-bottom:none; border-radius:6px;
+  .record-split .list-item,
+  #doc-roster-list .list-item,
+  #pat-appts-list .list-item,
+  #doc-clinics-list .list-item,
+  #pat-trusted-list .list-item,
+  #pat-adhoc-list .list-item,
+  #pat-family-list .list-item,
+  #pat-family-detail-guardians .list-item,
+  #doc-specialty-options .list-item{
+    position:relative; border-bottom:none; border-radius:6px;
   }
-  .record-split .list-item:not(:last-child)::after{
+  .record-split .list-item,
+  #doc-roster-list .list-item,
+  #pat-appts-list .list-item,
+  #doc-clinics-list .list-item{ margin:0 -19px; padding:10px 22px; }
+  #pat-trusted-list .list-item,
+  #pat-adhoc-list .list-item,
+  #pat-family-list .list-item,
+  #pat-family-detail-guardians .list-item,
+  #doc-specialty-options .list-item{ margin:0 -24px; padding:10px 27px; }
+  .record-split .list-item:not(:last-child)::after,
+  #doc-roster-list .list-item:not(:last-child)::after,
+  #pat-appts-list .list-item:not(:last-child)::after,
+  #doc-clinics-list .list-item:not(:last-child)::after{
     content:''; position:absolute; left:19px; right:19px; bottom:0; border-bottom:1px solid var(--line);
   }
-  .record-split .list-item:hover::after, .record-split .list-item.active::after{ display:none; }
+  #pat-trusted-list .list-item:not(:last-child)::after,
+  #pat-adhoc-list .list-item:not(:last-child)::after,
+  #pat-family-list .list-item:not(:last-child)::after,
+  #pat-family-detail-guardians .list-item:not(:last-child)::after,
+  #doc-specialty-options .list-item:not(:last-child)::after{
+    content:''; position:absolute; left:24px; right:24px; bottom:0; border-bottom:1px solid var(--line);
+  }
+  .record-split .list-item:hover::after, .record-split .list-item.active::after,
+  #doc-roster-list .list-item:hover::after,
+  #pat-appts-list .list-item:hover::after,
+  #doc-clinics-list .list-item:hover::after,
+  #pat-trusted-list .list-item:hover::after,
+  #pat-adhoc-list .list-item:hover::after,
+  #pat-family-list .list-item:hover::after,
+  #pat-family-detail-guardians .list-item:hover::after,
+  #doc-specialty-options .list-item:hover::after{ display:none; }
+  /* The specialty picker scrolls on its own, which would clip rows that reach out
+     past it — so the scroller itself spans the whole card and pads its content back in. */
+  #doc-specialty-options{ margin-left:-24px; margin-right:-24px; padding:0 24px; }
 
   .rx-medicine-list{ margin:8px 0 0; padding-left:16px; }
   .rx-medicine-list li{ margin-bottom:6px; line-height:1.5; }
@@ -913,6 +947,45 @@
     font-family:'IBM Plex Mono', monospace; margin-top:5px;
   }
   .number-line-empty{ color: var(--muted); font-size:0.64rem; margin-top:3px; }
+
+  /* ---------- Blood pressure ---------- */
+  .bp-add-btn{ width:auto; }
+  .bp-latest{ border:1px solid var(--line); border-radius: var(--radius); padding:18px; margin-top:13px; }
+  .bp-latest-value{
+    font-family:'Spectral', serif; font-weight:600; font-size:2.1rem; line-height:1.1; color: var(--ink); margin-top:6px;
+  }
+  .bp-latest-value .bp-unit{
+    font-family:'IBM Plex Sans', sans-serif; font-weight:400; font-size:0.68rem; color: var(--muted); margin-left:7px;
+  }
+  .bp-latest-meta{ font-size:0.68rem; color: var(--muted); margin-top:6px; }
+  .bp-latest-hint{ font-size:0.62rem; color: var(--muted); margin-top:11px; line-height:1.5; }
+  .bp-category{
+    display:inline-block; font-size:0.62rem; font-weight:600; padding:3px 10px; border-radius:999px; margin-top:10px;
+  }
+  .bp-category.normal{ background: var(--teal-wash); color: var(--teal-dark); }
+  .bp-category.elevated{ background: var(--amber-wash); color: var(--amber); }
+  .bp-category.high{ background: var(--red-wash); color: var(--red); }
+  .bp-category.sm{ font-size:0.56rem; padding:2px 8px; margin:0 0 0 7px; vertical-align:1px; }
+  .bp-range{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+  .bp-range-btn{
+    font-family:inherit; font-size:0.64rem; font-weight:500; color: var(--ink-soft); background: var(--paper);
+    border:1px solid var(--line); border-radius:999px; padding:5px 12px; cursor:pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .bp-range-btn:hover{ border-color: var(--teal); color: var(--teal-dark); }
+  .bp-range-btn.active, .bp-range-btn.active:hover{ background: var(--teal); border-color: var(--teal); color:#fff; }
+  .bp-chart-wrap{ margin-top:6px; }
+  .bp-chart-wrap svg{ width:100%; display:block; }
+  #pat-bp-list .bp-row-value{ font-family:'IBM Plex Mono', monospace; }
+  #pat-bp-list .list-item{ gap:12px; align-items:flex-start; }
+  #pat-bp-list .bp-note{ color: var(--ink-soft); margin-top:3px; line-height:1.4; overflow-wrap:anywhere; }
+  /* The pulse sits right beside the reading: "120/80 mmHg ♥ 72". */
+  .bp-pulse{ display:inline-flex; align-items:center; gap:4px; margin-left:9px; white-space:nowrap; font-weight:600; }
+  .bp-pulse svg{ color: var(--red); flex-shrink:0; }
+  .bp-latest-value .bp-pulse{ font-family:'Spectral', serif; font-size:1.05rem; margin-left:14px; }
+  .bp-latest-value .bp-pulse svg{ width:15px; height:15px; }
+  .bp-del-btn{ flex-shrink:0; padding:6px 8px; color: var(--muted); }
+  .bp-del-btn svg{ display:block; }
 
   /* ---------- Patient record list ---------- */
   .record-list{ display:flex; flex-direction:column; gap:14px; }

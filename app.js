@@ -78,6 +78,9 @@
     // back/forward) re-pulls this doctor's appointments so a patient's new booking
     // shows up without needing a full reload — see refreshDoctorAppointments().
     if (id === 'view-doctor-dash') refreshDoctorAppointments();
+    // The blood-pressure chart is drawn at the width it actually has on screen, which
+    // is only known once its page is showing.
+    if (id === 'view-patient-bp') renderBpChart();
     // Keep the "Individual account"/"Viewing: X" indicator on screen across
     // every patient page, not just the dashboard — see placeFamilyIndicator().
     if (session && session.type === 'patient' && PATIENT_ONLY_VIEWS.indexOf(id) !== -1) placeFamilyIndicator(id);
@@ -88,7 +91,7 @@
       history.pushState({ view: id }, '', '#' + id);
     }
   }
-  var PATIENT_ONLY_VIEWS = ['view-patient-dash','view-record-visits','view-record-tests','view-record-prescriptions','view-patient-eyes','view-pat-profile','view-pat-account-settings','view-pat-stats','view-pat-book-appt'];
+  var PATIENT_ONLY_VIEWS = ['view-patient-dash','view-record-visits','view-record-tests','view-record-prescriptions','view-patient-eyes','view-patient-bp','view-pat-profile','view-pat-account-settings','view-pat-stats','view-pat-book-appt'];
   var DOCTOR_ONLY_VIEWS = ['view-doctor-dash', 'view-doctor-record', 'view-doc-profile', 'view-doc-account-settings', 'view-doc-clinics', 'view-doc-stats'];
   window.addEventListener('popstate', function(e){
     var requested = (e.state && e.state.view) || 'view-landing';
@@ -770,9 +773,12 @@
     var testsRes = await supabaseClient.from('tests').select('*').eq('patient_id', id).order('date', { ascending:false });
     var eyesRes = await supabaseClient.from('eye_entries').select('*').eq('patient_id', id).order('date', { ascending:false });
     var apptsRes = await supabaseClient.from('appointments').select('*').eq('patient_id', id).order('date', { ascending:true });
+    var bpRes = await supabaseClient.from('bp_entries').select('*').eq('patient_id', id).order('measured_at', { ascending:false });
+    if (bpRes.error) console.warn('Could not load blood pressure readings:', bpRes.error.message);
     data.visits = (visitsRes.data || []).map(mapVisitRow);
     data.tests = (testsRes.data || []).map(mapTestRow);
     data.eyeEntries = (eyesRes.data || []).map(mapEyeRow);
+    data.bpEntries = (bpRes.data || []).map(mapBpRow);
     data.appointments = (apptsRes.data || []).map(mapAppointmentRow);
     currentPatientData = data;
     renderHealthCard(data);
@@ -783,11 +789,13 @@
     renderTestsList(data.tests);
     renderPrescriptionsList(data.visits);
     renderEyesList(data.eyeEntries);
+    renderBpPage(data.bpEntries);
     calViewDate = new Date();
     renderAppointmentsCalendar(data.appointments);
     renderAppointmentsList(data.appointments);
     closeAddEyeModal();
     closeEyeRxPrevModal();
+    closeAddBpModal();
     closePatAccessModal();
     closePatApptDetailModal();
     closePatFamilyModal();
@@ -1254,6 +1262,10 @@
 
   function openPatProfilePage(){
     $('pat-name').value = (currentPatientData && currentPatientData.name) || '';
+    $('pat-dob').value = (currentPatientData && currentPatientData.dob) || '';
+    $('pat-dob').max = toDateKey(new Date());
+    $('pat-gender').value = (currentPatientData && currentPatientData.gender) || '';
+    clearError($('pat-profile-error'));
     $('pat-emergency-contact').value = (currentPatientData && currentPatientData.emergencyContact) || '';
     $('pat-allergies').value = (currentPatientData && currentPatientData.allergies) || '';
     $('pat-conditions').value = (currentPatientData && currentPatientData.conditions) || '';
@@ -1264,13 +1276,21 @@
 
   $('pat-profile-save-btn').addEventListener('click', async function(){
     var name = $('pat-name').value.trim();
+    var dob = $('pat-dob').value;
+    var gender = $('pat-gender').value;
     var emergencyContact = $('pat-emergency-contact').value.trim();
     var allergies = $('pat-allergies').value.trim();
     var conditions = $('pat-conditions').value.trim();
-    await supabaseClient.from('patients').update({
-      name: name, emergency_contact: emergencyContact, allergies: allergies, conditions: conditions
+    clearError($('pat-profile-error'));
+    if (dob && dob > toDateKey(new Date())){ showError($('pat-profile-error'), 'Date of birth can\'t be in the future.'); return; }
+    var res = await supabaseClient.from('patients').update({
+      name: name, dob: dob || null, gender: gender,
+      emergency_contact: emergencyContact, allergies: allergies, conditions: conditions
     }).eq('id', activePatientId);
+    if (res.error){ showError($('pat-profile-error'), 'Something went wrong saving your profile. Please try again.'); return; }
     currentPatientData.name = name;
+    currentPatientData.dob = dob;
+    currentPatientData.gender = gender;
     currentPatientData.emergencyContact = emergencyContact;
     currentPatientData.allergies = allergies;
     currentPatientData.conditions = conditions;
@@ -2529,6 +2549,292 @@
     }
   });
 
+  // ---- Blood Pressure ----
+  // Patient-owned like My Eyes: a log the patient (or a guardian) keeps for themselves,
+  // with no doctor access. Readings load newest-first and a new save is unshifted to
+  // match. measured_at is a real timestamp, so a reading sorts and charts by when it
+  // was taken, not when it was typed in.
+  function mapBpRow(row){
+    return {
+      id: row.id, measuredAt: row.measured_at, systolic: row.systolic, diastolic: row.diastolic,
+      pulse: (row.pulse === null || row.pulse === undefined) ? null : row.pulse, note: row.note || ''
+    };
+  }
+  // The usual adult bands (AHA). Shown as a label for tracking, never as a diagnosis.
+  function bpCategory(sys, dia){
+    if (sys > 180 || dia > 120) return { label: 'Very high', tone: 'high', urgent: true };
+    if (sys >= 140 || dia >= 90) return { label: 'High (stage 2)', tone: 'high' };
+    if (sys >= 130 || dia >= 80) return { label: 'High (stage 1)', tone: 'elevated' };
+    if (sys >= 120) return { label: 'Elevated', tone: 'elevated' };
+    return { label: 'Normal', tone: 'normal' };
+  }
+  function formatBpWhen(iso){
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' })
+      + ', ' + d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+  }
+  function bpReading(e){ return e.systolic + '/' + e.diastolic; }
+  // A small heart and the pulse, for sitting right beside a reading ("120/80 mmHg ♥ 72").
+  function bpPulseInner(pulse){
+    return '<svg width="11" height="11" viewBox="9.5 6.5 11 10.5" aria-hidden="true"><path d="M19,8.3 C18,7.3 16.3,7.3 15.3,8.3 L15,8.6 L14.7,8.3 C13.7,7.3 12,7.3 11,8.3 C10,9.3 10,11 11,12 L15,16 L19,12 C20,11 20,9.3 19,8.3 Z" fill="currentColor"/></svg>' + pulse;
+  }
+  function bpPulseHtml(pulse){
+    if (pulse === null || pulse === undefined) return '';
+    return '<span class="bp-pulse" title="Pulse, beats per minute">' + bpPulseInner(pulse) + '</span>';
+  }
+  var BIN_SVG = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5,4 H13.5 M6,4 V2.5 H10 V4 M4,4 L4.7,13.5 H11.3 L12,4 M6.6,6.5 V11 M9.4,6.5 V11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function setBpCategory(el, cat){
+    el.textContent = cat.label;
+    el.className = 'bp-category ' + cat.tone;
+  }
+
+  var BP_LIST_INITIAL = 15;
+  var bpShowAll = false;
+  function renderBpPage(entries){
+    entries = entries || [];
+    var has = entries.length > 0;
+    $('pat-bp-empty').classList.toggle('hidden', has);
+    $('bp-latest').classList.toggle('hidden', !has);
+    $('pat-bp-chart-panel').classList.toggle('hidden', !has);
+    $('pat-bp-list-panel').classList.toggle('hidden', !has);
+    if (!has){
+      $('pat-bp-list').innerHTML = '';
+      $('bp-chart-wrap').innerHTML = '';
+      bpShowAll = false;
+      return;
+    }
+    var latest = entries[0];
+    var cat = bpCategory(latest.systolic, latest.diastolic);
+    $('bp-latest-value').textContent = bpReading(latest);
+    $('bp-latest-meta').textContent = formatBpWhen(latest.measuredAt);
+    if (latest.pulse !== null) $('bp-latest-pulse').innerHTML = bpPulseInner(latest.pulse);
+    $('bp-latest-pulse').classList.toggle('hidden', latest.pulse === null);
+    setBpCategory($('bp-latest-category'), cat);
+    $('bp-latest-hint').textContent = cat.urgent
+      ? 'A reading this high needs medical attention. If you also have chest pain, shortness of breath, weakness or a severe headache, get emergency help now.'
+      : 'For your own tracking — this label isn\'t a diagnosis. Talk to your doctor about your readings.';
+
+    var shown = bpShowAll ? entries : entries.slice(0, BP_LIST_INITIAL);
+    clearError($('pat-bp-list-error'));
+    $('pat-bp-list').innerHTML = shown.map(function(e){
+      var c = bpCategory(e.systolic, e.diastolic);
+      return '<div class="list-item static">'
+        + '<div>'
+        + '<div class="li-title"><span class="bp-row-value">'+escapeHtml(bpReading(e))+'</span> mmHg'
+        + bpPulseHtml(e.pulse)
+        + '<span class="bp-category sm '+c.tone+'">'+escapeHtml(c.label)+'</span></div>'
+        + '<div class="li-sub">'+escapeHtml(formatBpWhen(e.measuredAt))+'</div>'
+        + (e.note ? '<div class="li-sub bp-note">'+escapeHtml(e.note)+'</div>' : '')
+        + '</div>'
+        + '<button class="btn btn-secondary btn-sm hold-btn hold-btn-danger bp-del-btn" type="button" data-id="'+escapeHtml(e.id)+'" title="Press and hold to delete" aria-label="Press and hold to delete this reading">'
+        + '<span class="hold-fill"></span><span class="hold-label">'+BIN_SVG+'</span></button>'
+        + '</div>';
+    }).join('');
+    // Press-and-hold like the app's other irreversible deletes. The delete is checked by
+    // asking for the deleted row back, so an RLS-blocked delete can't look like it worked.
+    $('pat-bp-list').querySelectorAll('.bp-del-btn').forEach(function(btn){
+      makeHoldButton(btn, 2000, async function(){
+        var id = btn.getAttribute('data-id');
+        clearError($('pat-bp-list-error'));
+        var res = await supabaseClient.from('bp_entries').delete().eq('id', id).select();
+        if (res.error || !res.data || !res.data.length){
+          showError($('pat-bp-list-error'), 'Couldn\'t delete this reading. Please try again.');
+          return;
+        }
+        currentPatientData.bpEntries = currentPatientData.bpEntries.filter(function(e){ return e.id !== id; });
+        renderBpPage(currentPatientData.bpEntries);
+      });
+    });
+    var hidden = entries.length - shown.length;
+    $('pat-bp-more-btn').classList.toggle('hidden', hidden <= 0);
+    $('pat-bp-more-btn').textContent = 'Show older readings (' + hidden + ')';
+
+    renderBpChart();
+  }
+  $('pat-bp-more-btn').addEventListener('click', function(){
+    bpShowAll = true;
+    renderBpPage(currentPatientData.bpEntries);
+  });
+
+  // Which stretch of time the trend chart covers. Today is the calendar day (so the axis
+  // shows the whole day, with the rest still to come); 30 days, 6 months and 1 year are
+  // rolling windows counted back from now; All runs from the first reading to the latest,
+  // never less than a week so a lone reading still sits on a timeline.
+  var bpRange = 'all';
+  var BP_MS_DAY = 24 * 60 * 60 * 1000;
+  function bpRangeWindow(range, entries){
+    var now = new Date(), y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+    // A reading may be dated a few minutes ahead (the form allows 5), so rolling windows
+    // reach slightly past now rather than clipping it.
+    var soon = now.getTime() + 10 * 60 * 1000;
+    if (range === 'today') return { start: new Date(y, m, d).getTime(), end: new Date(y, m, d + 1).getTime() };
+    if (range === '30d') return { start: new Date(y, m, d - 30).getTime(), end: soon };
+    if (range === '6m') return { start: new Date(y, m - 6, d).getTime(), end: soon };
+    if (range === '1y') return { start: new Date(y - 1, m, d).getTime(), end: soon };
+    var newest = new Date(entries[0].measuredAt).getTime();
+    var oldest = new Date(entries[entries.length - 1].measuredAt).getTime();
+    return { start: Math.min(oldest, newest - 7 * BP_MS_DAY), end: newest + 1 };   // +1ms: the window is end-exclusive
+  }
+
+  // Systolic (teal) and diastolic (red) against real elapsed time, drawn at the
+  // container's real pixel width so its text isn't stretched on a phone.
+  function renderBpChart(){
+    var wrap = $('bp-chart-wrap');
+    var entries = currentPatientData && currentPatientData.bpEntries;
+    if (!wrap || !entries || !entries.length){ if (wrap) wrap.innerHTML = ''; return; }
+    document.querySelectorAll('#bp-range .bp-range-btn').forEach(function(btn){
+      btn.classList.toggle('active', btn.getAttribute('data-range') === bpRange);
+    });
+    var win = bpRangeWindow(bpRange, entries);
+    var pts = entries.filter(function(e){
+      var t = new Date(e.measuredAt).getTime();
+      return t >= win.start && t < win.end;
+    }).reverse();   // oldest first
+    var subEl = $('pat-bp-chart-sub');
+    if (!pts.length){
+      subEl.textContent = 'No readings in this period.';
+      wrap.innerHTML = '';
+      return;
+    }
+    var avgSys = Math.round(pts.reduce(function(a, e){ return a + e.systolic; }, 0) / pts.length);
+    var avgDia = Math.round(pts.reduce(function(a, e){ return a + e.diastolic; }, 0) / pts.length);
+    subEl.textContent = pts.length + (pts.length === 1 ? ' reading' : ' readings') + ' · average ' + avgSys + '/' + avgDia + ' mmHg';
+    var w = wrap.clientWidth;
+    if (!w) return;   // page not showing yet — showView() calls this again once it is
+
+    var h = 210, padL = 34, padR = 14, padT = 12, padB = 28;
+    var innerW = w - padL - padR, innerH = h - padT - padB;
+    var span = win.end - win.start;
+    var lo = Infinity, hi = -Infinity;
+    pts.forEach(function(e){ lo = Math.min(lo, e.diastolic); hi = Math.max(hi, e.systolic); });
+    var minV = Math.floor((lo - 10) / 10) * 10, maxV = Math.ceil((hi + 10) / 10) * 10;
+    var step = (maxV - minV) > 100 ? 40 : 20;
+    function xAt(t){ return padL + ((t - win.start) / span) * innerW; }
+    function x(iso){ return xAt(new Date(iso).getTime()); }
+    function y(v){ return padT + innerH - ((v - minV) / (maxV - minV)) * innerH; }
+    var mono = 'font-size="9" fill="var(--muted)" font-family=\'IBM Plex Mono, monospace\'';
+
+    var grid = '';
+    for (var v = minV; v <= maxV; v += step){
+      grid += '<line x1="'+padL+'" y1="'+y(v)+'" x2="'+(w-padR)+'" y2="'+y(v)+'" stroke="var(--line)" stroke-width="1"/>'
+        + '<text x="'+(padL-7)+'" y="'+(y(v)+3)+'" text-anchor="end" '+mono+'>'+v+'</text>';
+    }
+    // Axis labels: hours across a day; otherwise start / middle / end dates (with the
+    // year once the window is long enough for the month alone to be ambiguous).
+    var ticks = [];
+    if (bpRange === 'today'){
+      var base = new Date(win.start);
+      [0, 6, 12, 18, 24].forEach(function(hr){
+        var t = new Date(base.getFullYear(), base.getMonth(), base.getDate(), hr).getTime();
+        var h12 = hr % 12 === 0 ? 12 : hr % 12;
+        ticks.push({ t: t, text: h12 + (hr % 24 < 12 ? ' AM' : ' PM') });
+      });
+    } else {
+      var fmt = span > 300 * BP_MS_DAY ? { month:'short', year:'numeric' } : { day:'numeric', month:'short' };
+      [win.start, (win.start + win.end) / 2, win.end].forEach(function(t, i){
+        // The end tick sits a few minutes past now; label it with now so a late-night
+        // look can't read as tomorrow.
+        var shown = i === 2 ? Math.min(t, Date.now()) : t;
+        ticks.push({ t: t, text: new Date(shown).toLocaleDateString(undefined, fmt) });
+      });
+    }
+    var xLabels = ticks.map(function(tk, i){
+      var anchor = i === 0 ? 'start' : (i === ticks.length - 1 ? 'end' : 'middle');
+      return '<text x="'+xAt(tk.t)+'" y="'+(h-9)+'" text-anchor="'+anchor+'" '+mono+'>'+escapeHtml(tk.text)+'</text>';
+    }).join('');
+
+    var r = pts.length > 60 ? 2 : 3;
+    function line(key, color, label){
+      var poly = pts.map(function(e){ return x(e.measuredAt)+','+y(e[key]); }).join(' ');
+      var dots = pts.map(function(e){
+        return '<circle cx="'+x(e.measuredAt)+'" cy="'+y(e[key])+'" r="'+r+'" fill="'+color+'"><title>'
+          + escapeHtml(formatBpWhen(e.measuredAt)+' — '+label+' '+e[key])+'</title></circle>';
+      }).join('');
+      return '<polyline points="'+poly+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' + dots;
+    }
+    wrap.innerHTML = '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'">'
+      + grid + xLabels + line('systolic', 'var(--teal)', 'Systolic') + line('diastolic', 'var(--red)', 'Diastolic')
+      + '</svg>'
+      + '<div class="chart-legend"><span><span class="legend-dot" style="background:var(--teal);"></span>Systolic</span>'
+      + '<span><span class="legend-dot" style="background:var(--red);"></span>Diastolic</span></div>';
+  }
+  document.querySelectorAll('#bp-range .bp-range-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      bpRange = btn.getAttribute('data-range');
+      renderBpChart();
+    });
+  });
+  window.addEventListener('resize', function(){
+    if (!$('view-patient-bp').classList.contains('hidden')) renderBpChart();
+  });
+
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function openAddBpModal(){
+    var now = new Date();
+    $('bp-date').value = toDateKey(now);
+    $('bp-time').value = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    ['bp-sys', 'bp-dia', 'bp-pulse', 'bp-note'].forEach(function(id){ $(id).value = ''; });
+    clearError($('add-bp-error'));
+    $('add-bp-modal').classList.remove('hidden');
+  }
+  function closeAddBpModal(){ $('add-bp-modal').classList.add('hidden'); }
+  $('add-bp-btn').addEventListener('click', openAddBpModal);
+  $('add-bp-close').addEventListener('click', closeAddBpModal);
+  $('add-bp-cancel').addEventListener('click', closeAddBpModal);
+  $('add-bp-modal').addEventListener('click', function(e){ if (e.target === $('add-bp-modal')) closeAddBpModal(); });
+  $('add-bp-save').addEventListener('click', async function(){
+    var errEl = $('add-bp-error');
+    clearError(errEl);
+    var date = $('bp-date').value, time = $('bp-time').value;
+    if (!date || !time){ showError(errEl, 'Please choose a date and time.'); return; }
+    var when = new Date(date + 'T' + time);   // local time
+    if (isNaN(when.getTime())){ showError(errEl, 'Please choose a valid date and time.'); return; }
+    if (when.getTime() > Date.now() + 5 * 60 * 1000){ showError(errEl, 'The date and time can\'t be in the future.'); return; }
+    function whole(id){
+      var raw = $(id).value.trim();
+      return /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
+    }
+    var sys = whole('bp-sys'), dia = whole('bp-dia');
+    if (isNaN(sys) || isNaN(dia)){ showError(errEl, 'Enter both the systolic (top) and diastolic (bottom) numbers.'); return; }
+    if (sys < 50 || sys > 300){ showError(errEl, 'Systolic should be between 50 and 300.'); return; }
+    if (dia < 30 || dia > 200){ showError(errEl, 'Diastolic should be between 30 and 200.'); return; }
+    if (sys <= dia){ showError(errEl, 'Systolic (top) should be higher than diastolic (bottom).'); return; }
+    var pulse = null;
+    if ($('bp-pulse').value.trim() !== ''){
+      pulse = whole('bp-pulse');
+      if (isNaN(pulse) || pulse < 20 || pulse > 250){ showError(errEl, 'Pulse should be between 20 and 250.'); return; }
+    }
+    var row = {
+      patient_id: activePatientId, measured_at: when.toISOString(),
+      systolic: sys, diastolic: dia, pulse: pulse, note: $('bp-note').value.trim()
+    };
+    $('add-bp-save').disabled = true;
+    $('add-bp-save').textContent = 'Saving...';
+    try{
+      var res = await supabaseClient.from('bp_entries').insert(row).select().maybeSingle();
+      if (res.error || !res.data){
+        if (res.error) console.warn('Could not save blood pressure reading:', res.error.message);
+        showError(errEl, 'Something went wrong saving this reading. Please try again.');
+        return;
+      }
+      var entries = currentPatientData.bpEntries;
+      entries.push(mapBpRow(res.data));
+      // Back-dated readings belong in date order, not at the top.
+      entries.sort(function(a, b){ return new Date(b.measuredAt) - new Date(a.measuredAt); });
+      renderBpPage(entries);
+      closeAddBpModal();
+      var note = $('add-bp-note');
+      note.classList.add('show');
+      setTimeout(function(){ note.classList.remove('show'); }, 2200);
+    }catch(err){
+      showError(errEl, 'Something went wrong saving this reading. Please try again.');
+    }finally{
+      $('add-bp-save').disabled = false;
+      $('add-bp-save').textContent = 'Save reading';
+    }
+  });
+
   // ================= DOCTOR DASHBOARD =================
   var currentDoctorData = null;
   function getDoctorInitials(name){
@@ -3436,6 +3742,20 @@
     }
   });
 
+  // "34 years" for anyone two or older; younger patients (a family member's profile,
+  // say) read better in months, or days for a newborn.
+  function formatAge(dob){
+    var d = dob ? parseLocalDate(dob) : null;
+    if (!d || isNaN(d.getTime())) return 'Not recorded';
+    var now = new Date();
+    var months = (now.getFullYear() - d.getFullYear()) * 12 + now.getMonth() - d.getMonth() - (now.getDate() < d.getDate() ? 1 : 0);
+    if (months < 0) return 'Not recorded';
+    if (months >= 24) return Math.floor(months / 12) + ' years';
+    if (months >= 1) return months + (months === 1 ? ' month' : ' months');
+    var days = Math.max(0, Math.floor((now - d) / 86400000));
+    return days + (days === 1 ? ' day' : ' days');
+  }
+
   var currentLookupCode = null;
   var currentLookupData = null;
   var currentLookupGrant = null;
@@ -3539,8 +3859,10 @@
     currentLookupData = data;
     currentLookupGrant = grant || null;
     $('res-name').textContent = data.name || 'Unnamed patient';
-    $('doc-pt-allergy-banner').classList.toggle('hidden', !data.allergies);
-    $('doc-pt-allergy-text').textContent = data.allergies || '';
+    $('doc-pt-age').textContent = formatAge(data.dob);
+    $('doc-pt-gender').textContent = data.gender || 'Not recorded';
+    $('doc-pt-allergies-text').textContent = data.allergies || 'Not recorded';
+    $('doc-pt-allergies-text').classList.toggle('allergy-on-file', !!data.allergies);
     $('doc-pt-conditions-text').textContent = data.conditions || 'Not recorded';
     collapseAddVisitFields();
     renderDoctorVisitsList(data.visits || []);
